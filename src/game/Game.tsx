@@ -32,6 +32,7 @@ interface GameProps {
 // stats, and a celebratory chat line.
 function grantTigerstarVictory() {
   const s = useGameStore.getState();
+  s.bumpTask('defeat-tigerstar', 1);
   s.pushChat({
     id: 'fs' + Date.now(),
     fromId: 'system',
@@ -164,6 +165,7 @@ function PlayerController({
       while (distanceAccum.current >= 1) {
         distanceAccum.current -= 1;
         useGameStore.getState().bumpTask('walk-distance', 1);
+        if (c.sprint) useGameStore.getState().bumpTask('sprint-distance', 1);
       }
     }
     // Cheap clan-camp proximity check — every 0.5s
@@ -208,6 +210,22 @@ function PlayerController({
         useGameStore.getState().setHud({
           reputation: Math.min(100, hud.reputation + 4 * dt),
         });
+        useGameStore.getState().bumpTask('visit-moonpool', 1);
+      }
+    }
+
+    // Standing on your own High Rock (camp.x, camp.z - 7) — counts as
+    // "climbing" the rock for the rotating task.
+    {
+      const myClan = CLANS[cat.clan];
+      if (myClan) {
+        const rx = myClan.campCenter[0];
+        const rz = myClan.campCenter[2] - 7;
+        const dx = pos.current.x - rx;
+        const dz = pos.current.z - rz;
+        if (dx * dx + dz * dz < 2 * 2) {
+          useGameStore.getState().bumpTask('climb-rock', 1);
+        }
       }
     }
 
@@ -232,6 +250,7 @@ function PlayerController({
       vy.current = 6.5;
       grounded.current = false;
       c.jump = false;
+      useGameStore.getState().bumpTask('jump-n', 1);
     }
     vy.current -= 18 * dt; // gravity
     pos.current.y += vy.current * dt;
@@ -459,8 +478,14 @@ function PlayerController({
         // Tasks: any catch, kind-specific, and the no-miss streak.
         const store = useGameStore.getState();
         store.bumpTask('catch-any-n', 1);
-        if (closest.p.kind === 'mouse') store.bumpTask('catch-mouse-n', 1);
-        if (closest.p.kind === 'fish') store.bumpTask('catch-fish-n', 1);
+        const k = closest.p.kind;
+        if (k === 'mouse') store.bumpTask('catch-mouse-n', 1);
+        if (k === 'fish') store.bumpTask('catch-fish-n', 1);
+        if (k === 'rabbit') store.bumpTask('catch-rabbit-n', 1);
+        if (k === 'vole') store.bumpTask('catch-vole-n', 1);
+        if (k === 'squirrel') store.bumpTask('catch-squirrel-n', 1);
+        if (k === 'frog') store.bumpTask('catch-frog-n', 1);
+        if (k === 'bird' || k === 'sparrow' || k === 'blackbird') store.bumpTask('catch-bird-n', 1);
         store.bumpTask('pounce-streak', 1);
       } else {
         // Missed — give the player audible + chat feedback so the pounce
@@ -625,6 +650,8 @@ function eatFromPile() {
     const piece = s.carrying;
     s.setCarrying(null);
     s.setHud({ hunger: Math.min(100, s.hud.hunger + 35) });
+    s.bumpPileContrib(1);
+    s.bumpTask('drop-pile-n', 1);
     s.pushChat({
       id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
       text: `You eat the ${piece} you brought in. Strength returns to your paws.`,
@@ -632,7 +659,19 @@ function eatFromPile() {
     });
     return;
   }
-  // Take a small share from the existing pile — 18 hunger.
+  // Eating from the pile without bringing prey requires a previous
+  // contribution. Warriors who haven't hunted today can't take from the
+  // shared store.
+  if (s.pileContrib <= 0) {
+    s.pushChat({
+      id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
+      text: 'You haven\'t added to the pile today — go hunt before you eat.',
+      at: Date.now(),
+    });
+    return;
+  }
+  s.bumpPileContrib(-1);
+  s.bumpTask('eat-pile-n', 1);
   s.setHud({ hunger: Math.min(100, s.hud.hunger + 18) });
   s.pushChat({
     id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',

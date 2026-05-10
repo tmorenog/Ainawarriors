@@ -109,11 +109,13 @@ export function MapPanel() {
     const my = ((e.clientY - rect.top) / rect.height) * MAP_SIZE;
     const w = mapToWorld(mx, my);
     setWaypoint({ x: w.x, z: w.z, label: 'Waypoint' });
+    useGameStore.getState().bumpTask('use-waypoint', 1);
     setOpen(false);
   };
 
   const setTo = (m: Marker) => {
     setWaypoint({ x: m.x, z: m.z, label: m.label });
+    useGameStore.getState().bumpTask('use-waypoint', 1);
     setOpen(false);
   };
 

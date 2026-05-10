@@ -135,6 +135,7 @@ function NpcInstance({
             store.setBattleActive(false);
             store.setMission('won');
             store.setNpcDialogId(null);
+            store.bumpTask('defeat-tigerstar', 1);
             store.pushChat({
               id: 'sys' + Date.now(),
               fromId: 'system',

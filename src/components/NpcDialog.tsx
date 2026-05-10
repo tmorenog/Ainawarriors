@@ -70,6 +70,7 @@ export function NpcDialog() {
                 }
                 if (opt.result === 'accept-battle') {
                   setMission('accepted');
+                  useGameStore.getState().bumpTask('accept-mission', 1);
                   pushChat({
                     id: 'sys' + Date.now(),
                     fromId: 'system',
@@ -83,6 +84,7 @@ export function NpcDialog() {
                 }
                 if (opt.result === 'engage') {
                   setMission('accepted');
+                  useGameStore.getState().bumpTask('accept-mission', 1);
                   setTigerstarHp(100);
                   setBattleActive(true);
                   // Run the cinematic intro before letting the player swing.

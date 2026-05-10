@@ -115,6 +115,13 @@ interface GameStore {
   waypoint: { x: number; z: number; label: string } | null;
   setWaypoint: (w: { x: number; z: number; label: string } | null) => void;
 
+  // Personal contributions to the fresh-kill pile. You can only eat from
+  // the pile (without carrying prey of your own) if pileContrib > 0 —
+  // every meal you take from the pile decrements it. Hunting and dropping
+  // your catch on the pile increments it.
+  pileContrib: number;
+  bumpPileContrib: (n?: number) => void;
+
   // Rotating ambient task board — three quests at a time, auto-completing
   // as the player plays. Completed tasks are replaced with fresh ones.
   tasks: Task[];
@@ -218,6 +225,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   waypoint: null,
   setWaypoint: (w) => set({ waypoint: w }),
+
+  pileContrib: 0,
+  bumpPileContrib: (n = 1) => set((st) => ({ pileContrib: Math.max(0, st.pileContrib + n) })),
 
   tasks: generateTaskBoard(3),
   reseedTasks: () => set({ tasks: generateTaskBoard(3) }),
