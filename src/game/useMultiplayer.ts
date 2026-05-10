@@ -323,10 +323,14 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
       }
       if (!cat) return;
       const myId = bcIdRef.current || useGameStore.getState().selfId;
+      // Use the same per-tab suffixed name we broadcast for our player
+      // record so chat messages from another tab don't look like they
+      // came from the local cat.
+      const tabName = myId && myId.length >= 4 ? `${cat.name}·${myId.slice(-4)}` : cat.name;
       const msg: ChatMessage = {
         id: 'me' + Date.now(),
         fromId: myId,
-        fromName: cat.name,
+        fromName: tabName,
         scope,
         text,
         at: Date.now(),
@@ -350,11 +354,12 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
       }
       if (!cat) return;
       const myId = bcIdRef.current || useGameStore.getState().selfId;
+      const tabName = myId && myId.length >= 4 ? `${cat.name}·${myId.slice(-4)}` : cat.name;
       const s = useGameStore.getState();
       s.pushChat({
         id: 'em' + Date.now(),
         fromId: myId,
-        fromName: cat.name,
+        fromName: tabName,
         scope: 'nearby',
         text: `*${emote.replace('-', ' ')}s*`,
         at: Date.now(),
@@ -364,13 +369,13 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
         s.pushChat({
           id: 'sp' + Date.now(),
           fromId: myId,
-          fromName: cat.name,
+          fromName: tabName,
           scope: 'nearby',
           text: said[emote],
           at: Date.now() + 1,
         });
       }
-      try { bcRef.current?.postMessage({ kind: 'emote', id: myId, name: cat.name, emote } as BcMessage); } catch {}
+      try { bcRef.current?.postMessage({ kind: 'emote', id: myId, name: tabName, emote } as BcMessage); } catch {}
     },
     sendCommand: (kind, payload) => socketRef.current?.emit('command', { kind, payload }),
     sendCatch: (preyId, kind) => socketRef.current?.emit('catch', { preyId, kind }),
