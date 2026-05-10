@@ -880,9 +880,11 @@ export function Game({ room, net }: GameProps) {
       }
       const roll = Math.random();
       let pick: 'twoleg' | 'flood' | 'fire' | null = null;
-      if (roll < 0.05) pick = 'twoleg';
-      else if (roll < 0.10) pick = 'flood';
-      else if (roll < 0.15) pick = 'fire';
+      // 2% chance each (~6% total per roll). Rare enough that they feel
+      // like real events instead of constant chaos.
+      if (roll < 0.02) pick = 'twoleg';
+      else if (roll < 0.04) pick = 'flood';
+      else if (roll < 0.06) pick = 'fire';
       if (!pick) return;
       const messages: Record<typeof pick, string> = {
         twoleg: 'TWOLEGS in the forest! Hide, or they will carry you away in a cage!',
