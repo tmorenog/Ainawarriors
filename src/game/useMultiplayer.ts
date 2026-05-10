@@ -15,9 +15,18 @@ export interface MultiplayerHandle {
   sendDisaster: (d: { kind: 'twoleg' | 'flood' | 'fire'; until: number; message: string }) => void;
 }
 
-const SOCKET_URL = (typeof window !== 'undefined'
-  ? (window as any).__WOTC_SOCKET_URL__
-  : null) || process.env.NEXT_PUBLIC_SOCKET_URL || '';
+// Multiplayer Socket.io URL.
+// Preferred env name (request from the user): WARRIOR_CATS_PUBLIC_SOCKET_URL
+// Next.js note: only names starting with NEXT_PUBLIC_ are inlined into the
+// browser bundle. So if you're deploying on Vercel / Next you actually
+// want NEXT_PUBLIC_WARRIOR_CATS_SOCKET_URL — we read that too. The legacy
+// NEXT_PUBLIC_SOCKET_URL still works for back-compat.
+const SOCKET_URL =
+  (typeof window !== 'undefined' ? (window as any).__WOTC_SOCKET_URL__ : null) ||
+  process.env.WARRIOR_CATS_PUBLIC_SOCKET_URL ||
+  process.env.NEXT_PUBLIC_WARRIOR_CATS_SOCKET_URL ||
+  process.env.NEXT_PUBLIC_SOCKET_URL ||
+  '';
 
 // Module-level singleton so multiple components in the tree share one socket.
 let _socket: Socket | null = null;
@@ -29,7 +38,7 @@ let _refs = 0;
 // "automatically multiplayer" — any other browser tab/window the player has
 // open joins the same forest and sees each other walk around. This works
 // across tabs on the same browser; for cross-device multiplayer the user can
-// still set NEXT_PUBLIC_SOCKET_URL.
+// still set WARRIOR_CATS_PUBLIC_SOCKET_URL.
 // ---------------------------------------------------------------------------
 
 type BcMessage =

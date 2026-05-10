@@ -77,7 +77,7 @@ export function TitleScreen({ onStart }: Props) {
             </button>
 
             <p className="text-xs opacity-60 mt-4">
-              Guest play saves locally. Set <code>NEXT_PUBLIC_SOCKET_URL</code> to enable live multiplayer.
+              Guest play saves locally. Set <code>WARRIOR_CATS_PUBLIC_SOCKET_URL</code> (or <code>NEXT_PUBLIC_WARRIOR_CATS_SOCKET_URL</code> on Vercel) to enable live multiplayer.
             </p>
           </div>
         </div>
