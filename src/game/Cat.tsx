@@ -526,7 +526,7 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
 
         {/* tail — slightly shorter to match the chibi body */}
         <SmoothTail
-          length={cat.tail === 'short' ? 0.55 : cat.tail === 'long' ? 1.05 : cat.tail === 'fluffy' ? 0.85 : 0.7}
+          length={cat.tail === 'short' ? 0.55 : cat.tail === 'long' ? 0.85 : cat.tail === 'fluffy' ? 0.95 : 0.7}
           baseRadius={(bodyR * 0.5) * tailFluff * (1 + cat.fluffiness * 0.25)}
           tailType={cat.tail}
           anim={anim}
@@ -654,12 +654,22 @@ function SmoothTail({ length, baseRadius, tailType, anim, material, attach }: Sm
       const segments = TAIL_NODES - 1;
       const frames = curve.computeFrenetFrames(segments, false);
 
-      const fluffTip = tailType === 'fluffy' ? 0.5 : 0.25;
       for (let i = 0; i <= segments; i++) {
         const tt = i / segments;
         curve.getPointAt(tt, tmp.p);
-        // Tapered radius: thicker at base, slim at tip, slight bulge if fluffy
-        const taper = (1 - tt * 0.78) + (tailType === 'fluffy' ? Math.sin(tt * Math.PI) * 0.25 : 0);
+        // Radius profile per tail type:
+        //   fluffy — wide all the way, big mid-bulge, and a flared plume
+        //            at the tip. Matches the brushy reference look.
+        //   other  — classic taper, thicker at base, slim at tip.
+        let taper: number;
+        if (tailType === 'fluffy') {
+          const base = 1.55 - tt * 0.35;                      // thick along the length
+          const mid  = Math.sin(tt * Math.PI) * 0.85;          // big middle bulge
+          const tip  = tt > 0.78 ? (tt - 0.78) * 2.4 : 0;      // flared brushy plume
+          taper = base + mid + tip;
+        } else {
+          taper = 1 - tt * 0.78;
+        }
         const r = Math.max(0.005, baseRadius * taper);
         const N = frames.normals[i];
         const B = frames.binormals[i];
@@ -684,7 +694,8 @@ function SmoothTail({ length, baseRadius, tailType, anim, material, attach }: Sm
         // Cap the tip with a small sphere for a clean rounded end
         if (i === segments && tipRef.current) {
           tipRef.current.position.set(tmp.p.x, tmp.p.y, tmp.p.z);
-          const tipR = Math.max(0.01, baseRadius * 0.22 + (tailType === 'fluffy' ? 0.03 : 0));
+          // Fluffy tails get a prominent plume sphere at the end.
+          const tipR = Math.max(0.01, baseRadius * 0.22 + (tailType === 'fluffy' ? 0.18 : 0));
           tipRef.current.scale.setScalar(tipR / 0.05); // base sphere is r=0.05
         }
       }

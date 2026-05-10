@@ -136,7 +136,9 @@ function PlayerController({
     const stats = SIZE_STATS[cat.size];
     const clanBonus = (CLANS[cat.clan].bonuses.speed ?? 1) as number;
     const base = 6 * stats.speed * clanBonus;
-    const speed = (c.sprint ? base * 1.7 : base) * (c.crouch ? 0.45 : 1) * (hud.stamina < 5 ? 0.5 : 1);
+    // Crouch is a deliberate slow stalk — slower than before so the
+    // player can creep up on prey instead of zipping past them.
+    const speed = (c.sprint ? base * 1.7 : base) * (c.crouch ? 0.32 : 1) * (hud.stamina < 5 ? 0.5 : 1);
     const fwd = c.forward;
     const sd = c.strafe;
 
@@ -446,7 +448,9 @@ function PlayerController({
         .filter((p) => p.alive)
         .map((p) => ({ p, d: p.pos.distanceTo(pos.current) }))
         .sort((a, b) => a.d - b.d)[0];
-      const reach = c.crouch ? 2.8 : 2.4;
+      // Pounce reach is generous now — 4.0 stand, 5.0 crouch — so casual
+      // taps catch prey without pixel-perfect positioning.
+      const reach = c.crouch ? 5.0 : 4.0;
       if (closest && closest.d < reach) {
         closest.p.alive = false;
         onCatch(closest.p.id, closest.p.kind);
@@ -493,7 +497,9 @@ function PlayerController({
       lastTargetAt.current = tgtNow;
       let bestId: string | null = null;
       let bestD = Infinity;
-      const reach = c.crouch ? 3.4 : 3.0;
+      // Highlight ring should match the actual pounce reach so the
+      // player sees what they'll hit.
+      const reach = c.crouch ? 5.5 : 4.4;
       for (const p of preyList.current) {
         if (!p.alive) continue;
         const d = p.pos.distanceTo(pos.current);
