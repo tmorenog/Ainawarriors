@@ -1,7 +1,7 @@
 'use client';
 
 import { useFrame } from '@react-three/fiber';
-import { forwardRef, useMemo, useRef } from 'react';
+import { forwardRef, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { CatAppearance } from './types';
 import { SIZE_STATS } from './types';
@@ -60,7 +60,6 @@ const Leg = forwardRef<THREE.Group, LegProps>(function Leg({ position, material,
 export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'idle', injured = false, carrying = null }: CatProps) {
   const cat = useMemo(() => normalizeCat(rawCat), [rawCat]);
   const groupRef = useRef<THREE.Group>(null);
-  const tailRefs = useRef<THREE.Mesh[]>([]);
   const earL = useRef<THREE.Mesh>(null);
   const earR = useRef<THREE.Mesh>(null);
   const headRef = useRef<THREE.Group>(null);
@@ -113,14 +112,6 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
       bLegR.current.rotation.x = a * 0.9;
       bodyBob = Math.abs(Math.sin(time * speed)) * 0.04 * stride;
     }
-
-    // tail wave — flowing along the length
-    tailRefs.current.forEach((seg, i) => {
-      if (!seg) return;
-      const phase = time * (anim === 'run' ? 5 : 2.2) - i * 0.5;
-      seg.rotation.y = Math.sin(phase) * (0.18 + i * 0.06);
-      seg.rotation.x = Math.sin(phase * 0.8) * 0.05 + (anim === 'pounce' ? -0.2 : 0) + (anim === 'jump' ? 0.3 : 0);
-    });
 
     // ear twitch
     const ear = Math.sin(time * 1.4) > 0.95 ? 0.25 : 0;
@@ -186,7 +177,6 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
   })();
 
   const safe = (n: number, fallback: number) => (Number.isFinite(n) ? n : fallback);
-  const tailLen = cat.tail === 'short' ? 5 : cat.tail === 'long' ? 11 : cat.tail === 'fluffy' ? 8 : 7;
   const tailFluff = cat.tail === 'fluffy' ? 1.6 : 1;
   const fluff = safe(1 + cat.fluffiness * 0.35, 1);
 
@@ -348,30 +338,164 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
         <Leg ref={bLegL} position={[-bodyLen * 0.4, -bodyR * 0.55, 0.12]} material={bodyMaterial} back />
         <Leg ref={bLegR} position={[-bodyLen * 0.4, -bodyR * 0.55, -0.12]} material={bodyMaterial} back />
 
-        {/* tail — long, tapered, segmented for natural curve */}
-        <group position={[-bodyLen * 0.55, 0.1, 0]}>
-          {Array.from({ length: tailLen }).map((_, i) => {
-            const ratio = i / tailLen;
-            const segR = (bodyR * 0.55) * (1 - ratio * 0.7) * tailFluff * (1 + cat.fluffiness * 0.25);
-            // Curve the tail upward like the reference image
-            const baseRise = Math.sin((i / tailLen) * Math.PI * 0.6) * 0.18;
-            return (
-              <mesh
-                key={i}
-                ref={(el) => { if (el) tailRefs.current[i] = el; }}
-                position={[
-                  -i * 0.095,
-                  baseRise + (cat.tail === 'kink' && i === 4 ? 0.08 : 0),
-                  0,
-                ]}
-                material={bodyMaterial}
-              >
-                <sphereGeometry args={[segR, 10, 8]} />
-              </mesh>
-            );
-          })}
-        </group>
+        {/* tail — single smooth, tapered, animated tube */}
+        <SmoothTail
+          length={cat.tail === 'short' ? 0.85 : cat.tail === 'long' ? 1.55 : cat.tail === 'fluffy' ? 1.2 : 1.05}
+          baseRadius={(bodyR * 0.55) * tailFluff * (1 + cat.fluffiness * 0.25)}
+          tailType={cat.tail}
+          anim={anim}
+          material={bodyMaterial}
+          attach={[-bodyLen * 0.5, 0.06, 0]}
+        />
       </group>
+    </group>
+  );
+}
+
+/* ----- Smooth tail (single tube + animated curve) ----- */
+
+interface SmoothTailProps {
+  length: number;
+  baseRadius: number;
+  tailType: CatAppearance['tail'];
+  anim: NonNullable<CatProps['anim']>;
+  material: THREE.Material;
+  attach: [number, number, number];
+}
+
+const TAIL_NODES = 14;     // curve control points
+const TAIL_RADIAL = 10;    // tube cross-section vertices
+
+function SmoothTail({ length, baseRadius, tailType, anim, material, attach }: SmoothTailProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const tipRef = useRef<THREE.Mesh>(null);
+  const t = useRef(0);
+
+  // Reusable structures (avoid per-frame allocation)
+  const points = useMemo(
+    () => Array.from({ length: TAIL_NODES }, () => new THREE.Vector3()),
+    []
+  );
+  const positions = useMemo(
+    () => new Float32Array((TAIL_NODES) * TAIL_RADIAL * 3),
+    []
+  );
+  const normals = useMemo(
+    () => new Float32Array((TAIL_NODES) * TAIL_RADIAL * 3),
+    []
+  );
+  const indices = useMemo(() => {
+    const arr: number[] = [];
+    for (let i = 0; i < TAIL_NODES - 1; i++) {
+      for (let j = 0; j < TAIL_RADIAL; j++) {
+        const a = i * TAIL_RADIAL + j;
+        const b = i * TAIL_RADIAL + ((j + 1) % TAIL_RADIAL);
+        const c = (i + 1) * TAIL_RADIAL + j;
+        const d = (i + 1) * TAIL_RADIAL + ((j + 1) % TAIL_RADIAL);
+        arr.push(a, b, d, a, d, c);
+      }
+    }
+    return new Uint16Array(arr);
+  }, []);
+
+  const geom = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+    g.setIndex(new THREE.BufferAttribute(indices, 1));
+    return g;
+  }, [positions, normals, indices]);
+
+  useEffect(() => () => geom.dispose(), [geom]);
+
+  // Working vectors
+  const tmp = useMemo(() => ({
+    p: new THREE.Vector3(),
+    tangent: new THREE.Vector3(),
+    normal: new THREE.Vector3(),
+    binormal: new THREE.Vector3(),
+    up: new THREE.Vector3(0, 1, 0),
+  }), []);
+
+  useFrame((_, dt) => {
+    try {
+      t.current += dt;
+      const time = t.current;
+
+      // Build smooth control points along the tail
+      const sway = anim === 'run' ? 5 : anim === 'walk' ? 3.4 : 2.0;
+      const swayAmount = anim === 'run' ? 0.55 : anim === 'walk' ? 0.32 : 0.18;
+      const upRise = anim === 'jump' ? 0.55 : anim === 'pounce' ? -0.15 : 0.32;
+
+      for (let i = 0; i < TAIL_NODES; i++) {
+        const ratio = i / (TAIL_NODES - 1);
+        const phase = time * sway - ratio * 4.5;
+        const x = -length * ratio;
+        // Base curve rises smoothly toward the tip
+        const baseRise = Math.sin(ratio * Math.PI * 0.65) * upRise;
+        const wobbleY = Math.sin(phase * 0.8) * 0.04 * ratio;
+        const kinkOffset = (tailType === 'kink' && Math.abs(ratio - 0.5) < 0.07) ? 0.12 : 0;
+        const y = baseRise + wobbleY + kinkOffset;
+        const z = Math.sin(phase) * swayAmount * Math.pow(ratio, 1.2);
+        points[i].set(x, y, z);
+      }
+
+      // CatmullRom curve through the points → consistent tangent frames
+      const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.4);
+      const segments = TAIL_NODES - 1;
+      const frames = curve.computeFrenetFrames(segments, false);
+
+      const fluffTip = tailType === 'fluffy' ? 0.5 : 0.25;
+      for (let i = 0; i <= segments; i++) {
+        const tt = i / segments;
+        curve.getPointAt(tt, tmp.p);
+        // Tapered radius: thicker at base, slim at tip, slight bulge if fluffy
+        const taper = (1 - tt * 0.78) + (tailType === 'fluffy' ? Math.sin(tt * Math.PI) * 0.25 : 0);
+        const r = Math.max(0.005, baseRadius * taper);
+        const N = frames.normals[i];
+        const B = frames.binormals[i];
+
+        for (let j = 0; j < TAIL_RADIAL; j++) {
+          const angle = (j / TAIL_RADIAL) * Math.PI * 2;
+          const sin = Math.sin(angle);
+          const cos = Math.cos(angle);
+          const nx = cos * N.x + sin * B.x;
+          const ny = cos * N.y + sin * B.y;
+          const nz = cos * N.z + sin * B.z;
+
+          const idx = (i * TAIL_RADIAL + j) * 3;
+          positions[idx]     = tmp.p.x + nx * r;
+          positions[idx + 1] = tmp.p.y + ny * r;
+          positions[idx + 2] = tmp.p.z + nz * r;
+          normals[idx]     = nx;
+          normals[idx + 1] = ny;
+          normals[idx + 2] = nz;
+        }
+
+        // Cap the tip with a small sphere for a clean rounded end
+        if (i === segments && tipRef.current) {
+          tipRef.current.position.set(tmp.p.x, tmp.p.y, tmp.p.z);
+          const tipR = Math.max(0.01, baseRadius * 0.22 + (tailType === 'fluffy' ? 0.03 : 0));
+          tipRef.current.scale.setScalar(tipR / 0.05); // base sphere is r=0.05
+        }
+      }
+
+      const posAttr = geom.attributes.position as THREE.BufferAttribute;
+      const normAttr = geom.attributes.normal as THREE.BufferAttribute;
+      posAttr.needsUpdate = true;
+      normAttr.needsUpdate = true;
+      geom.computeBoundingSphere();
+    } catch (e) {
+      if (typeof console !== 'undefined') console.warn('[wotc] tail frame error', e);
+    }
+  });
+
+  return (
+    <group position={attach}>
+      <mesh ref={meshRef} geometry={geom} material={material} castShadow />
+      <mesh ref={tipRef} material={material}>
+        <sphereGeometry args={[0.05, 10, 8]} />
+      </mesh>
     </group>
   );
 }
