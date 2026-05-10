@@ -37,7 +37,10 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
     _refs += 1;
     // No URL? Run offline (single player) — leader is set locally.
     if (!SOCKET_URL) {
-      const localId = 'local_' + Math.random().toString(36).slice(2, 8);
+      // Stable id so editing the cat (e.g. changing role/fur) updates the
+      // same player record instead of leaving an old "clone" of the previous
+      // self in the players map.
+      const localId = 'local_self';
       setSelfId(localId);
       const me: PlayerState = {
         socketId: localId,
@@ -48,7 +51,9 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
         hp: 100, hunger: 60, stamina: 100, reputation: 50,
         isLeader: true, isDeputy: false,
       };
-      upsertPlayer(me);
+      // Wipe any stale records (in case a different id lingered from a
+      // previous session before this fix shipped).
+      setPlayers({ [localId]: me });
       setRoom({
         roomId: 'offline',
         leaderId: localId,

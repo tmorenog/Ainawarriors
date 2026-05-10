@@ -13,6 +13,8 @@ import { useGameStore } from './useGameStore';
 import { CLANS } from '@/lib/clans';
 import { SIZE_STATS } from './types';
 import { SilentErrorBoundary } from '@/components/SilentErrorBoundary';
+import { terrainHeightAt } from './terrain';
+import { getAudioEngine } from './audio';
 
 export interface GameNetHandle {
   sendMove: (pos: [number, number, number], rot: number, anim: string) => void;
@@ -26,6 +28,7 @@ interface GameProps {
 
 function PlayerController({
   selfRef,
+  catYaw,
   yaw,
   pitch,
   onAnim,
@@ -34,6 +37,7 @@ function PlayerController({
   onCatch,
 }: {
   selfRef: React.MutableRefObject<THREE.Object3D | null>;
+  catYaw: React.MutableRefObject<number>;
   yaw: React.MutableRefObject<number>;
   pitch: React.MutableRefObject<number>;
   onAnim: (a: string) => void;
@@ -51,7 +55,6 @@ function PlayerController({
   const setCarrying = useGameStore((s) => s.setCarrying);
   const carrying = useGameStore((s) => s.carrying);
   const settings = useGameStore((s) => s.settings);
-  const room = useGameStore((s) => s.room);
 
   const pos = useRef(new THREE.Vector3(0, 0, 0));
   const vy = useRef(0);
@@ -60,8 +63,12 @@ function PlayerController({
   const lastAnim = useRef('idle');
 
   useEffect(() => {
-    if (cat) pos.current.set(...(CLANS[cat.clan].campCenter as [number, number, number]));
-  }, [cat]);
+    if (cat) {
+      const [cx, , cz] = CLANS[cat.clan].campCenter as [number, number, number];
+      pos.current.set(cx, terrainHeightAt(cx, cz), cz);
+      catYaw.current = yaw.current; // start aligned with the camera
+    }
+  }, [cat, catYaw, yaw]);
 
   useFrame((_, dt) => {
     if (!cat) return;
@@ -90,6 +97,19 @@ function PlayerController({
     if (dir.lengthSq() > 0) dir.normalize();
     pos.current.addScaledVector(dir, speed * dt);
 
+    // Clamp horizontal position to the playable disk so the cat can't wander
+    // off the terrain plane.
+    const maxR = 280;
+    const r2 = pos.current.x * pos.current.x + pos.current.z * pos.current.z;
+    if (r2 > maxR * maxR) {
+      const r = Math.sqrt(r2);
+      pos.current.x *= maxR / r;
+      pos.current.z *= maxR / r;
+    }
+
+    // Ground = analytical terrain height under the cat's feet.
+    const groundY = terrainHeightAt(pos.current.x, pos.current.z);
+
     // Jump physics
     if (c.jump && grounded.current) {
       vy.current = 6.5;
@@ -98,8 +118,9 @@ function PlayerController({
     }
     vy.current -= 18 * dt; // gravity
     pos.current.y += vy.current * dt;
-    if (pos.current.y <= 0) {
-      pos.current.y = 0;
+    if (pos.current.y <= groundY) {
+      // Landed (or never left): stick to the terrain — no sky-walking.
+      pos.current.y = groundY;
       vy.current = 0;
       grounded.current = true;
     }
@@ -134,9 +155,22 @@ function PlayerController({
       }
     }
 
+    // Cat body rotation: only follow the movement direction, NOT the camera.
+    // The camera yaw is just for looking around. The cat keeps its own facing
+    // and turns smoothly when you actually walk somewhere new.
+    if (fwd !== 0 || sd !== 0) {
+      const moveYaw = Math.atan2(dir.x, dir.z);
+      // shortest-path lerp
+      let delta = moveYaw - catYaw.current;
+      while (delta >  Math.PI) delta -= Math.PI * 2;
+      while (delta < -Math.PI) delta += Math.PI * 2;
+      const turnRate = c.sprint ? 10 : 6;
+      catYaw.current += delta * Math.min(1, dt * turnRate);
+    }
+
     if (selfRef.current) {
       selfRef.current.position.copy(pos.current);
-      selfRef.current.rotation.y = yaw.current + Math.PI;
+      selfRef.current.rotation.y = catYaw.current;
     }
 
     if (anim !== lastAnim.current) {
@@ -147,7 +181,7 @@ function PlayerController({
     const now = performance.now();
     if (now - lastSent.current > 80) {
       lastSent.current = now;
-      onPos([pos.current.x, pos.current.y, pos.current.z], yaw.current + Math.PI);
+      onPos([pos.current.x, pos.current.y, pos.current.z], catYaw.current);
     }
   });
 
@@ -186,6 +220,7 @@ export function Game({ room, net }: GameProps) {
   const selfRef = useRef<THREE.Object3D | null>(null);
   const yaw = useRef(0);
   const pitch = useRef(0);
+  const catYaw = useRef(0); // cat body facing — independent of the camera yaw
   const [anim, setAnim] = useState<string>('idle');
   const preyList = useRef<PreyState[]>(spawnPrey(28));
 
@@ -210,6 +245,39 @@ export function Game({ room, net }: GameProps) {
     }, 600);
     return () => clearInterval(id);
   }, [roomState, setRoom]);
+
+  // Audio mode selection — drives crickets at night, dramatic music while
+  // hunting (crouch/pounce), battle bed when other cats are very close, and
+  // a calm day pad otherwise.
+  useEffect(() => {
+    const engine = getAudioEngine();
+    engine.setVolume(settings.sound);
+    engine.setMuted(settings.sound <= 0.001);
+  }, [settings.sound]);
+
+  useEffect(() => {
+    if (!roomState || !cat) return;
+    const engine = getAudioEngine();
+    const tick = () => {
+      const tod = roomState.timeOfDay;
+      const isNight = tod < 0.22 || tod > 0.78;
+      const here = selfRef.current?.position;
+      let nearbyCat = false;
+      if (here) {
+        for (const p of Object.values(useGameStore.getState().players)) {
+          if (p.socketId === useGameStore.getState().selfId) continue;
+          const dx = p.pos[0] - here.x, dz = p.pos[2] - here.z;
+          if (dx * dx + dz * dz < 36) { nearbyCat = true; break; }
+        }
+      }
+      let mode: 'day' | 'night' | 'hunt' | 'battle' = isNight ? 'night' : 'day';
+      if (anim === 'crouch' || anim === 'pounce') mode = 'hunt';
+      if (nearbyCat && (anim === 'pounce' || anim === 'run')) mode = 'battle';
+      engine.setMode(mode);
+    };
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [roomState, cat, anim]);
 
   // last bubble text per player
   const bubbles = useMemo(() => {
@@ -252,6 +320,10 @@ export function Game({ room, net }: GameProps) {
         // Always-visible sky-blue fallback so the canvas is never pure black even
         // for the first frame before the World mounts.
         try { gl.setClearColor(new THREE.Color('#7ec8e3')); } catch {}
+      }}
+      onPointerDown={() => {
+        // iOS Safari only starts AudioContext from a user gesture
+        try { getAudioEngine().ensure(); } catch {}
       }}
     >
       <Suspense fallback={null}>
@@ -307,6 +379,7 @@ export function Game({ room, net }: GameProps) {
         <CameraRig target={selfRef as any} yaw={yaw} pitch={pitch} mode={settings.cameraMode} />
         <PlayerController
           selfRef={selfRef as any}
+          catYaw={catYaw}
           yaw={yaw}
           pitch={pitch}
           preyList={preyList}
@@ -314,7 +387,7 @@ export function Game({ room, net }: GameProps) {
             setAnim(a);
             net.sendMove(
               selfRef.current ? [selfRef.current.position.x, selfRef.current.position.y, selfRef.current.position.z] : [0, 0, 0],
-              yaw.current + Math.PI,
+              catYaw.current,
               a
             );
           }}
