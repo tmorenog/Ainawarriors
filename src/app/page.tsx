@@ -10,6 +10,7 @@ import { SettingsPanel } from '@/components/Settings';
 import { LeaderPanel } from '@/components/LeaderPanel';
 import { MobileControls } from '@/components/MobileControls';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { WebGLGuard } from '@/components/WebGLGuard';
 import { BookPanel } from '@/components/BookPanel';
 import { useGameStore } from '@/game/useGameStore';
 import { useMultiplayer } from '@/game/useMultiplayer';
@@ -93,13 +94,15 @@ export default function Page() {
         <>
           <SleepOverlay />
           <ErrorBoundary label="game" onReset={() => setScreen('title')}>
-            {/* No WebGLGuard here on purpose — the editor already created a Canvas
-                successfully, so we trust WebGL works. If the game Canvas does fail
-                to get a context (e.g. iOS Safari hasn't released the previous one
-                yet), the ErrorBoundary above catches the throw and shows the
-                friendly "The warriors have discovered an issue" message with retry
-                buttons. */}
-            <Game room={room} net={{ sendMove: mp.sendMove, sendCatch: mp.sendCatch }} />
+            {/* WebGLGuard probes for a usable WebGL context BEFORE we mount the
+                game Canvas. Without this, iOS Safari occasionally hands three.js
+                a null GL context (the editor's Canvas hasn't been fully released
+                yet), which then crashes inside WebGLCapabilities with the
+                "getShaderPrecisionFormat of null" error. The guard retries a few
+                times automatically and falls back to a friendly retry screen. */}
+            <WebGLGuard fallbackTitle="The forest is gathering its strength.">
+              <Game room={room} net={{ sendMove: mp.sendMove, sendCatch: mp.sendCatch }} />
+            </WebGLGuard>
           </ErrorBoundary>
           <HUD onOpenSettings={() => setShowSettings(true)} onOpenLeader={() => setShowLeader(true)} />
           <Chat
