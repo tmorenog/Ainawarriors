@@ -252,16 +252,8 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
       <color attach="background" args={[skyTop]} />
       <fog attach="fog" args={[fogColor, 30, fog]} />
 
-      {/* sky dome — simple two-color gradient using a single vertex-color
-          mesh (no custom shader, so no GLSL compatibility issues across devices) */}
-      <mesh>
-        <sphereGeometry args={[490, 32, 24]} />
-        <meshBasicMaterial side={THREE.BackSide} color={skyTop} />
-      </mesh>
-      <mesh position={[0, -240, 0]}>
-        <sphereGeometry args={[480, 24, 12, 0, Math.PI * 2, Math.PI * 0.5, Math.PI * 0.5]} />
-        <meshBasicMaterial side={THREE.BackSide} color={skyBot} />
-      </mesh>
+      {/* sky color comes from the scene background (above) — no sphere mesh
+          needed, which avoids any back-face rendering quirks across browsers */}
 
       {/* sun / moon */}
       <directionalLight
