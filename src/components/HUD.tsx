@@ -198,7 +198,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-22 · eat the pile + chat top
+        wotc-23 · sleep cinematic
       </div>
     </div>
   );
@@ -289,14 +289,37 @@ function triggerSleep() {
   try { getAudioEngine().setMode('sleep'); } catch {}
   s.setSleeping(true);
   s.setSleepStage('loaf');
+
+  // Animate the time-of-day forward so the sky actually darkens to
+  // midnight and brightens back to dawn over the course of the cutscene.
+  // We sweep ~12 hours of in-game time across ~7 seconds of real time.
+  const startTod = s.room?.timeOfDay ?? 0.5;
+  const endTod = 0.27; // dawn
+  const sweep = (() => {
+    let d = endTod - startTod;
+    if (d <= 0) d += 1; // always sweep forward through the night
+    return d;
+  })();
+  const startReal = performance.now();
+  const sweepDuration = 7000;
+  const sweepInt = window.setInterval(() => {
+    const k = Math.min(1, (performance.now() - startReal) / sweepDuration);
+    const cur = useGameStore.getState();
+    if (!cur.sleeping || !cur.room) {
+      clearInterval(sweepInt);
+      return;
+    }
+    const tod = (startTod + sweep * k) % 1;
+    cur.setRoom({ ...cur.room, timeOfDay: tod });
+    if (k >= 1) clearInterval(sweepInt);
+  }, 90);
+
   setTimeout(() => useGameStore.getState().setSleepStage('curl'), 1500);
   setTimeout(() => useGameStore.getState().setSleepStage('deep'), 3000);
   setTimeout(() => {
     const cur = useGameStore.getState();
     cur.setSleepStage('waking');
-    const room = cur.room;
-    if (room) cur.setRoom({ ...room, timeOfDay: 0.27 });
-    // Sleep restores HP/stamina/hunger a bit
+    if (cur.room) cur.setRoom({ ...cur.room, timeOfDay: endTod });
     cur.setHud({
       hp: Math.min(100, cur.hud.hp + 30),
       stamina: 100,
