@@ -17,13 +17,13 @@ export function TasksPanel() {
     <>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="absolute right-3 top-1/2 -translate-y-[120px] rounded-l-xl bg-black/55 hover:bg-black/75 backdrop-blur px-3 py-2 text-xs text-bone shadow pointer-events-auto"
+        className="absolute right-3 top-[36%] rounded-l-xl bg-black/55 hover:bg-black/75 backdrop-blur px-3 py-2 text-xs text-bone shadow pointer-events-auto"
         title="Tasks — three rotating ambient goals"
       >
         ⛰ Tasks {tasks.filter((t) => t.progress >= t.goal).length > 0 ? '✓' : ''}
       </button>
       {open && (
-        <div className="absolute right-3 top-[calc(50%-95px)] w-[280px] max-w-[90vw] bg-black/75 backdrop-blur rounded-xl p-3 text-bone text-xs shadow-xl pointer-events-auto">
+        <div className="absolute right-3 top-[calc(36%+44px)] w-[280px] max-w-[90vw] bg-black/75 backdrop-blur rounded-xl p-3 text-bone text-xs shadow-xl pointer-events-auto">
           <div className="flex items-center justify-between mb-2">
             <div className="font-display text-sm">Tasks</div>
             <button

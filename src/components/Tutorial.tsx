@@ -79,7 +79,7 @@ export function Tutorial() {
     return (
       <button
         onClick={() => { setStep(0); setOpen(true); }}
-        className="absolute right-3 bottom-[200px] z-30 rounded-full bg-black/55 hover:bg-black/75 backdrop-blur w-12 h-12 grid place-items-center text-bone text-lg font-display shadow-lg pointer-events-auto border border-white/15"
+        className="absolute right-3 top-24 z-30 rounded-full bg-black/55 hover:bg-black/75 backdrop-blur w-9 h-9 grid place-items-center text-bone text-sm font-display shadow-lg pointer-events-auto border border-white/15"
         title="Hint / tutorial — press X on a keyboard"
         aria-label="Show hints"
       >
