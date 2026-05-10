@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #0d1310;
+  color: #f5efe2;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+
+#__next, body {
+  height: 100%;
+}
+
+@font-face {
+  font-family: 'Cinzel';
+  src: local('Cinzel');
+}
+
+/* colorblind filters applied via [data-colorblind] on body */
+body[data-colorblind="protanopia"]   { filter: url(#cb-prot); }
+body[data-colorblind="deuteranopia"] { filter: url(#cb-deut); }
+body[data-colorblind="tritanopia"]   { filter: url(#cb-trit); }
+
+canvas { outline: none; }
+
+/* prevent text selection during play */
+main, .no-select { user-select: none; -webkit-user-select: none; }

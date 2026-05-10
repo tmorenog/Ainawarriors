@@ -1,0 +1,106 @@
+import type { CatAppearance } from '@/game/types';
+
+const KEY = 'wotc_save_v1';
+
+export interface SaveData {
+  cat: CatAppearance | null;
+  settings: GameSettings;
+  friends: string[];
+  muted: string[];
+  reputation: number;
+  unlocks: string[];
+  lastClan: string | null;
+  guestId: string;
+}
+
+export interface GameSettings {
+  graphics: 'low' | 'medium' | 'high';
+  cameraMode: 'third' | 'first';
+  sound: number;
+  music: number;
+  uiScale: number;
+  colorblind: 'none' | 'protanopia' | 'deuteranopia' | 'tritanopia';
+  invertY: boolean;
+}
+
+export const DEFAULT_SETTINGS: GameSettings = {
+  graphics: 'medium',
+  cameraMode: 'third',
+  sound: 0.7,
+  music: 0.4,
+  uiScale: 1,
+  colorblind: 'none',
+  invertY: false,
+};
+
+function newGuestId() {
+  return 'guest_' + Math.random().toString(36).slice(2, 10);
+}
+
+export function loadSave(): SaveData {
+  if (typeof window === 'undefined') {
+    return {
+      cat: null,
+      settings: DEFAULT_SETTINGS,
+      friends: [],
+      muted: [],
+      reputation: 50,
+      unlocks: [],
+      lastClan: null,
+      guestId: 'guest_ssr',
+    };
+  }
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) {
+      const fresh: SaveData = {
+        cat: null,
+        settings: DEFAULT_SETTINGS,
+        friends: [],
+        muted: [],
+        reputation: 50,
+        unlocks: [],
+        lastClan: null,
+        guestId: newGuestId(),
+      };
+      localStorage.setItem(KEY, JSON.stringify(fresh));
+      return fresh;
+    }
+    const parsed = JSON.parse(raw) as Partial<SaveData>;
+    return {
+      cat: parsed.cat ?? null,
+      settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
+      friends: parsed.friends ?? [],
+      muted: parsed.muted ?? [],
+      reputation: parsed.reputation ?? 50,
+      unlocks: parsed.unlocks ?? [],
+      lastClan: parsed.lastClan ?? null,
+      guestId: parsed.guestId ?? newGuestId(),
+    };
+  } catch {
+    return {
+      cat: null,
+      settings: DEFAULT_SETTINGS,
+      friends: [],
+      muted: [],
+      reputation: 50,
+      unlocks: [],
+      lastClan: null,
+      guestId: newGuestId(),
+    };
+  }
+}
+
+export function saveData(data: SaveData) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(KEY, JSON.stringify(data));
+  } catch {}
+}
+
+export function patchSave(patch: Partial<SaveData>) {
+  const current = loadSave();
+  const next = { ...current, ...patch };
+  saveData(next);
+  return next;
+}
