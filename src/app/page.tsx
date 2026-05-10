@@ -66,7 +66,6 @@ export default function Page() {
               patchSave({ cat: c });
             }}
             onPlay={(c) => {
-              // Persist the morph and enter the forest.
               setCat(c);
               patchSave({ cat: c });
               setScreen('game');
@@ -82,9 +81,13 @@ export default function Page() {
       {screen === 'game' && cat && (
         <>
           <ErrorBoundary label="game" onReset={() => setScreen('title')}>
-            <WebGLGuard>
-              <Game room={room} net={{ sendMove: mp.sendMove, sendCatch: mp.sendCatch }} />
-            </WebGLGuard>
+            {/* No WebGLGuard here on purpose — the editor already created a Canvas
+                successfully, so we trust WebGL works. If the game Canvas does fail
+                to get a context (e.g. iOS Safari hasn't released the previous one
+                yet), the ErrorBoundary above catches the throw and shows the
+                friendly "The warriors have discovered an issue" message with retry
+                buttons. */}
+            <Game room={room} net={{ sendMove: mp.sendMove, sendCatch: mp.sendCatch }} />
           </ErrorBoundary>
           <HUD onOpenSettings={() => setShowSettings(true)} onOpenLeader={() => setShowLeader(true)} />
           <Chat

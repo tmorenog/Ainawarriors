@@ -188,6 +188,16 @@ export function Game({ room, net }: GameProps) {
   const [anim, setAnim] = useState<string>('idle');
   const preyList = useRef<PreyState[]>(spawnPrey(28));
 
+  // Wait ~400ms after mount before creating the Canvas so the editor's
+  // previous WebGL context has time to be torn down by the browser. iPad
+  // Safari can otherwise refuse to allocate a second GL context if the
+  // first one is still pending release.
+  const [canvasReady, setCanvasReady] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setCanvasReady(true), 400);
+    return () => clearTimeout(id);
+  }, []);
+
   // Day/night/weather progression in offline mode
   useEffect(() => {
     if (!roomState || roomState.roomId !== 'offline') return;
@@ -211,7 +221,7 @@ export function Game({ room, net }: GameProps) {
     return m;
   }, [chat]);
 
-  if (!cat || !roomState) {
+  if (!cat || !roomState || !canvasReady) {
     return (
       <div className="absolute inset-0 grid place-items-center text-bone">
         <div className="text-center font-display text-2xl animate-pulse-soft">Slipping into the forest...</div>
