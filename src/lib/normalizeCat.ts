@@ -48,6 +48,7 @@ export function normalizeCat(input: any): CatAppearance {
     height: num(safe.height, 1.0, 0.85, 1.25),
     build: num(safe.build, 1.0, 0.8, 1.2),
     scars: Array.isArray(safe.scars) ? safe.scars.filter((s: any) => typeof s === 'string') : [],
+    blush: typeof safe.blush === 'boolean' ? safe.blush : false,
     clan: str(safe.clan, 'ThunderClan') as CatAppearance['clan'],
     role: str(safe.role, 'Warrior') as CatAppearance['role'],
     bubbleStyle: pick(safe.bubbleStyle, BUBBLES, 'classic'),

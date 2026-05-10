@@ -74,6 +74,7 @@ function makeDefault(): CatAppearance {
     height: 1.0,
     build: 1.0,
     scars: [],
+    blush: false,
     clan: 'ThunderClan',
     role: 'Warrior',
     bubbleStyle: 'classic',
@@ -215,6 +216,16 @@ export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
               </Group>
               <Group title="Fluffiness">
                 <Slider value={cat.fluffiness} min={0} max={1} step={0.05} onChange={(v) => update({ fluffiness: v })} />
+              </Group>
+              <Group title="Blush">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!cat.blush}
+                    onChange={(e) => update({ blush: e.target.checked })}
+                  />
+                  Show pink cheek blush
+                </label>
               </Group>
             </>
           )}

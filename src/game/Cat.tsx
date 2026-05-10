@@ -354,7 +354,7 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
 
           {/* mouth — flat "3" sitting on the muzzle just below the nose */}
           <mesh position={[0.272, -0.082, 0]} geometry={CAT_MOUTH_GEO} renderOrder={2}>
-            <meshBasicMaterial color={'#3a1f24'} depthTest={true} />
+            <meshBasicMaterial color={'#000000'} depthTest={true} />
           </mesh>
 
           {/* tiny pink tongue tip peeking out under the mouth */}
@@ -363,15 +363,19 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
             <meshStandardMaterial color={'#f08aa3'} roughness={0.55} />
           </mesh>
 
-          {/* soft pink blush spots on the cheeks for extra cuteness */}
-          <mesh position={[0.20, -0.03, 0.16]} rotation={[0, 0.3, 0]}>
-            <circleGeometry args={[0.038, 18]} />
-            <meshBasicMaterial color={'#f7a8b4'} transparent opacity={0.55} />
-          </mesh>
-          <mesh position={[0.20, -0.03, -0.16]} rotation={[0, -0.3, 0]}>
-            <circleGeometry args={[0.038, 18]} />
-            <meshBasicMaterial color={'#f7a8b4'} transparent opacity={0.55} />
-          </mesh>
+          {/* optional soft pink blush spots on the cheeks */}
+          {cat.blush && (
+            <>
+              <mesh position={[0.20, -0.03, 0.16]} rotation={[0, 0.3, 0]}>
+                <circleGeometry args={[0.038, 18]} />
+                <meshBasicMaterial color={'#f7a8b4'} transparent opacity={0.55} />
+              </mesh>
+              <mesh position={[0.20, -0.03, -0.16]} rotation={[0, -0.3, 0]}>
+                <circleGeometry args={[0.038, 18]} />
+                <meshBasicMaterial color={'#f7a8b4'} transparent opacity={0.55} />
+              </mesh>
+            </>
+          )}
 
           {/* big round eyes (groups so we can scale Y to blink) */}
           <group ref={eyeLRef} position={[0.18, 0.06, 0.10]}>
@@ -542,6 +546,18 @@ function SmoothTail({ length, baseRadius, tailType, anim, material, attach }: Sm
     () => new Float32Array((TAIL_NODES) * TAIL_RADIAL * 3),
     []
   );
+  // UVs are static (depend only on segment / radial index), so build once
+  const uvs = useMemo(() => {
+    const u = new Float32Array((TAIL_NODES) * TAIL_RADIAL * 2);
+    for (let i = 0; i < TAIL_NODES; i++) {
+      for (let j = 0; j < TAIL_RADIAL; j++) {
+        const idx = (i * TAIL_RADIAL + j) * 2;
+        u[idx]     = i / (TAIL_NODES - 1);     // U along the length of the tail
+        u[idx + 1] = j / TAIL_RADIAL;          // V around the cross-section
+      }
+    }
+    return u;
+  }, []);
   const indices = useMemo(() => {
     const arr: number[] = [];
     for (let i = 0; i < TAIL_NODES - 1; i++) {
@@ -560,9 +576,10 @@ function SmoothTail({ length, baseRadius, tailType, anim, material, attach }: Sm
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     g.setIndex(new THREE.BufferAttribute(indices, 1));
     return g;
-  }, [positions, normals, indices]);
+  }, [positions, normals, uvs, indices]);
 
   useEffect(() => () => geom.dispose(), [geom]);
 

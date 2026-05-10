@@ -28,6 +28,7 @@ export interface CatAppearance {
   height: number; // 0.85..1.25
   build: number; // 0.8..1.2
   scars: string[];
+  blush?: boolean;            // show pink cheek blush spots
   clan: ClanId;
   role: RoleId;
   bubbleStyle: 'classic' | 'cloud' | 'leaf' | 'stone';
