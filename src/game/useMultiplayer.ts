@@ -292,14 +292,27 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
         socketRef.current.emit('move', { pos, rot, anim });
         return;
       }
-      // BroadcastChannel: keep our own player record fresh and let the
-      // heartbeat propagate it. We also send an immediate state so other tabs
-      // see us moving smoothly instead of in 2s steps.
-      const myId = bcIdRef.current;
-      if (!myId) return;
+      // BroadcastChannel path. Build a fresh full player record every call
+      // — that way we always broadcast even if the local players map got
+      // reset, and the broadcast cat carries the per-tab name suffix.
+      const myId = bcIdRef.current || (typeof window !== 'undefined' ? (window as any).__WOTC_TAB_ID__ : '');
+      if (!myId || !cat) return;
       const cur = useGameStore.getState().players[myId];
-      if (!cur) return;
-      const next: PlayerState = { ...cur, pos, rot, anim };
+      const next: PlayerState = {
+        socketId: myId,
+        cat: {
+          ...cat,
+          name: `${cat.name}·${myId.slice(-4)}`,
+          id: `${cat.id}__${myId}`,
+        },
+        pos, rot, anim,
+        hp: cur?.hp ?? 100,
+        hunger: cur?.hunger ?? 60,
+        stamina: cur?.stamina ?? 100,
+        reputation: cur?.reputation ?? 50,
+        isLeader: cur?.isLeader ?? true,
+        isDeputy: cur?.isDeputy ?? false,
+      };
       useGameStore.getState().upsertPlayer(next);
       try { bcRef.current?.postMessage({ kind: 'state', player: next } as BcMessage); } catch {}
     },
