@@ -85,12 +85,18 @@ export function NpcDialog() {
                   setMission('accepted');
                   setTigerstarHp(100);
                   setBattleActive(true);
+                  // Run the cinematic intro before letting the player swing.
+                  // The fight banner is up for 2s; the rest of the time the
+                  // player has full control via Q (pounce) and F (swipe).
+                  const s = useGameStore.getState();
+                  s.setBattlePhase('intro');
+                  setTimeout(() => useGameStore.getState().setBattlePhase('fighting'), 2000);
                   pushChat({
                     id: 'sys' + Date.now(),
                     fromId: 'system',
                     fromName: 'Tigerstar',
                     scope: 'system',
-                    text: 'Tigerstar lunges! Pounce (Q) within reach to strike — but watch your own hide.',
+                    text: 'Tigerstar lunges! Pounce (Q) for a heavy strike or swipe (F) for a fast claw — but watch your own hide.',
                     at: Date.now(),
                   });
                   close();

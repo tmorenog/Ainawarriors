@@ -3,6 +3,7 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { useGameStore } from './useGameStore';
 
 interface Props {
   target: React.MutableRefObject<THREE.Object3D | null>;
@@ -94,8 +95,22 @@ export function CameraRig({ target, yaw, pitch, mode }: Props) {
     if (!target.current) return;
     const t = target.current.position;
     const p = Math.max(-0.9, Math.min(0.9, pitch.current));
+
+    // Camera shake — decay the global magnitude each frame and apply a
+    // small randomised offset to the camera's position. Used by hits in
+    // the Tigerstar fight to give every blow some weight.
+    const store = useGameStore.getState();
+    const shake = store.cameraShake;
+    let shakeX = 0, shakeY = 0, shakeZ = 0;
+    if (shake > 0.001) {
+      shakeX = (Math.random() - 0.5) * shake;
+      shakeY = (Math.random() - 0.5) * shake;
+      shakeZ = (Math.random() - 0.5) * shake;
+      store.setCameraShake(Math.max(0, shake - dt * 3));
+    }
+
     if (mode === 'first') {
-      camera.position.set(t.x + Math.sin(yaw.current) * 0.4, t.y + 0.55, t.z + Math.cos(yaw.current) * 0.4);
+      camera.position.set(t.x + Math.sin(yaw.current) * 0.4 + shakeX, t.y + 0.55 + shakeY, t.z + Math.cos(yaw.current) * 0.4 + shakeZ);
       const look = tmp.current.set(
         t.x + Math.sin(yaw.current) * 8,
         t.y + 0.55 + p * 4,
@@ -107,10 +122,8 @@ export function CameraRig({ target, yaw, pitch, mode }: Props) {
       const offY = 1.8 + p * 1.5 + dist * 0.12;
       const cx = t.x - Math.sin(yaw.current) * dist;
       const cz = t.z - Math.cos(yaw.current) * dist;
-      // Frame-rate-independent follow. ~0.1s settle time on a 60fps device,
-      // and feels the same on 30fps and 120fps screens.
       const a = Math.min(1, dt * 8);
-      camera.position.lerp(tmp.current.set(cx, t.y + offY, cz), a);
+      camera.position.lerp(tmp.current.set(cx + shakeX, t.y + offY + shakeY, cz + shakeZ), a);
       camera.lookAt(t.x, t.y + 0.6, t.z);
     }
   });

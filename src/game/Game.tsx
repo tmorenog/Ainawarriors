@@ -248,6 +248,53 @@ function PlayerController({
       });
     }
 
+    // F (swipe) — fast claw attack. Less damage than pounce but no
+    // wind-up, and only meaningful while a battle is active.
+    if (c.attack) {
+      c.attack = false;
+      const sStore = useGameStore.getState();
+      if (sStore.battleActive && sStore.battlePhase === 'fighting') {
+        const tx = NPCS.tigerstar.pos[0], tz = NPCS.tigerstar.pos[2];
+        const tdx = pos.current.x - tx;
+        const tdz = pos.current.z - tz;
+        if (tdx * tdx + tdz * tdz < 3.0 * 3.0) {
+          const next = Math.max(0, sStore.tigerstarHp - 10);
+          sStore.setTigerstarHp(next);
+          sStore.setHud({ hp: Math.max(0, hud.hp - 4) });
+          sStore.setCameraShake(0.45);
+          try { getAudioEngine().playStinger('miss'); } catch {}
+          if (next <= 0) {
+            sStore.setMission('won');
+            sStore.setNpcDialogId(null);
+            sStore.setBattlePhase('victory');
+            setTimeout(() => {
+              const s = useGameStore.getState();
+              s.setBattleActive(false);
+              s.setBattlePhase('idle');
+            }, 2500);
+            sStore.pushChat({
+              id: 'sys' + Date.now(),
+              fromId: 'system',
+              fromName: 'StarClan',
+              scope: 'system',
+              text: 'Your final swipe finds his throat. Tigerstar collapses — the forest exhales.',
+              at: Date.now(),
+            });
+            sStore.setHud({ hp: 100, stamina: 100, reputation: Math.min(100, hud.reputation + 25) });
+          } else {
+            sStore.pushChat({
+              id: 'sys' + Date.now(),
+              fromId: 'system',
+              fromName: 'StarClan',
+              scope: 'system',
+              text: `You swipe Tigerstar! (${next}/100 hp left)`,
+              at: Date.now(),
+            });
+          }
+        }
+      }
+    }
+
     // attempt to catch nearest prey when pouncing — pounce reach widened
     // from 1.4 → 2.4 so a well-aimed lunge actually lands. Crouching gives
     // a small extra reach bonus to reward stalking.
@@ -264,10 +311,18 @@ function PlayerController({
           store.setTigerstarHp(next);
           // Tigerstar bites back — the player loses some HP too.
           store.setHud({ hp: Math.max(0, hud.hp - 8) });
+          store.setCameraShake(0.6);
           if (next <= 0) {
-            store.setBattleActive(false);
             store.setMission('won');
             store.setNpcDialogId(null);
+            store.setBattlePhase('victory');
+            store.setCameraShake(0.8);
+            // Hold the victory banner for 2.5s, then exit battle mode.
+            setTimeout(() => {
+              const s = useGameStore.getState();
+              s.setBattleActive(false);
+              s.setBattlePhase('idle');
+            }, 2500);
             store.pushChat({
               id: 'sys' + Date.now(),
               fromId: 'system',
