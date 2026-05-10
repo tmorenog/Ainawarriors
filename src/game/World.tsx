@@ -254,38 +254,81 @@ function Rocks({ count }: { count: number }) {
 }
 
 function Stars({ visible, count = 320 }: { visible: boolean; count?: number }) {
-  // A dome of point sprites high above the world. Only mounted on the night
-  // side of the day/night cycle, with a gentle twinkle via material opacity.
+  // A dome of point sprites high above the world plus a few "warrior"
+  // constellations — bright connected stars that trace the rough outline
+  // of a leaping cat, a pouncing kit, and a watching elder. The lore is
+  // that StarClan warriors walk the sky at night.
   const ref = useRef<THREE.Points>(null);
+  const constellationRef = useRef<THREE.LineSegments>(null);
   const positions = useMemo(() => {
     const a = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      // Spherical distribution — only the upper hemisphere
       const u = Math.random();
-      const v = Math.random() * 0.5; // 0..0.5 → upper hemisphere
+      const v = Math.random() * 0.5;
       const theta = u * Math.PI * 2;
       const phi = Math.acos(1 - 2 * v);
       const r = 240;
       a[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
-      a[i * 3 + 1] = r * Math.cos(phi) + 80; // lift the dome
+      a[i * 3 + 1] = r * Math.cos(phi) + 80;
       a[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
     }
     return a;
   }, [count]);
-  useFrame((_, dt) => {
-    if (!ref.current) return;
-    const mat = ref.current.material as THREE.PointsMaterial;
-    const t = performance.now() * 0.0006;
-    mat.opacity = visible ? 0.65 + Math.sin(t) * 0.18 : 0;
+
+  // Three small constellations placed at compass points around the dome.
+  // Each is a list of 3D vertex pairs that THREE.LineSegments connects.
+  const constellation = useMemo(() => {
+    const verts: number[] = [];
+    const cats: { ox: number; oz: number }[] = [
+      { ox: -160, oz: -180 }, // North-west: leaping warrior
+      { ox:  170, oz: -150 }, // North-east: pouncing kit
+      { ox:    0, oz:  220 }, // South: elder
+    ];
+    const offsets = [
+      // simple cat outline: head → body → tail tip → leg → leg
+      [[0, 14, 0], [4, 14, 0], [10, 12, 4], [14, 8, 6], [12, 4, 4], [8, 4, 0]],
+    ];
+    for (const c of cats) {
+      const pts = offsets[0];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        verts.push(c.ox + a[0], 110 + a[1], c.oz + a[2]);
+        verts.push(c.ox + b[0], 110 + b[1], c.oz + b[2]);
+      }
+    }
+    return new Float32Array(verts);
+  }, []);
+
+  useFrame(() => {
+    if (ref.current) {
+      const mat = ref.current.material as THREE.PointsMaterial;
+      const t = performance.now() * 0.0006;
+      mat.opacity = visible ? 0.65 + Math.sin(t) * 0.18 : 0;
+    }
+    if (constellationRef.current) {
+      const mat = constellationRef.current.material as THREE.LineBasicMaterial;
+      const t = performance.now() * 0.0008;
+      mat.opacity = visible ? 0.35 + Math.sin(t) * 0.18 : 0;
+    }
   });
+
   if (!visible) return null;
   return (
-    <points ref={ref}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} count={count} />
-      </bufferGeometry>
-      <pointsMaterial color={'#ffffff'} size={1.4} sizeAttenuation transparent opacity={0.8} depthWrite={false} />
-    </points>
+    <group>
+      <points ref={ref}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[positions, 3]} count={count} />
+        </bufferGeometry>
+        <pointsMaterial color={'#ffffff'} size={1.4} sizeAttenuation transparent opacity={0.8} depthWrite={false} />
+      </points>
+      {/* StarClan warriors etched in the sky */}
+      <lineSegments ref={constellationRef}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[constellation, 3]} count={constellation.length / 3} />
+        </bufferGeometry>
+        <lineBasicMaterial color={'#cdd9ff'} transparent opacity={0.4} depthWrite={false} />
+      </lineSegments>
+    </group>
   );
 }
 

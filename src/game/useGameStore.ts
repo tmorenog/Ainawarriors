@@ -128,6 +128,19 @@ interface GameStore {
   clanGathering: boolean;
   setClanGathering: (v: boolean) => void;
 
+  // Hard pause — when true, Game.tsx skips its useFrame work.
+  paused: boolean;
+  setPaused: (v: boolean) => void;
+
+  // Active disaster (random rare event) and its visible kind.
+  disaster: null | { kind: 'twoleg' | 'flood' | 'fire'; until: number; message: string };
+  setDisaster: (d: GameStore['disaster']) => void;
+
+  // Latest StarClan dream — shown as a card during the deep stage of
+  // sleep. Cleared once the cutscene ends.
+  dreamLine: string | null;
+  setDreamLine: (s: string | null) => void;
+
   // Rotating ambient task board — three quests at a time, auto-completing
   // as the player plays. Completed tasks are replaced with fresh ones.
   tasks: Task[];
@@ -237,6 +250,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   clanGathering: false,
   setClanGathering: (v) => set({ clanGathering: v }),
+
+  paused: false,
+  setPaused: (v) => set({ paused: v }),
+
+  disaster: null,
+  setDisaster: (d) => set({ disaster: d }),
+
+  dreamLine: null,
+  setDreamLine: (s) => set({ dreamLine: s }),
 
   tasks: generateTaskBoard(3),
   reseedTasks: () => set({ tasks: generateTaskBoard(3) }),

@@ -20,11 +20,16 @@ import { terrainHeightAt } from './terrain';
 //                 a small amount of damage (~6 hp / 2s).
 //   - 'won'     : he returns to camp.
 export function Npcs({ viewerRef }: { viewerRef: React.MutableRefObject<THREE.Object3D | null> }) {
+  // Tigerstar is replaced by Blackstar once the player has killed him —
+  // ShadowClan's deputy steps up. We swap which NPC actually renders.
+  const missionWon = useGameStore((s) => s.mission) === 'won';
   return (
     <>
-      {(Object.keys(NPCS) as NpcId[]).map((id) => (
-        <NpcInstance key={id} id={id} viewerRef={viewerRef} />
-      ))}
+      {(Object.keys(NPCS) as NpcId[]).map((id) => {
+        if (id === 'tigerstar' && missionWon) return null;
+        if (id === 'blackstar' && !missionWon) return null;
+        return <NpcInstance key={id} id={id} viewerRef={viewerRef} />;
+      })}
     </>
   );
 }

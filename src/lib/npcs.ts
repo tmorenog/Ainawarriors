@@ -2,7 +2,7 @@
 
 import type { CatAppearance } from '@/game/types';
 
-export type NpcId = 'firestar' | 'tigerstar' | 'leopardstar' | 'tallstar';
+export type NpcId = 'firestar' | 'tigerstar' | 'leopardstar' | 'tallstar' | 'blackstar';
 
 export interface NpcDef {
   id: NpcId;
@@ -133,16 +133,46 @@ const TALLSTAR_CAT: CatAppearance = {
   nightVision: true,
 };
 
+const BLACKSTAR_CAT: CatAppearance = {
+  id: 'npc_blackstar',
+  name: 'Blackstar',
+  prefix: 'Black',
+  suffix: 'star',
+  furBase: '#f4f1ea',
+  furBelly: '#ffffff',
+  furPattern: 'solid',
+  patternColor: '#1a1a1a',
+  patternColor2: '#a8a8a8',
+  patternColor3: '#1a1a1a',
+  eyeColor: 'amber',
+  earShape: 'standard',
+  tail: 'long',
+  fluffiness: 0.3,
+  size: 'large',
+  height: 1.1,
+  build: 1.1,
+  scars: ['flank'],
+  blush: false,
+  clan: 'ShadowClan',
+  role: 'Leader',
+  bubbleStyle: 'stone',
+  voicePitch: 0.85,
+  pupilSize: 0.3,
+  vision: 'normal',
+  nightVision: true,
+};
+
 // World location of the full-moon Gathering (Fourtrees-style clearing). All
-// four clan leaders converge here while clanGathering is true. Picked away
-// from any single camp so it feels neutral.
+// four clan leaders converge here while clanGathering is true.
 export const GATHERING_POS: [number, number, number] = [-100, 0, -90];
 
 // Each leader's seat at the Gathering — small radial offsets so they don't
-// stack on top of each other.
+// stack on top of each other. Blackstar takes Tigerstar's seat once
+// Tigerstar is dead.
 export const GATHERING_SEATS: Record<NpcId, [number, number]> = {
   firestar:    [-2, -2],
   tigerstar:   [ 2, -2],
+  blackstar:   [ 2, -2],
   leopardstar: [-2,  2],
   tallstar:    [ 2,  2],
 };
@@ -191,6 +221,17 @@ export const NPCS: Record<NpcId, NpcDef> = {
       'The wind brought your scent before you. WindClan holds the moor — be careful where your paws fall, kin of trees.',
     options: [
       { label: 'May your hunt be swift, Tallstar.', result: 'goodbye' },
+    ],
+  },
+  blackstar: {
+    id: 'blackstar',
+    cat: BLACKSTAR_CAT,
+    // Stands where Tigerstar used to be once Tigerstar is dead.
+    pos: [-20, 0, 50],
+    greeting:
+      'Tigerstar is gone. I am Blackstar, and ShadowClan will not bow. We honour the truce — but our claws are still sharp.',
+    options: [
+      { label: 'Walk in peace, Blackstar.', result: 'goodbye' },
     ],
   },
 };

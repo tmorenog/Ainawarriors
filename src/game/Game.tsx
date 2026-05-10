@@ -109,6 +109,7 @@ function PlayerController({
 
   useFrame((_, dt) => {
     if (!cat) return;
+    if (useGameStore.getState().paused) return; // hard pause
     const c = controlsRef.current;
     yaw.current += c.yaw; c.yaw = 0;
     pitch.current += c.pitch; c.pitch = 0;
@@ -864,12 +865,78 @@ export function Game({ room, net }: GameProps) {
     return () => clearInterval(id);
   }, [roomState, setRoom]);
 
-  // Full-moon Gathering — every ~2 minutes a meeting opens at Fourtrees
-  // and lasts 90 seconds. All four leader NPCs converge there. Pure
-  // client-side timer so it works in offline mode too.
+  // Random disasters — every ~60s we roll. ~5% chance each of fire,
+  // flood, twoleg invasion. Only one active at a time. Each runs 45s,
+  // shown via a banner overlay and drains a little HP/hunger to keep it
+  // dramatic but never fatal on its own.
   useEffect(() => {
-    const PERIOD = 120_000;   // 2 min
-    const DURATION = 90_000;  // 1.5 min open
+    const id = setInterval(() => {
+      const s = useGameStore.getState();
+      if (s.disaster && Date.now() < s.disaster.until) return; // active
+      if (s.disaster && Date.now() >= s.disaster.until) {
+        s.setDisaster(null);
+        s.pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
+          text: 'The danger has passed. The forest holds its breath.', at: Date.now() });
+        return;
+      }
+      const roll = Math.random();
+      let pick: 'twoleg' | 'flood' | 'fire' | null = null;
+      if (roll < 0.05) pick = 'twoleg';
+      else if (roll < 0.10) pick = 'flood';
+      else if (roll < 0.15) pick = 'fire';
+      if (!pick) return;
+      const messages: Record<typeof pick, string> = {
+        twoleg: 'TWOLEGS in the forest! Hide, or they will carry you away in a cage!',
+        flood:  'The river bursts its banks — a flood pours through RiverClan! Higher ground, now!',
+        fire:   'Smoke on the wind — FIRE in the pines! Run for water!',
+      };
+      s.setDisaster({ kind: pick, until: Date.now() + 45_000, message: messages[pick] });
+      s.pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
+        text: messages[pick], at: Date.now() });
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Random inter-clan drama + rude clanmate banter — every ~75s a one-off
+  // message from an unseen warrior. Flavour only, no mechanics.
+  useEffect(() => {
+    const dramatic = [
+      'A WindClan patrol crossed our scent markers near the moor — Bramblepaw saw them.',
+      'RiverClan brags about fish — they always do.',
+      'ShadowClan deputies whisper about a new alliance against the river.',
+      'The kits stole a vole from the elders\' den again.',
+      'Mistyfoot called the apprentices lazy. She wasn\'t wrong.',
+      'An elder swears she saw a fox-shape at dusk near the Thunderpath.',
+      'A loner hissed at a ThunderClan patrol and ran — strange.',
+    ];
+    const rude = [
+      'You walk too loud, kit. Even a deaf squirrel would hear you.',
+      'Did your mother teach you how to crouch? She did a bad job.',
+      'I have caught more prey before dawn than you all moon.',
+      'Move, mouse-brain. I have actual hunting to do.',
+      'Half-tail couldn\'t track a fish in a puddle.',
+    ];
+    const id = setInterval(() => {
+      const s = useGameStore.getState();
+      const r = Math.random();
+      if (r < 0.5) {
+        s.pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'Whispers', scope: 'system',
+          text: dramatic[Math.floor(Math.random() * dramatic.length)], at: Date.now() });
+      } else {
+        const speakers = ['Dustpelt', 'Mistyfoot', 'Thornclaw', 'Whitestorm', 'Sandstorm'];
+        s.pushChat({ id: 'sys' + Date.now(), fromId: 'npc:rude', fromName: speakers[Math.floor(Math.random() * speakers.length)], scope: 'nearby',
+          text: rude[Math.floor(Math.random() * rude.length)], at: Date.now() });
+      }
+    }, 75_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Full-moon Gathering — once per "month" (every ~12 minutes of real
+  // time) and lasts 6 minutes. All four leader NPCs converge at
+  // Fourtrees. Pure client-side timer so it works in offline mode too.
+  useEffect(() => {
+    const PERIOD = 12 * 60 * 1000;   // ~12 min between gatherings
+    const DURATION = 6 * 60 * 1000;  // ~6 min open
     const tick = () => {
       const t = Date.now() % PERIOD;
       const open = t < DURATION;

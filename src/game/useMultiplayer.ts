@@ -308,15 +308,23 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
       try { bcRef.current?.postMessage({ kind: 'chat', msg } as BcMessage); } catch {}
     },
     sendEmote: (emote) => {
-      // Both online and offline: count it for the rotating "use N emotes" task.
       try { useGameStore.getState().bumpTask('emote-n', 1); } catch {}
+      // Vocalize the emote — purr/meow/hiss/mew get said out loud as a
+      // chat line in addition to the *action* asterisk version. Other
+      // emotes stay as actions only.
+      const said: Record<string, string> = {
+        purr: 'mrrrr…',
+        mew: 'mew!',
+        hiss: 'hsssss!',
+      };
       if (socketRef.current) {
         socketRef.current.emit('emote', { emote });
         return;
       }
       if (!cat) return;
       const myId = bcIdRef.current || useGameStore.getState().selfId;
-      useGameStore.getState().pushChat({
+      const s = useGameStore.getState();
+      s.pushChat({
         id: 'em' + Date.now(),
         fromId: myId,
         fromName: cat.name,
@@ -325,6 +333,16 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
         at: Date.now(),
         emote,
       });
+      if (said[emote]) {
+        s.pushChat({
+          id: 'sp' + Date.now(),
+          fromId: myId,
+          fromName: cat.name,
+          scope: 'nearby',
+          text: said[emote],
+          at: Date.now() + 1,
+        });
+      }
       try { bcRef.current?.postMessage({ kind: 'emote', id: myId, name: cat.name, emote } as BcMessage); } catch {}
     },
     sendCommand: (kind, payload) => socketRef.current?.emit('command', { kind, payload }),
