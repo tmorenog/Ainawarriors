@@ -19,7 +19,9 @@ Open http://localhost:3000.
 To enable multiplayer locally, copy `.env.example` to `.env.local` and set:
 
 ```
-NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
+WARRIOR_CATS_PUBLIC_SOCKET_URL=http://localhost:3001
+# On Vercel / Next deployments, also set this so the browser bundle sees it:
+# NEXT_PUBLIC_WARRIOR_CATS_SOCKET_URL=http://localhost:3001
 ```
 
 Without that variable the game runs in offline single-player mode, where you are the leader of your chosen clan.
@@ -30,7 +32,7 @@ Without that variable the game runs in offline single-player mode, where you are
 
 1. Push this repo to GitHub.
 2. Import the repo in Vercel as a **Next.js** project.
-3. In Project → Settings → Environment Variables, set `NEXT_PUBLIC_SOCKET_URL` to your Socket.io server URL (e.g. `https://warriors-server.onrender.com`). Leave it blank for offline-only.
+3. In Project → Settings → Environment Variables, set `WARRIOR_CATS_PUBLIC_SOCKET_URL` (and the Next-visible variant `NEXT_PUBLIC_WARRIOR_CATS_SOCKET_URL`) to your Socket.io server URL (e.g. `https://warriors-server.onrender.com`). Leave it blank for offline-only.
 4. Deploy.
 
 ### Multiplayer server → Render / Railway / Fly.io
