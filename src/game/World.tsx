@@ -264,10 +264,10 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
         shadow-mapSize-width={graphics === 'high' ? 2048 : 1024}
         shadow-mapSize-height={graphics === 'high' ? 2048 : 1024}
       />
-      <ambientLight intensity={isNight ? 0.25 : 0.55} color={isNight ? '#243049' : '#ffffff'} />
-      {isNight && (
-        <hemisphereLight args={['#aabbe6', '#10162a', 0.4]} />
-      )}
+      {/* Ambient + hemisphere fill so the scene is well lit even if the
+          directional light fails to compute on a constrained device */}
+      <ambientLight intensity={isNight ? 0.5 : 0.85} color={isNight ? '#243049' : '#ffffff'} />
+      <hemisphereLight args={[isNight ? '#aabbe6' : '#cfe9f3', isNight ? '#10162a' : '#5a7d4f', 0.6]} />
 
       {/* terrain */}
       <mesh receiveShadow geometry={terrainGeo}>
