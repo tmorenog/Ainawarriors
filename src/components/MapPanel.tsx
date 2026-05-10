@@ -90,9 +90,11 @@ export function MapPanel() {
 
   if (!open) {
     return (
+      // Sits on the LEFT of the screen, just under the player info card.
+      // Keeps the right edge clear for Book / Tasks / Zoom / Settings.
       <button
         onClick={() => setOpen(true)}
-        className="absolute right-3 bottom-[170px] z-30 rounded-full bg-black/55 hover:bg-black/75 backdrop-blur w-12 h-12 grid place-items-center text-bone text-base font-display shadow-lg pointer-events-auto border border-white/15"
+        className="absolute left-3 top-32 z-30 rounded-full bg-black/55 hover:bg-black/75 backdrop-blur w-12 h-12 grid place-items-center text-bone text-base font-display shadow-lg pointer-events-auto border border-white/15"
         title="Open territory map"
         aria-label="Open territory map"
       >
