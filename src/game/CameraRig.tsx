@@ -90,7 +90,7 @@ export function CameraRig({ target, yaw, pitch, mode }: Props) {
     };
   }, [gl]);
 
-  useFrame(() => {
+  useFrame((_, dt) => {
     if (!target.current) return;
     const t = target.current.position;
     const p = Math.max(-0.9, Math.min(0.9, pitch.current));
@@ -107,7 +107,10 @@ export function CameraRig({ target, yaw, pitch, mode }: Props) {
       const offY = 1.8 + p * 1.5 + dist * 0.12;
       const cx = t.x - Math.sin(yaw.current) * dist;
       const cz = t.z - Math.cos(yaw.current) * dist;
-      camera.position.lerp(tmp.current.set(cx, t.y + offY, cz), 0.15);
+      // Frame-rate-independent follow. ~0.1s settle time on a 60fps device,
+      // and feels the same on 30fps and 120fps screens.
+      const a = Math.min(1, dt * 8);
+      camera.position.lerp(tmp.current.set(cx, t.y + offY, cz), a);
       camera.lookAt(t.x, t.y + 0.6, t.z);
     }
   });

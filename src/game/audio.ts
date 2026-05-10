@@ -116,15 +116,18 @@ class AudioEngine {
     let cancelled = false;
     const cricket = () => {
       if (cancelled) return;
-      const buf = ctx.createBuffer(1, 2048, ctx.sampleRate);
+      // Fresh noise per chirp + a wider band-pass sweep so each cricket has
+      // a slightly different "voice". The previous version reused a static
+      // buffer which made the chorus sound mechanical.
+      const buf = ctx.createBuffer(1, 1024 + Math.floor(Math.random() * 1536), ctx.sampleRate);
       const data = buf.getChannelData(0);
       for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
       const src = ctx.createBufferSource();
       src.buffer = buf;
       const bp = ctx.createBiquadFilter();
       bp.type = 'bandpass';
-      bp.frequency.value = 4500 + Math.random() * 1500;
-      bp.Q.value = 22;
+      bp.frequency.value = 3800 + Math.random() * 2200;
+      bp.Q.value = 18 + Math.random() * 10;
       const g = ctx.createGain();
       g.gain.setValueAtTime(0, ctx.currentTime);
       g.gain.linearRampToValueAtTime(0.10, ctx.currentTime + 0.005);
@@ -184,7 +187,9 @@ class AudioEngine {
     const ctx = this.ctx!, master = this.master!;
     const stops: (() => void)[] = [];
 
-    // Tense low cello-ish drone, plus rhythmic woodblock pulses
+    // Tense low cello-ish drone, plus rhythmic woodblock pulses.
+    // A slow LFO modulates the drone's pitch (~±4 Hz around 82) so the
+    // tone breathes instead of sitting on a flat sawtooth.
     const drone = ctx.createOscillator();
     const dg = ctx.createGain();
     drone.type = 'sawtooth';
@@ -196,6 +201,13 @@ class AudioEngine {
     drone.connect(dlp).connect(dg).connect(master);
     drone.start();
     dg.gain.linearRampToValueAtTime(0.10, ctx.currentTime + 0.4);
+
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.frequency.value = 0.45;
+    lfoGain.gain.value = 4;
+    lfo.connect(lfoGain).connect(drone.frequency);
+    lfo.start();
 
     // Heartbeat rhythm
     let cancelled = false;
@@ -221,6 +233,7 @@ class AudioEngine {
       dg.gain.cancelScheduledValues(ctx.currentTime);
       dg.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
       drone.stop(ctx.currentTime + 0.5);
+      try { lfo.stop(ctx.currentTime + 0.5); } catch {}
     });
     this.nodes.push({ stop: () => stops.forEach((s) => s()) });
   }
@@ -302,6 +315,28 @@ class AudioEngine {
       });
     });
     this.nodes.push({ stop: () => stops.forEach((s) => s()) });
+  }
+
+  // One-shot UI sound — does not interrupt the current background mode.
+  // Used today only by the "Missed!" pounce feedback.
+  playStinger(kind: 'miss') {
+    const ctx = this.ensure();
+    if (!ctx || !this.master) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const master = this.master;
+    if (kind === 'miss') {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(360, ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + 0.18);
+      g.gain.setValueAtTime(0, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
+      o.connect(g).connect(master);
+      o.start();
+      o.stop(ctx.currentTime + 0.25);
+    }
   }
 }
 
