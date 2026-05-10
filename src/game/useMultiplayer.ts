@@ -125,7 +125,16 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
 
     const me: PlayerState = {
       socketId: myId,
-      cat,
+      // Both tabs load the same cat from localStorage, so without a tweak
+      // the OTHER tab sees a duplicate of your name. Append a short tag
+      // derived from the tab id (e.g. "Flamestorm·b4f2") so each tab is
+      // visually distinct over the wire. Your own HUD still uses the
+      // un-suffixed cat from the store, so you see your real name.
+      cat: {
+        ...cat,
+        name: `${cat.name}·${myId.slice(-4)}`,
+        id: `${cat.id}__${myId}`,
+      },
       pos: [0, 0, 0],
       rot: 0,
       anim: 'idle',
