@@ -12,6 +12,7 @@ import { createControls, useKeyboardControls, useMouseLook } from './useControls
 import { useGameStore } from './useGameStore';
 import { CLANS } from '@/lib/clans';
 import { SIZE_STATS } from './types';
+import { SilentErrorBoundary } from '@/components/SilentErrorBoundary';
 
 export interface GameNetHandle {
   sendMove: (pos: [number, number, number], rot: number, anim: string) => void;
@@ -254,46 +255,54 @@ export function Game({ room, net }: GameProps) {
       }}
     >
       <Suspense fallback={null}>
-        <World
-          timeOfDay={roomState.timeOfDay}
-          weather={roomState.weather}
-          season={roomState.season}
-          graphics={settings.graphics}
-        />
+        <SilentErrorBoundary label="world">
+          <World
+            timeOfDay={roomState.timeOfDay}
+            weather={roomState.weather}
+            season={roomState.season}
+            graphics={settings.graphics}
+          />
+        </SilentErrorBoundary>
 
         {/* self */}
-        <group ref={selfRef as any}>
-          <Cat cat={cat} anim={anim as any} carrying={useGameStore.getState().carrying} />
-          {bubbles.get(selfId) && <RemoteBubble text={bubbles.get(selfId)!} />}
-        </group>
+        <SilentErrorBoundary label="self">
+          <group ref={selfRef as any}>
+            <Cat cat={cat} anim={anim as any} carrying={useGameStore.getState().carrying} />
+            {bubbles.get(selfId) && <RemoteBubble text={bubbles.get(selfId)!} />}
+          </group>
+        </SilentErrorBoundary>
 
         {/* others */}
-        {Object.values(players).map((p) => {
-          if (p.socketId === selfId) return null;
-          return (
-            <group key={p.socketId} position={p.pos} rotation={[0, p.rot, 0]}>
-              <Cat cat={p.cat} anim={p.anim as any} />
-              <NameTag name={p.cat.name} role={p.cat.role} isLeader={p.isLeader} isDeputy={p.isDeputy} />
-              {bubbles.get(p.socketId) && <RemoteBubble text={bubbles.get(p.socketId)!} />}
-            </group>
-          );
-        })}
+        <SilentErrorBoundary label="others">
+          {Object.values(players).map((p) => {
+            if (p.socketId === selfId) return null;
+            return (
+              <group key={p.socketId} position={p.pos} rotation={[0, p.rot, 0]}>
+                <Cat cat={p.cat} anim={p.anim as any} />
+                <NameTag name={p.cat.name} role={p.cat.role} isLeader={p.isLeader} isDeputy={p.isDeputy} />
+                {bubbles.get(p.socketId) && <RemoteBubble text={bubbles.get(p.socketId)!} />}
+              </group>
+            );
+          })}
+        </SilentErrorBoundary>
 
         {/* prey */}
-        {preyList.current.map((p) => (
-          <PreyMesh
-            key={p.id}
-            state={p}
-            threat={selfRef.current ? selfRef.current.position : null}
-            onCaught={(id) => {
-              const found = preyList.current.find((x) => x.id === id);
-              if (found) net.sendCatch(id, found.kind);
-              const cur = useGameStore.getState();
-              cur.setHud({ hunger: Math.min(100, cur.hud.hunger + 18) });
-              cur.pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: `You caught a ${found?.kind ?? 'prey'}.`, at: Date.now() });
-            }}
-          />
-        ))}
+        <SilentErrorBoundary label="prey">
+          {preyList.current.map((p) => (
+            <PreyMesh
+              key={p.id}
+              state={p}
+              threat={selfRef.current ? selfRef.current.position : null}
+              onCaught={(id) => {
+                const found = preyList.current.find((x) => x.id === id);
+                if (found) net.sendCatch(id, found.kind);
+                const cur = useGameStore.getState();
+                cur.setHud({ hunger: Math.min(100, cur.hud.hunger + 18) });
+                cur.pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: `You caught a ${found?.kind ?? 'prey'}.`, at: Date.now() });
+              }}
+            />
+          ))}
+        </SilentErrorBoundary>
 
         <CameraRig target={selfRef as any} yaw={yaw} pitch={pitch} mode={settings.cameraMode} />
         <PlayerController
