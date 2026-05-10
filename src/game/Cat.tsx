@@ -66,6 +66,29 @@ const Leg = forwardRef<THREE.Group, LegProps>(function Leg({ position, material,
       <mesh position={[0, -0.33, back ? 0.085 : 0.025]} scale={[1.1, 0.45, 1.25]} material={material}>
         <sphereGeometry args={[0.062, 14, 10]} />
       </mesh>
+      {/* Pink toe beans (4) underneath the paw — visible at low angles */}
+      <group position={[0, -0.345, back ? 0.085 : 0.025]}>
+        <mesh position={[0, 0, 0]}>
+          <sphereGeometry args={[0.018, 10, 8]} />
+          <meshStandardMaterial color={'#f3a3b4'} roughness={0.5} />
+        </mesh>
+        <mesh position={[0.025, 0, 0.022]}>
+          <sphereGeometry args={[0.012, 10, 8]} />
+          <meshStandardMaterial color={'#f3a3b4'} roughness={0.5} />
+        </mesh>
+        <mesh position={[0.025, 0, -0.022]}>
+          <sphereGeometry args={[0.012, 10, 8]} />
+          <meshStandardMaterial color={'#f3a3b4'} roughness={0.5} />
+        </mesh>
+        <mesh position={[-0.025, 0, 0.022]}>
+          <sphereGeometry args={[0.012, 10, 8]} />
+          <meshStandardMaterial color={'#f3a3b4'} roughness={0.5} />
+        </mesh>
+        <mesh position={[-0.025, 0, -0.022]}>
+          <sphereGeometry args={[0.012, 10, 8]} />
+          <meshStandardMaterial color={'#f3a3b4'} roughness={0.5} />
+        </mesh>
+      </group>
     </group>
   );
 });
@@ -332,6 +355,12 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
           {/* mouth — flat "3" sitting on the muzzle just below the nose */}
           <mesh position={[0.272, -0.082, 0]} geometry={CAT_MOUTH_GEO} renderOrder={2}>
             <meshBasicMaterial color={'#3a1f24'} depthTest={true} />
+          </mesh>
+
+          {/* tiny pink tongue tip peeking out under the mouth */}
+          <mesh position={[0.276, -0.092, 0]} scale={[0.4, 0.4, 0.6]}>
+            <sphereGeometry args={[0.022, 12, 10]} />
+            <meshStandardMaterial color={'#f08aa3'} roughness={0.55} />
           </mesh>
 
           {/* soft pink blush spots on the cheeks for extra cuteness */}
