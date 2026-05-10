@@ -282,7 +282,7 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
           delete lastSeenRef.current[id];
         }
       }
-    }, 2000) as unknown as number;
+    }, 1000) as unknown as number;
 
     const onUnload = () => {
       try { send({ kind: 'leave', id: myId }); } catch {}
@@ -339,7 +339,11 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
         isDeputy: cur?.isDeputy ?? false,
       };
       useGameStore.getState().upsertPlayer(next);
-      try { bcRef.current?.postMessage({ kind: 'state', player: next } as BcMessage); } catch {}
+      // Try both the closed-over ref AND the window-level handle. If the
+      // hook ever re-mounted, bcRef.current could briefly be stale; the
+      // window value is always the freshest live BroadcastChannel.
+      const bc = bcRef.current ?? (typeof window !== 'undefined' ? (window as any).__WOTC_BC__ : null);
+      try { bc?.postMessage({ kind: 'state', player: next } as BcMessage); } catch {}
     },
     sendChat: (text, scope) => {
       if (socketRef.current) {
