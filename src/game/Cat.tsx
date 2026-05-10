@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import type { CatAppearance } from './types';
 import { SIZE_STATS } from './types';
 import { normalizeCat } from '@/lib/normalizeCat';
+import { buildFurTexture, hashId } from './furTexture';
 
 interface CatProps {
   cat: CatAppearance;
@@ -15,16 +16,6 @@ interface CatProps {
   injured?: boolean;
   carrying?: string | null;
 }
-
-const PATTERN_TINT: Record<string, number> = {
-  solid: 0,
-  tabby: 0.45,
-  tortoiseshell: 0.6,
-  calico: 0.5,
-  point: 0.3,
-  bicolor: 0.55,
-  spotted: 0.4,
-};
 
 // Flat ":3" cat-mouth curve, lying in the YZ plane (the cat faces +X).
 // Five control points trace a real "3" lying on its side:
@@ -103,10 +94,7 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
   const scale = stats.scale * cat.height;
   const buildScale = cat.build;
 
-  const furBase = useMemo(() => new THREE.Color(cat.furBase), [cat.furBase]);
-  const furBelly = useMemo(() => new THREE.Color(cat.furBelly), [cat.furBelly]);
-  const patternColor = useMemo(() => new THREE.Color(cat.patternColor), [cat.patternColor]);
-  const patternStrength = PATTERN_TINT[cat.furPattern] ?? 0;
+  // (Pattern is now baked into the canvas-generated furTexture below; no per-frame color math needed.)
 
   useFrame((_, dt) => {
     try {
@@ -201,24 +189,45 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
     }
   });
 
-  // body material with pattern tint
+  // Procedural fur texture for non-solid coats (spotted / tabby / tortoiseshell / calico / point / bicolor)
+  const furTexture = useMemo(
+    () => buildFurTexture({
+      pattern: cat.furPattern,
+      base: cat.furBase,
+      patternColor: cat.patternColor,
+      belly: cat.furBelly,
+      seed: hashId(cat.id || cat.name),
+    }),
+    [cat.furPattern, cat.furBase, cat.patternColor, cat.furBelly, cat.id, cat.name]
+  );
+  useEffect(() => () => { furTexture?.dispose(); }, [furTexture]);
+
+  // Smooth, slightly glossy fur — much less rough than before
   const bodyMaterial = useMemo(() => {
-    const c = furBase.clone().lerp(patternColor, patternStrength * 0.35);
-    return new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, metalness: 0 });
-  }, [furBase, patternColor, patternStrength]);
+    return new THREE.MeshStandardMaterial({
+      color: furTexture ? 0xffffff : cat.furBase, // let the texture show through when present
+      map: furTexture ?? null,
+      roughness: 0.55,
+      metalness: 0.02,
+      envMapIntensity: 0.7,
+    });
+  }, [furTexture, cat.furBase]);
 
   const bellyMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: furBelly, roughness: 0.9, metalness: 0 }),
-    [furBelly]
-  );
-
-  const stripesMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: patternColor, roughness: 0.85, metalness: 0, transparent: true, opacity: patternStrength * 0.85 }),
-    [patternColor, patternStrength]
+    () => new THREE.MeshStandardMaterial({
+      color: cat.furBelly,
+      roughness: 0.5,
+      metalness: 0.02,
+    }),
+    [cat.furBelly]
   );
 
   const earInnerMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#f4b8c4', roughness: 0.9 }),
+    () => new THREE.MeshStandardMaterial({
+      color: '#f4b8c4',
+      roughness: 0.45,
+      metalness: 0,
+    }),
     []
   );
 
@@ -257,35 +266,28 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
       </mesh>
 
       <group ref={bodyRef} position={[0, 0.5, 0]}>
-        {/* main body — short, chubby cylinder + sphere caps */}
-        <mesh castShadow rotation={[0, 0, Math.PI / 2]} material={bodyMaterial}>
-          <cylinderGeometry args={[bodyR, bodyR, bodyLen, 18]} />
+        {/* main body — short, chubby cylinder + sphere caps. Slight downward tilt toward the rear for a real cat slope. */}
+        <mesh castShadow rotation={[0, 0, Math.PI / 2 + 0.06]} material={bodyMaterial}>
+          <cylinderGeometry args={[bodyR, bodyR, bodyLen, 24]} />
         </mesh>
-        <mesh position={[bodyLen * 0.5, 0, 0]} material={bodyMaterial}>
-          <sphereGeometry args={[bodyR, 18, 14]} />
+        <mesh position={[bodyLen * 0.5, 0.02, 0]} material={bodyMaterial}>
+          <sphereGeometry args={[bodyR, 22, 18]} />
         </mesh>
-        <mesh position={[-bodyLen * 0.5, 0, 0]} material={bodyMaterial}>
-          <sphereGeometry args={[bodyR, 18, 14]} />
+        <mesh position={[-bodyLen * 0.5, -0.05, 0]} material={bodyMaterial}>
+          <sphereGeometry args={[bodyR, 22, 18]} />
         </mesh>
         {/* shoulders */}
-        <mesh position={[bodyLen * 0.4, 0.02, 0]} material={bodyMaterial}>
-          <sphereGeometry args={[bodyR * 1.06, 14, 12]} />
+        <mesh position={[bodyLen * 0.4, 0.04, 0]} material={bodyMaterial}>
+          <sphereGeometry args={[bodyR * 1.06, 18, 14]} />
         </mesh>
-        {/* round haunches — slightly flattened along forward axis for a soft butt */}
-        <mesh position={[-bodyLen * 0.42, 0.02, 0]} scale={[0.78, 0.95, 1.08]} material={bodyMaterial}>
-          <sphereGeometry args={[bodyR * 1.2, 18, 14]} />
+        {/* lower-back haunches — sit lower than shoulders for a real cat profile */}
+        <mesh position={[-bodyLen * 0.42, -0.06, 0]} scale={[0.78, 0.95, 1.08]} material={bodyMaterial}>
+          <sphereGeometry args={[bodyR * 1.2, 22, 16]} />
         </mesh>
         {/* fluffy belly */}
         <mesh position={[0, -bodyR * 0.45, 0]} rotation={[0, 0, Math.PI / 2]} scale={[1, 0.95, 0.78]} material={bellyMaterial}>
           <cylinderGeometry args={[bodyR * 0.78, bodyR * 0.78, bodyLen * 0.85, 14]} />
         </mesh>
-        {/* tabby / spotted overlay */}
-        {patternStrength > 0 && (
-          <mesh rotation={[0, 0, Math.PI / 2]} scale={[1.02, 1.02, 1.02]} material={stripesMaterial}>
-            <cylinderGeometry args={[bodyR * 1.005, bodyR * 1.005, bodyLen, 18]} />
-          </mesh>
-        )}
-
         {/* short, chubby neck */}
         <mesh position={[bodyLen * 0.55, 0.16, 0]} rotation={[0, 0, -0.55]} material={bodyMaterial}>
           <cylinderGeometry args={[bodyR * 0.78, bodyR * 0.92, 0.16, 14]} />
@@ -440,11 +442,11 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
           )}
         </group>
 
-        {/* legs — chubby kitten stance */}
+        {/* legs — chubby kitten stance, back legs sit lower with the dropped haunch */}
         <Leg ref={fLegL} position={[bodyLen * 0.38, -bodyR * 0.55, 0.13]} material={bodyMaterial} />
         <Leg ref={fLegR} position={[bodyLen * 0.38, -bodyR * 0.55, -0.13]} material={bodyMaterial} />
-        <Leg ref={bLegL} position={[-bodyLen * 0.38, -bodyR * 0.5, 0.13]} material={bodyMaterial} back />
-        <Leg ref={bLegR} position={[-bodyLen * 0.38, -bodyR * 0.5, -0.13]} material={bodyMaterial} back />
+        <Leg ref={bLegL} position={[-bodyLen * 0.38, -bodyR * 0.65, 0.13]} material={bodyMaterial} back />
+        <Leg ref={bLegR} position={[-bodyLen * 0.38, -bodyR * 0.65, -0.13]} material={bodyMaterial} back />
 
         {/* tail — slightly shorter to match the chibi body */}
         <SmoothTail
