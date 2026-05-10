@@ -14,6 +14,7 @@ import { WebGLGuard } from '@/components/WebGLGuard';
 import { BookPanel } from '@/components/BookPanel';
 import { TasksPanel } from '@/components/TasksPanel';
 import { Tutorial } from '@/components/Tutorial';
+import { NpcDialog } from '@/components/NpcDialog';
 import { useGameStore } from '@/game/useGameStore';
 import { useMultiplayer } from '@/game/useMultiplayer';
 import { patchSave, loadSave } from '@/lib/persist';
@@ -96,6 +97,7 @@ export default function Page() {
         <>
           <VisionOverlay />
           <GatherOverlay />
+          <FishOverlay />
           <SleepOverlay />
           <ErrorBoundary label="game" onReset={() => setScreen('title')}>
             {/* WebGLGuard probes for a usable WebGL context BEFORE we mount the
@@ -130,6 +132,7 @@ export default function Page() {
           <BookPanel />
           <TasksPanel />
           <Tutorial />
+          <NpcDialog />
         </>
       )}
 
@@ -248,6 +251,32 @@ function GatherOverlay() {
         </div>
       </div>
       <style>{`@keyframes gatherbar { from { width: 0% } to { width: 100% } }`}</style>
+    </div>
+  );
+}
+
+// Brief cutscene overlay shown while the player is fishing in the river.
+function FishOverlay() {
+  const fishing = useGameStore((s) => s.fishing);
+  return (
+    <div
+      className="absolute inset-0 z-40 pointer-events-none transition-opacity duration-300"
+      style={{
+        opacity: fishing ? 1 : 0,
+        background: 'radial-gradient(ellipse at center, rgba(20,40,60,0.55), rgba(0,0,0,0.4))',
+      }}
+    >
+      <div className="h-full grid place-items-center text-bone p-6">
+        <div className="text-center max-w-sm">
+          <div className="text-5xl mb-2 animate-pulse-soft">🐟</div>
+          <div className="font-display text-2xl mb-2">Watching the water…</div>
+          <div className="text-sm opacity-80">Crouch low. Strike fast.</div>
+          <div className="mt-4 h-1 w-48 mx-auto rounded-full overflow-hidden bg-white/10">
+            <div className="h-full bg-river animate-[fishbar_2.5s_linear_forwards]" />
+          </div>
+        </div>
+      </div>
+      <style>{`@keyframes fishbar { from { width: 0% } to { width: 100% } }`}</style>
     </div>
   );
 }

@@ -42,6 +42,14 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
 
   const gathering = useGameStore((s) => s.gathering);
   const setGathering = useGameStore((s) => s.setGathering);
+  const fishing = useGameStore((s) => s.fishing);
+  const setFishing = useGameStore((s) => s.setFishing);
+
+  // The river runs at x ≈ 180 (see makeTerrain in World.tsx). We show the
+  // "Fish" button only when the player's record places them within that
+  // band, so fishing is rooted in the world (RiverClan territory).
+  const meForFish = players[selfId];
+  const inRiver = !!meForFish && Math.abs(meForFish.pos[0] - 180) < 22;
 
   const gather = () => {
     if (gathering) return; // already searching
@@ -121,6 +129,16 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
         >
           Sleep at den
         </button>
+        {inRiver && (
+          <button
+            onClick={() => fish(setFishing, setCarrying, pushChat, carrying)}
+            disabled={fishing}
+            className={`rounded-full px-3 py-2 text-xs shadow ${fishing ? 'bg-river/30 cursor-wait' : 'bg-river/90 hover:bg-river'}`}
+            title="Fish in the RiverClan river — chance of a real fish, takes a moment"
+          >
+            {fishing ? 'Watching the water…' : '🐟 Fish in river'}
+          </button>
+        )}
         {(isLeader || isDeputy) && (
           <button onClick={onOpenLeader} className="rounded-full bg-river px-3 py-2 text-xs shadow">Leader actions</button>
         )}
@@ -180,7 +198,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-11 · dens + cutscenes
+        wotc-12 · firestar + tigerstar + fishing
       </div>
     </div>
   );
@@ -209,6 +227,57 @@ function KeyHints() {
       <span>WASD move</span><span>Shift sprint</span><span>C / Ctrl crouch</span><span>Q pounce</span><span>E interact</span><span>V camera</span>
     </div>
   );
+}
+
+// Fishing — RiverClan-style. The cat crouches over the bank for ~2.5s,
+// then either snags a fish (added to `carrying` so you can drop it on the
+// fresh-kill pile) or comes up empty. Takes the same throttling pattern
+// as the gather cutscene.
+function fish(
+  setFishing: (v: boolean) => void,
+  setCarrying: (s: string | null) => void,
+  pushChat: ReturnType<typeof useGameStore.getState>['pushChat'],
+  carrying: string | null,
+) {
+  const s = useGameStore.getState();
+  if (s.fishing) return;
+  setFishing(true);
+  setTimeout(() => {
+    const success = Math.random() < 0.6;
+    if (success) {
+      // Slot the fish into the carrying slot if free, otherwise just count
+      // it directly and credit the catch.
+      if (!carrying) setCarrying('fish');
+      const cur = useGameStore.getState();
+      cur.bumpTask('catch-any-n', 1);
+      cur.bumpTask('catch-fish-n', 1);
+      cur.bumpTask('pounce-streak', 1);
+      pushChat({
+        id: 'sys' + Date.now(),
+        fromId: 'system',
+        fromName: 'StarClan',
+        scope: 'system',
+        text: 'You hook a silver fish from the shallows!',
+        at: Date.now(),
+      });
+    } else {
+      const reasons = [
+        'The fish darts away — too fast.',
+        'A heron startles your prey.',
+        'The water is muddy from the rain. Nothing today.',
+        'You miss your strike — water flies, fish gone.',
+      ];
+      pushChat({
+        id: 'sys' + Date.now(),
+        fromId: 'system',
+        fromName: 'StarClan',
+        scope: 'system',
+        text: reasons[Math.floor(Math.random() * reasons.length)],
+        at: Date.now(),
+      });
+    }
+    setFishing(false);
+  }, 2500);
 }
 
 // Multi-stage sleep cutscene shared between the HUD's "Sleep at den" button

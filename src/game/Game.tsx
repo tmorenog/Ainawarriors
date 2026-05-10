@@ -15,6 +15,8 @@ import { SIZE_STATS, type PlayerState } from './types';
 import { SilentErrorBoundary } from '@/components/SilentErrorBoundary';
 import { terrainHeightAt } from './terrain';
 import { getAudioEngine } from './audio';
+import { Npcs } from './Npcs';
+import { NPCS } from '@/lib/npcs';
 
 export interface GameNetHandle {
   sendMove: (pos: [number, number, number], rot: number, anim: string) => void;
@@ -251,6 +253,44 @@ function PlayerController({
     // from 1.4 → 2.4 so a well-aimed lunge actually lands. Crouching gives
     // a small extra reach bonus to reward stalking.
     if (anim === 'pounce') {
+      // Tigerstar fight — if the battle is active and the player pounces
+      // within reach of Tigerstar, do damage. Each hit drops his HP by 18.
+      const store = useGameStore.getState();
+      if (store.battleActive) {
+        const tx = NPCS.tigerstar.pos[0], tz = NPCS.tigerstar.pos[2];
+        const tdx = pos.current.x - tx;
+        const tdz = pos.current.z - tz;
+        if (tdx * tdx + tdz * tdz < 3.5 * 3.5) {
+          const next = Math.max(0, store.tigerstarHp - 18);
+          store.setTigerstarHp(next);
+          // Tigerstar bites back — the player loses some HP too.
+          store.setHud({ hp: Math.max(0, hud.hp - 8) });
+          if (next <= 0) {
+            store.setBattleActive(false);
+            store.setMission('won');
+            store.setNpcDialogId(null);
+            store.pushChat({
+              id: 'sys' + Date.now(),
+              fromId: 'system',
+              fromName: 'StarClan',
+              scope: 'system',
+              text: 'Tigerstar collapses. The forest exhales — your name will be sung in every clan.',
+              at: Date.now(),
+            });
+            store.setHud({ hp: 100, stamina: 100, reputation: Math.min(100, hud.reputation + 25) });
+          } else {
+            store.pushChat({
+              id: 'sys' + Date.now(),
+              fromId: 'system',
+              fromName: 'StarClan',
+              scope: 'system',
+              text: `You strike Tigerstar! (${next}/100 hp left)`,
+              at: Date.now(),
+            });
+          }
+          return; // skip the prey branch this frame
+        }
+      }
       const closest = preyList.current
         .filter((p) => p.alive)
         .map((p) => ({ p, d: p.pos.distanceTo(pos.current) }))
@@ -619,6 +659,9 @@ export function Game({ room, net }: GameProps) {
         <SilentErrorBoundary label="prey">
           <PreyList preyList={preyList} selfRef={selfRef} netSendCatch={net.sendCatch} />
         </SilentErrorBoundary>
+
+        {/* NPCs — Firestar in ThunderClan camp, Tigerstar in ShadowClan camp */}
+        <Npcs viewerRef={selfRef} />
 
         <CameraRig target={selfRef as any} yaw={yaw} pitch={pitch} mode={settings.cameraMode} />
         <PlayerController
