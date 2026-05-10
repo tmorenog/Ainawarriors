@@ -24,9 +24,18 @@ export function BattleOverlay() {
     return null;
   }
 
-  const title = phase === 'intro' ? 'BATTLE!' : 'VICTORY';
-  const subtitle = phase === 'intro' ? 'Tigerstar bares his fangs.' : 'Tigerstar walks the Dark Forest.';
-  const tone = phase === 'intro' ? '#c64a4a' : '#cdb673';
+  const title =
+    phase === 'intro' ? 'BATTLE!' :
+    phase === 'victory' ? 'VICTORY' :
+    'DEFEAT';
+  const subtitle =
+    phase === 'intro' ? 'Tigerstar bares his fangs.' :
+    phase === 'victory' ? 'Tigerstar walks the Dark Forest.' :
+    'You are in StarClan\'s hands now…';
+  const tone =
+    phase === 'intro' ? '#c64a4a' :
+    phase === 'victory' ? '#cdb673' :
+    '#9aaee2';
 
   return (
     <div className="absolute inset-0 z-50 pointer-events-none grid place-items-center">

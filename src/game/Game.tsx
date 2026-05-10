@@ -27,6 +27,29 @@ interface GameProps {
   net: GameNetHandle;
 }
 
+// Shared post-victory rewards — Firestar's gift of fresh-kill, full
+// stats, and a celebratory chat line.
+function grantTigerstarVictory() {
+  const s = useGameStore.getState();
+  s.pushChat({
+    id: 'fs' + Date.now(),
+    fromId: 'system',
+    fromName: 'Firestar',
+    scope: 'system',
+    text: "Well done, young warrior! As a prize for doing this, I'll give you some fresh-kill — eat well, and rest tonight.",
+    at: Date.now(),
+  });
+  // Drop a piece of fresh-kill into the player's carrying slot if it's
+  // free, otherwise just credit hunger directly.
+  if (!s.carrying) s.setCarrying('rabbit');
+  s.setHud({
+    hp: 100,
+    stamina: 100,
+    hunger: Math.min(100, s.hud.hunger + 35),
+    reputation: Math.min(100, s.hud.reputation + 25),
+  });
+}
+
 function PlayerController({
   selfRef,
   catYaw,
@@ -67,6 +90,9 @@ function PlayerController({
   const lastTargetAt = useRef(0);
   const distanceAccum = useRef(0);
   const lastClanVisited = useRef<string | null>(null);
+  // When Tigerstar last bit / clawed the player on his own. Used to give
+  // him an autonomous attack rhythm during the fight.
+  const lastTigerAttackAt = useRef(0);
 
   useEffect(() => {
     if (cat) {
@@ -233,19 +259,70 @@ function PlayerController({
     // partial hunger restored. A real game would gate this behind StarClan
     // narration, but for now a quick respawn keeps the loop playable.
     if (hud.hp <= 0) {
+      const dStore = useGameStore.getState();
       const [cx, , cz] = CLANS[cat.clan].campCenter as [number, number, number];
       pos.current.set(cx, terrainHeightAt(cx, cz), cz);
       vy.current = 0;
       grounded.current = true;
-      setHud({ hp: 60, hunger: 50, stamina: 60 });
-      useGameStore.getState().pushChat({
-        id: 'sys' + Date.now(),
-        fromId: 'system',
-        fromName: 'StarClan',
-        scope: 'system',
-        text: `${cat.name}'s spirit walks among the stars... but you are returned to your clan.`,
-        at: Date.now(),
-      });
+      if (dStore.battleActive) {
+        // Defeat path during the Tigerstar fight — keep mission='accepted'
+        // so the player can come back and try again. Firestar's StarClan
+        // line plays under a "DEFEAT" banner.
+        dStore.setBattlePhase('defeat');
+        dStore.pushChat({
+          id: 'sys' + Date.now(),
+          fromId: 'system',
+          fromName: 'Firestar',
+          scope: 'system',
+          text: 'You are in StarClan\'s hands now, brave one.',
+          at: Date.now(),
+        });
+        // Reset battle and respawn back at camp after the defeat cutscene
+        setTimeout(() => {
+          const s = useGameStore.getState();
+          s.setBattleActive(false);
+          s.setBattlePhase('idle');
+          s.setTigerstarHp(100);
+          s.setHud({ hp: 70, stamina: 70, hunger: 50 });
+        }, 3000);
+      } else {
+        setHud({ hp: 60, hunger: 50, stamina: 60 });
+        dStore.pushChat({
+          id: 'sys' + Date.now(),
+          fromId: 'system',
+          fromName: 'StarClan',
+          scope: 'system',
+          text: `${cat.name}'s spirit walks among the stars... but you are returned to your clan.`,
+          at: Date.now(),
+        });
+      }
+    }
+
+    // While the battle is active and the player is close, Tigerstar bites
+    // and claws on his own roughly every 1.6 seconds. Drains player HP and
+    // shakes the camera. Independent of whether the player attacks.
+    {
+      const sNow = performance.now() / 1000;
+      const sStore = useGameStore.getState();
+      if (sStore.battleActive && sStore.battlePhase === 'fighting') {
+        const tx = NPCS.tigerstar.pos[0], tz = NPCS.tigerstar.pos[2];
+        const tdx = pos.current.x - tx;
+        const tdz = pos.current.z - tz;
+        if (tdx * tdx + tdz * tdz < 4.5 * 4.5 && sNow - lastTigerAttackAt.current > 1.6) {
+          lastTigerAttackAt.current = sNow;
+          sStore.setHud({ hp: Math.max(0, hud.hp - 7) });
+          sStore.setCameraShake(0.5);
+          sStore.triggerSwipeFx('bite');
+          sStore.pushChat({
+            id: 'sys' + Date.now(),
+            fromId: 'system',
+            fromName: 'Tigerstar',
+            scope: 'system',
+            text: 'Tigerstar bites you!',
+            at: Date.now(),
+          });
+        }
+      }
     }
 
     // F (swipe) — fast claw attack. Less damage than pounce but no
@@ -262,6 +339,7 @@ function PlayerController({
           sStore.setTigerstarHp(next);
           sStore.setHud({ hp: Math.max(0, hud.hp - 4) });
           sStore.setCameraShake(0.45);
+          sStore.triggerSwipeFx('swipe');
           try { getAudioEngine().playStinger('miss'); } catch {}
           if (next <= 0) {
             sStore.setMission('won');
@@ -280,7 +358,7 @@ function PlayerController({
               text: 'Your final swipe finds his throat. Tigerstar collapses — the forest exhales.',
               at: Date.now(),
             });
-            sStore.setHud({ hp: 100, stamina: 100, reputation: Math.min(100, hud.reputation + 25) });
+            grantTigerstarVictory();
           } else {
             sStore.pushChat({
               id: 'sys' + Date.now(),
@@ -312,6 +390,7 @@ function PlayerController({
           // Tigerstar bites back — the player loses some HP too.
           store.setHud({ hp: Math.max(0, hud.hp - 8) });
           store.setCameraShake(0.6);
+          store.triggerSwipeFx('pounce');
           if (next <= 0) {
             store.setMission('won');
             store.setNpcDialogId(null);
@@ -331,7 +410,7 @@ function PlayerController({
               text: 'Tigerstar collapses. The forest exhales — your name will be sung in every clan.',
               at: Date.now(),
             });
-            store.setHud({ hp: 100, stamina: 100, reputation: Math.min(100, hud.reputation + 25) });
+            grantTigerstarVictory();
           } else {
             store.pushChat({
               id: 'sys' + Date.now(),

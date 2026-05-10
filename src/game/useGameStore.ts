@@ -93,11 +93,16 @@ interface GameStore {
   //   'intro'    — opening cutscene banner ("BATTLE: TIGERSTAR"), 2s
   //   'fighting' — full control, you can pounce (Q) or swipe (F)
   //   'victory'  — closing cutscene banner ("VICTORY"), 2.5s
-  battlePhase: 'idle' | 'intro' | 'fighting' | 'victory';
-  setBattlePhase: (p: 'idle' | 'intro' | 'fighting' | 'victory') => void;
+  battlePhase: 'idle' | 'intro' | 'fighting' | 'victory' | 'defeat';
+  setBattlePhase: (p: 'idle' | 'intro' | 'fighting' | 'victory' | 'defeat') => void;
   // Camera shake magnitude — decays each frame; set on every hit
   cameraShake: number;
   setCameraShake: (n: number) => void;
+  // Timestamp of the most recent swipe / pounce attack — the SwipeFX
+  // overlay watches this and animates a claw-mark slash.
+  swipeFlashAt: number;
+  swipeFlashKind: 'pounce' | 'swipe' | 'bite';
+  triggerSwipeFx: (kind: 'pounce' | 'swipe' | 'bite') => void;
 
   // Fishing — like gathering, a short cutscene with a chance of failure,
   // but only triggerable when the player is standing in the river.
@@ -204,6 +209,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setBattlePhase: (p) => set({ battlePhase: p }),
   cameraShake: 0,
   setCameraShake: (n) => set({ cameraShake: n }),
+  swipeFlashAt: 0,
+  swipeFlashKind: 'swipe',
+  triggerSwipeFx: (kind) => set({ swipeFlashAt: Date.now(), swipeFlashKind: kind }),
 
   fishing: false,
   setFishing: (v) => set({ fishing: v }),

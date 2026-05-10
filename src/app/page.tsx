@@ -18,6 +18,7 @@ import { NpcDialog } from '@/components/NpcDialog';
 import { WaypointArrow } from '@/components/WaypointArrow';
 import { MapPanel } from '@/components/MapPanel';
 import { BattleOverlay } from '@/components/BattleOverlay';
+import { SwipeFX } from '@/components/SwipeFX';
 import { useGameStore } from '@/game/useGameStore';
 import { useMultiplayer } from '@/game/useMultiplayer';
 import { patchSave, loadSave } from '@/lib/persist';
@@ -140,6 +141,7 @@ export default function Page() {
           <WaypointArrow />
           <MapPanel />
           <BattleOverlay />
+          <SwipeFX />
         </>
       )}
 
