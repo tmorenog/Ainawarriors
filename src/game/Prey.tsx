@@ -108,16 +108,18 @@ export const PreyMesh = forwardRef<THREE.Group, PreyMeshProps>(function PreyMesh
         // Flee — crouching also reduces the panic speed because the prey
         // is less alarmed.
         const away = state.pos.clone().sub(threat).setY(0).normalize();
-        const fleeSpeed = (state.kind === 'rabbit' ? 9 : 6) * (crouching ? 0.45 : 1);
+        // Way slower flee — rabbits 4.0, everything else 2.4. Crouching
+        // halves it again so a stalking cat outpaces any fleeing prey.
+        const fleeSpeed = (state.kind === 'rabbit' ? 4.0 : 2.4) * (crouching ? 0.45 : 1);
         desired.copy(away).multiplyScalar(fleeSpeed);
         state.alarmed = true;
       } else {
         state.alarmed = false;
-        // wander to home
+        // wander to home — slower idle drift too.
         const back = state.home.clone().sub(state.pos).setY(0);
-        if (back.length() > 6) desired.copy(back.normalize().multiplyScalar(1.5));
+        if (back.length() > 6) desired.copy(back.normalize().multiplyScalar(0.7));
         else {
-          desired.set(Math.sin(t.current * 0.7), 0, Math.cos(t.current * 0.5)).multiplyScalar(0.8);
+          desired.set(Math.sin(t.current * 0.7), 0, Math.cos(t.current * 0.5)).multiplyScalar(0.35);
         }
       }
     }
