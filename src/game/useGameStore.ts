@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import type { CatAppearance, ChatMessage, PlayerState, RoomState } from './types';
 import type { GameSettings } from '@/lib/persist';
 import { DEFAULT_SETTINGS } from '@/lib/persist';
+import { generateTask, generateTaskBoard, type Task, type TaskKind } from '@/lib/tasks';
 
 export type Screen = 'title' | 'creator' | 'game';
 
@@ -39,6 +40,12 @@ interface GameStore {
   carrying: string | null;
   setCarrying: (s: string | null) => void;
 
+  // Id of the prey closest to the player and within pounce reach. The
+  // prey render reads this to draw a highlight ring. The PlayerController
+  // useFrame keeps it fresh.
+  targetPreyId: string | null;
+  setTargetPreyId: (id: string | null) => void;
+
   herbInventory: Record<string, number>;
   addHerb: (id: string, n?: number) => void;
   consumeHerb: (id: string, n?: number) => boolean;
@@ -60,6 +67,12 @@ interface GameStore {
   setSleeping: (v: boolean) => void;
   dreamText: string;
   setDreamText: (s: string) => void;
+
+  // Rotating ambient task board — three quests at a time, auto-completing
+  // as the player plays. Completed tasks are replaced with fresh ones.
+  tasks: Task[];
+  reseedTasks: () => void;
+  bumpTask: (kind: TaskKind, amount?: number, predicate?: (t: Task) => boolean) => void;
 
   muted: Set<string>;
   toggleMute: (id: string) => void;
@@ -103,6 +116,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   carrying: null,
   setCarrying: (s) => set({ carrying: s }),
 
+  targetPreyId: null,
+  setTargetPreyId: (id) => set({ targetPreyId: id }),
+
   herbInventory: {},
   addHerb: (id, n = 1) =>
     set((st) => ({ herbInventory: { ...st.herbInventory, [id]: (st.herbInventory[id] ?? 0) + n } })),
@@ -128,6 +144,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setSleeping: (v) => set({ sleeping: v }),
   dreamText: '',
   setDreamText: (s) => set({ dreamText: s }),
+
+  tasks: generateTaskBoard(3),
+  reseedTasks: () => set({ tasks: generateTaskBoard(3) }),
+  bumpTask: (kind, amount = 1, predicate) =>
+    set((st) => {
+      const next = st.tasks.map((t) => {
+        if (t.kind !== kind) return t;
+        if (predicate && !predicate(t)) return t;
+        const progress = Math.min(t.goal, t.progress + amount);
+        return { ...t, progress };
+      });
+      // Replace any completed task with a fresh one and apply its reward
+      let hp = st.hud.hp, hunger = st.hud.hunger, rep = st.hud.reputation;
+      const replaced = next.map((t) => {
+        if (t.progress >= t.goal) {
+          if (t.reward.hp) hp = Math.min(100, hp + t.reward.hp);
+          if (t.reward.hunger) hunger = Math.min(100, hunger + t.reward.hunger);
+          if (t.reward.rep) rep = Math.min(100, rep + t.reward.rep);
+          return generateTask();
+        }
+        return t;
+      });
+      return {
+        tasks: replaced,
+        hud: { ...st.hud, hp, hunger, reputation: rep },
+      };
+    }),
 
   muted: new Set<string>(),
   toggleMute: (id) =>

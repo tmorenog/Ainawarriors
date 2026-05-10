@@ -43,6 +43,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
     const pool = HERBS;
     const pick = pool[Math.floor(Math.random() * pool.length)];
     addHerb(pick.id, 1);
+    useGameStore.getState().bumpTask('gather-herbs-n', 1);
     pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: `You found ${pick.name}.`, at: Date.now() });
   };
 
@@ -128,6 +129,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
                       onClick={() => {
                         if (consumeHerb(id, 1)) {
                           setHud({ hp: Math.min(100, hud.hp + 12) });
+                          useGameStore.getState().bumpTask('use-herb-n', 1);
                           pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: `You used ${h?.name ?? id}.`, at: Date.now() });
                         }
                       }}
@@ -146,7 +148,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-09 · quality pass
+        wotc-10 · easier hunt + tasks
       </div>
     </div>
   );
