@@ -203,9 +203,15 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
       </mesh>
 
       <group ref={bodyRef} position={[0, 0.6, 0]}>
-        {/* main body — long capsule along X (forward axis) */}
+        {/* main body — cylinder + spherical caps along X (forward axis) */}
         <mesh castShadow rotation={[0, 0, Math.PI / 2]} material={bodyMaterial}>
-          <capsuleGeometry args={[bodyR, bodyLen, 8, 16]} />
+          <cylinderGeometry args={[bodyR, bodyR, bodyLen, 16]} />
+        </mesh>
+        <mesh position={[bodyLen * 0.5, 0, 0]} material={bodyMaterial}>
+          <sphereGeometry args={[bodyR, 16, 12]} />
+        </mesh>
+        <mesh position={[-bodyLen * 0.5, 0, 0]} material={bodyMaterial}>
+          <sphereGeometry args={[bodyR, 16, 12]} />
         </mesh>
         {/* shoulders bulk */}
         <mesh position={[bodyLen * 0.42, 0.02, 0]} material={bodyMaterial}>
@@ -217,12 +223,12 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
         </mesh>
         {/* belly */}
         <mesh position={[0, -bodyR * 0.55, 0]} rotation={[0, 0, Math.PI / 2]} scale={[1, 0.85, 0.7]} material={bellyMaterial}>
-          <capsuleGeometry args={[bodyR * 0.7, bodyLen * 0.85, 6, 12]} />
+          <cylinderGeometry args={[bodyR * 0.7, bodyR * 0.7, bodyLen * 0.85, 12]} />
         </mesh>
         {/* tabby/spotted overlay */}
         {patternStrength > 0 && (
-          <mesh rotation={[0, 0, Math.PI / 2]} scale={[1.01, 1.01, 1.01]} material={stripesMaterial}>
-            <capsuleGeometry args={[bodyR * 1.005, bodyLen, 8, 16]} />
+          <mesh rotation={[0, 0, Math.PI / 2]} scale={[1.02, 1.02, 1.02]} material={stripesMaterial}>
+            <cylinderGeometry args={[bodyR * 1.005, bodyR * 1.005, bodyLen, 16]} />
           </mesh>
         )}
 

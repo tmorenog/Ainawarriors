@@ -34,14 +34,19 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.error) {
       if (this.props.fallback) return this.props.fallback(this.state.error, this.reset);
+      const msg = this.state.error?.message || String(this.state.error);
       return (
-        <div className="absolute inset-0 grid place-items-center bg-forest-900 text-bone p-6">
-          <div className="max-w-md text-center">
+        <div className="absolute inset-0 grid place-items-center bg-forest-900 text-bone p-6 overflow-y-auto">
+          <div className="max-w-md w-full text-center my-auto">
             <div className="text-xs uppercase tracking-[0.5em] opacity-70 mb-3">StarClan whispers...</div>
             <h1 className="font-display text-3xl mb-3">The warriors have discovered an issue.</h1>
-            <p className="text-sm opacity-80 mb-6">
+            <p className="text-sm opacity-80 mb-4">
               Something tangled in the brambles. Try again, or reset your cat if it keeps happening.
             </p>
+            <details className="text-left bg-black/40 rounded-lg p-2 mb-4 text-[11px] font-mono opacity-80">
+              <summary className="cursor-pointer opacity-70">Show details (for the medicine cat)</summary>
+              <pre className="whitespace-pre-wrap break-all mt-2">{msg}</pre>
+            </details>
             <div className="flex flex-col gap-2">
               <button
                 onClick={this.reset}
