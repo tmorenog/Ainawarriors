@@ -47,7 +47,38 @@ export type TaskKind =
   | 'distance-from-camp'
   | 'use-emote-variety'
   | 'walk-on-river-bank'
-  | 'sleep-night-only';
+  | 'sleep-night-only'
+  | 'defend-camp'
+  | 'defeat-raider-n'
+  | 'rally-defenders'
+  | 'survive-raid'
+  | 'eat-vole'
+  | 'eat-mouse'
+  | 'eat-bird'
+  | 'eat-frog'
+  | 'eat-squirrel'
+  | 'eat-shrew'
+  | 'feed-elder'
+  | 'feed-queen'
+  | 'feed-kits'
+  | 'visit-windclan'
+  | 'visit-shadowclan'
+  | 'visit-riverclan'
+  | 'visit-thunderclan'
+  | 'meet-firestar'
+  | 'meet-tigerstar'
+  | 'meet-leopardstar'
+  | 'meet-tallstar'
+  | 'meet-blackstar'
+  | 'cross-river'
+  | 'climb-tree'
+  | 'survive-disaster'
+  | 'witness-disaster'
+  | 'sprint-streak'
+  | 'crouch-master'
+  | 'pile-master'
+  | 'gather-marathon'
+  | 'long-walk';
 
 export interface Task {
   id: string;
@@ -269,6 +300,91 @@ export function generateTask(): Task {
     () => ({ id: newId(), kind: 'use-emote-variety', goal: 4, progress: 0,
       reward: { rep: 2 },
       description: 'Use 4 different emotes in a single day (purr, hiss, meow, tail-flick…)' }),
+
+    // ── raid defence (declare-battle → enemy warriors come to your camp)
+    () => ({ id: newId(), kind: 'defend-camp', goal: 1, progress: 0,
+      reward: { rep: 6, hp: 30 },
+      description: 'Defend your camp against a rival clan\'s raid' }),
+    () => ({ id: newId(), kind: 'defeat-raider-n', goal: 1 + Math.floor(Math.random() * 3), progress: 0,
+      reward: { rep: 4 },
+      description: rand(['Defeat a raiding warrior', 'Drive 2 raiders out of camp', 'Strike down 3 enemy warriors in a single raid']) }),
+    () => ({ id: newId(), kind: 'rally-defenders', goal: 1, progress: 0,
+      reward: { rep: 3 },
+      description: 'Make an announcement during a raid to rally your warriors' }),
+    () => ({ id: newId(), kind: 'survive-raid', goal: 1, progress: 0,
+      reward: { rep: 4, hunger: 18 },
+      description: 'Survive a full raid without your HP hitting zero' }),
+
+    // ── eat specific prey (carrying-eat path) ───────────────────────
+    () => ({ id: newId(), kind: 'eat-vole', goal: 1, progress: 0,
+      reward: { hunger: 12 }, description: 'Eat a vole you caught' }),
+    () => ({ id: newId(), kind: 'eat-mouse', goal: 1, progress: 0,
+      reward: { hunger: 12 }, description: 'Eat a mouse you caught' }),
+    () => ({ id: newId(), kind: 'eat-bird', goal: 1, progress: 0,
+      reward: { hunger: 14 }, description: 'Eat a bird you caught from the sky' }),
+    () => ({ id: newId(), kind: 'eat-frog', goal: 1, progress: 0,
+      reward: { hunger: 10 }, description: 'Eat a frog from the marsh' }),
+    () => ({ id: newId(), kind: 'eat-squirrel', goal: 1, progress: 0,
+      reward: { hunger: 14 }, description: 'Eat a squirrel you brought down' }),
+    () => ({ id: newId(), kind: 'eat-shrew', goal: 1, progress: 0,
+      reward: { hunger: 10 }, description: 'Eat a shrew' }),
+
+    // ── feed elders / queens / kits (drop-pile while carrying) ─────
+    () => ({ id: newId(), kind: 'feed-elder', goal: 1, progress: 0,
+      reward: { rep: 3 },
+      description: 'Bring fresh-kill to an elder before you eat yourself' }),
+    () => ({ id: newId(), kind: 'feed-queen', goal: 1, progress: 0,
+      reward: { rep: 3 },
+      description: 'Bring fresh-kill to a queen in the nursery' }),
+    () => ({ id: newId(), kind: 'feed-kits', goal: 1, progress: 0,
+      reward: { rep: 3 },
+      description: 'Bring small prey for the kits' }),
+
+    // ── visit each clan camp ────────────────────────────────────────
+    () => ({ id: newId(), kind: 'visit-windclan', goal: 1, progress: 0, reward: { rep: 2 },
+      description: 'Patrol the WindClan border on the moor' }),
+    () => ({ id: newId(), kind: 'visit-shadowclan', goal: 1, progress: 0, reward: { rep: 2 },
+      description: 'Patrol the ShadowClan border in the pines' }),
+    () => ({ id: newId(), kind: 'visit-riverclan', goal: 1, progress: 0, reward: { rep: 2 },
+      description: 'Patrol the RiverClan border by the river' }),
+    () => ({ id: newId(), kind: 'visit-thunderclan', goal: 1, progress: 0, reward: { rep: 2 },
+      description: 'Visit ThunderClan camp in the oak forest' }),
+
+    // ── meet specific leaders ───────────────────────────────────────
+    () => ({ id: newId(), kind: 'meet-firestar', goal: 1, progress: 0, reward: { rep: 3 },
+      description: 'Greet Firestar of ThunderClan' }),
+    () => ({ id: newId(), kind: 'meet-tigerstar', goal: 1, progress: 0, reward: { rep: 2 },
+      description: 'Face Tigerstar of ShadowClan (before he falls)' }),
+    () => ({ id: newId(), kind: 'meet-leopardstar', goal: 1, progress: 0, reward: { rep: 3 },
+      description: 'Greet Leopardstar of RiverClan' }),
+    () => ({ id: newId(), kind: 'meet-tallstar', goal: 1, progress: 0, reward: { rep: 3 },
+      description: 'Greet Tallstar of WindClan' }),
+    () => ({ id: newId(), kind: 'meet-blackstar', goal: 1, progress: 0, reward: { rep: 4 },
+      description: 'Greet Blackstar — ShadowClan\'s new leader' }),
+
+    // ── exploration milestones ──────────────────────────────────────
+    () => ({ id: newId(), kind: 'cross-river', goal: 1, progress: 0, reward: { rep: 3 },
+      description: 'Wade across the river to the other side' }),
+    () => ({ id: newId(), kind: 'climb-tree', goal: 1, progress: 0, reward: { rep: 2 },
+      description: 'Climb up onto a high rock or tree (jump to a perch)' }),
+    () => ({ id: newId(), kind: 'long-walk', goal: 250, progress: 0, reward: { rep: 4 },
+      description: 'Walk 250 paw-lengths in one outing' }),
+
+    // ── disaster encounters ─────────────────────────────────────────
+    () => ({ id: newId(), kind: 'survive-disaster', goal: 1, progress: 0, reward: { rep: 5, hp: 25 },
+      description: 'Survive a forest disaster (fire, flood, or twoleg invasion)' }),
+    () => ({ id: newId(), kind: 'witness-disaster', goal: 1, progress: 0, reward: { rep: 1 },
+      description: 'Witness a disaster in the forest' }),
+
+    // ── mastery streaks ─────────────────────────────────────────────
+    () => ({ id: newId(), kind: 'sprint-streak', goal: 100, progress: 0, reward: { rep: 3 },
+      description: 'Sprint 100 paw-lengths in one burst' }),
+    () => ({ id: newId(), kind: 'crouch-master', goal: 60, progress: 0, reward: { rep: 3 },
+      description: 'Spend 60 seconds total stalking in crouch' }),
+    () => ({ id: newId(), kind: 'pile-master', goal: 5, progress: 0, reward: { rep: 5, hunger: 15 },
+      description: 'Add 5 fresh-kill pieces to the pile' }),
+    () => ({ id: newId(), kind: 'gather-marathon', goal: 8, progress: 0, reward: { rep: 5, hp: 18 },
+      description: 'Gather 8 herbs in a single day' }),
   ];
 
   return rand(generators)();

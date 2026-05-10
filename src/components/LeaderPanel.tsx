@@ -45,6 +45,43 @@ export function LeaderPanel({ onClose, onCommand }: Props) {
       at: Date.now(),
     });
     useGameStore.getState().bumpTask('declare-battle', 1);
+    // Spawn an enemy raid heading for your camp. 3 raiders, 60 HP each,
+    // arriving at the player's camp from a random border direction.
+    // The Raids component reads this and renders + animates them.
+    const myClan = me.cat.clan;
+    const camp = (() => {
+      // Cheap inline lookup — only the 4 major clan camps.
+      const map: Record<string, [number, number]> = {
+        ThunderClan: [0, 0],
+        RiverClan:   [180, -30],
+        ShadowClan:  [-60, 180],
+        WindClan:    [-200, 60],
+      };
+      return map[myClan] ?? [0, 0];
+    })();
+    const angle = Math.random() * Math.PI * 2;
+    const spawnR = 18;
+    const raiders = Array.from({ length: 3 }, (_, i) => ({
+      id: 'raider_' + i + '_' + Math.random().toString(36).slice(2, 6),
+      x: camp[0] + Math.cos(angle + i * 0.4) * spawnR,
+      z: camp[1] + Math.sin(angle + i * 0.4) * spawnR,
+      hp: 60,
+      alive: true,
+      clan: battleTarget,
+    }));
+    useGameStore.getState().setRaid({
+      fromClan: battleTarget,
+      until: Date.now() + 90_000,
+      raiders,
+    });
+    useGameStore.getState().pushChat({
+      id: 'sys' + Date.now(),
+      fromId: 'system',
+      fromName: 'StarClan',
+      scope: 'system',
+      text: `${battleTarget} warriors approach the camp! Defend or fall!`,
+      at: Date.now(),
+    });
   };
 
   return (

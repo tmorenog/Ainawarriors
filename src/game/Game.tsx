@@ -16,6 +16,7 @@ import { terrainHeightAt } from './terrain';
 import { getAudioEngine } from './audio';
 import { Npcs } from './Npcs';
 import { NPCS } from '@/lib/npcs';
+import { Raids } from './Raids';
 
 export interface GameNetHandle {
   sendMove: (pos: [number, number, number], rot: number, anim: string) => void;
@@ -407,10 +408,49 @@ function PlayerController({
     }
 
     // F (swipe) — fast claw attack. Less damage than pounce but no
-    // wind-up, and only meaningful while a battle is active.
+    // wind-up, and only meaningful while a battle is active OR a raid
+    // is in progress.
     if (c.attack) {
       c.attack = false;
       const sStore = useGameStore.getState();
+      // First, raiders — if any raider is in melee range, hit the closest.
+      if (sStore.raid) {
+        const here = pos.current;
+        let bestId: string | null = null;
+        let bestD = 3.0 * 3.0;
+        for (const r of sStore.raid.raiders) {
+          if (!r.alive) continue;
+          const ddx = here.x - r.x, ddz = here.z - r.z;
+          const dsq = ddx * ddx + ddz * ddz;
+          if (dsq < bestD) { bestD = dsq; bestId = r.id; }
+        }
+        if (bestId) {
+          const target = sStore.raid.raiders.find((r) => r.id === bestId)!;
+          const nextHp = Math.max(0, target.hp - 14);
+          const alive = nextHp > 0;
+          sStore.updateRaider(bestId, { hp: nextHp, alive });
+          sStore.setCameraShake(0.4);
+          sStore.triggerSwipeFx('swipe');
+          if (!alive) {
+            sStore.bumpTask('defeat-raider-n', 1);
+            sStore.pushChat({
+              id: 'rd' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
+              text: 'You strike down a raider!', at: Date.now(),
+            });
+            const aliveLeft = sStore.raid.raiders.some((r) => r.id !== bestId && r.alive);
+            if (!aliveLeft) {
+              sStore.pushChat({
+                id: 'rd' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
+                text: 'The raiders are routed! Your camp holds.', at: Date.now(),
+              });
+              sStore.bumpTask('defend-camp', 1);
+              sStore.bumpTask('survive-raid', 1);
+              sStore.setRaid(null);
+            }
+          }
+          return; // skip the Tigerstar branch this attack
+        }
+      }
       if (sStore.battleActive && sStore.battlePhase === 'fighting') {
         const tx = NPCS.tigerstar.pos[0], tz = NPCS.tigerstar.pos[2];
         const tdx = pos.current.x - tx;
@@ -458,9 +498,45 @@ function PlayerController({
     // from 1.4 → 2.4 so a well-aimed lunge actually lands. Crouching gives
     // a small extra reach bonus to reward stalking.
     if (anim === 'pounce') {
+      const store = useGameStore.getState();
+      // First, raiders — a pounce kills almost any single raider in one hit.
+      if (store.raid) {
+        const here = pos.current;
+        let bestId: string | null = null;
+        let bestD = 4.5 * 4.5;
+        for (const r of store.raid.raiders) {
+          if (!r.alive) continue;
+          const ddx = here.x - r.x, ddz = here.z - r.z;
+          const dsq = ddx * ddx + ddz * ddz;
+          if (dsq < bestD) { bestD = dsq; bestId = r.id; }
+        }
+        if (bestId) {
+          const target = store.raid.raiders.find((r) => r.id === bestId)!;
+          const nextHp = Math.max(0, target.hp - 28);
+          const alive = nextHp > 0;
+          store.updateRaider(bestId, { hp: nextHp, alive });
+          store.setHud({ hp: Math.max(0, hud.hp - 6) });
+          store.setCameraShake(0.55);
+          store.triggerSwipeFx('pounce');
+          if (!alive) {
+            store.bumpTask('defeat-raider-n', 1);
+            const aliveLeft = store.raid.raiders.some((r) => r.id !== bestId && r.alive);
+            if (!aliveLeft) {
+              store.pushChat({ id: 'rd' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
+                text: 'The raiders are routed! Your camp holds.', at: Date.now() });
+              store.bumpTask('defend-camp', 1);
+              store.bumpTask('survive-raid', 1);
+              store.setRaid(null);
+            } else {
+              store.pushChat({ id: 'rd' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
+                text: 'You strike down a raider!', at: Date.now() });
+            }
+          }
+          return; // skip the Tigerstar / prey branches this pounce
+        }
+      }
       // Tigerstar fight — if the battle is active and the player pounces
       // within reach of Tigerstar, do damage. Each hit drops his HP by 18.
-      const store = useGameStore.getState();
       if (store.battleActive) {
         const tx = NPCS.tigerstar.pos[0], tz = NPCS.tigerstar.pos[2];
         const tdx = pos.current.x - tx;
@@ -864,6 +940,21 @@ export function Game({ room, net }: GameProps) {
     return () => clearInterval(id);
   }, [roomState, setRoom]);
 
+  // Auto-end a raid when its timer runs out (truce). Won/lost outcomes
+  // are handled inline by the pounce/swipe branches and the player
+  // death respawn path.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const s = useGameStore.getState();
+      if (s.raid && Date.now() > s.raid.until) {
+        s.pushChat({ id: 'rd' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
+          text: 'The raid breaks off — the rivals retreat to lick their wounds.', at: Date.now() });
+        s.setRaid(null);
+      }
+    }, 2000);
+    return () => clearInterval(id);
+  }, []);
+
   // Random disasters — every ~60s we roll. ~5% chance each of fire,
   // flood, twoleg invasion. Only one active at a time. Each runs 45s,
   // shown via a banner overlay and drains a little HP/hunger to keep it
@@ -1078,6 +1169,9 @@ export function Game({ room, net }: GameProps) {
 
         {/* NPCs — Firestar in ThunderClan camp, Tigerstar in ShadowClan camp */}
         <Npcs viewerRef={selfRef} />
+
+        {/* Enemy warriors that march on your camp when battle is declared */}
+        <Raids viewerRef={selfRef} />
 
         {/* Tap-to-eat prompt over the player's own fresh-kill pile */}
         <FreshKillPile viewerRef={selfRef} />

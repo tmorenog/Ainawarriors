@@ -6,6 +6,9 @@ import type { GameSettings } from '@/lib/persist';
 import { DEFAULT_SETTINGS } from '@/lib/persist';
 import { generateTask, generateTaskBoard, type Task, type TaskKind } from '@/lib/tasks';
 
+export interface Raider { id: string; x: number; z: number; hp: number; alive: boolean; clan?: string }
+export interface RaidState { fromClan: string; until: number; raiders: Raider[] }
+
 export type Screen = 'title' | 'creator' | 'game';
 
 interface GameStore {
@@ -141,6 +144,13 @@ interface GameStore {
   dreamLine: string | null;
   setDreamLine: (s: string | null) => void;
 
+  // Active raid — enemy warriors marching on the player's camp.
+  // Created when a leader declares battle. The Raid component reads
+  // this and animates the raiders / handles damage.
+  raid: null | RaidState;
+  setRaid: (r: RaidState | null) => void;
+  updateRaider: (id: string, patch: Partial<Raider>) => void;
+
   // Rotating ambient task board — three quests at a time, auto-completing
   // as the player plays. Completed tasks are replaced with fresh ones.
   tasks: Task[];
@@ -259,6 +269,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   dreamLine: null,
   setDreamLine: (s) => set({ dreamLine: s }),
+
+  raid: null,
+  setRaid: (r) => set({ raid: r }),
+  updateRaider: (id, patch) => set((st) => {
+    if (!st.raid) return {};
+    return {
+      raid: {
+        ...st.raid,
+        raiders: st.raid.raiders.map((r) => r.id === id ? { ...r, ...patch } : r),
+      },
+    };
+  }),
 
   tasks: generateTaskBoard(3),
   reseedTasks: () => set({ tasks: generateTaskBoard(3) }),
