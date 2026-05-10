@@ -232,11 +232,27 @@ export function BookPanel() {
 }
 
 function triggerSleep(setSleeping: (v: boolean) => void) {
+  // Multi-stage cutscene: loaf (sit) → curl → deep sleep → wake.
+  // After waking we nudge time-of-day to dawn so the world looks freshly
+  // morning, matching the player expectation that sleeping fast-forwards.
+  const store = useGameStore.getState();
   try { getAudioEngine().setMode('sleep'); } catch {}
   setSleeping(true);
+  store.setSleepStage('loaf');
+  setTimeout(() => useGameStore.getState().setSleepStage('curl'), 1500);
+  setTimeout(() => useGameStore.getState().setSleepStage('deep'), 3000);
   setTimeout(() => {
+    const s = useGameStore.getState();
+    s.setSleepStage('waking');
+    // Skip the night — wake at the hour just before sunrise.
+    const room = s.room;
+    if (room) s.setRoom({ ...room, timeOfDay: 0.27 });
+  }, 7000);
+  setTimeout(() => {
+    const s = useGameStore.getState();
+    s.setSleepStage('idle');
     setSleeping(false);
-  }, 5000);
+  }, 7800);
 }
 
 function describeObjective(kind: string, target: string | undefined, count: number | undefined, progress: number) {

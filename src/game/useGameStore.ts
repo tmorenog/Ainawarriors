@@ -65,8 +65,17 @@ interface GameStore {
   // few seconds before fading back in (also doubles as a Book objective).
   sleeping: boolean;
   setSleeping: (v: boolean) => void;
+  // Multi-stage sleep cutscene: 'idle' (not sleeping), 'loaf' (just sat down),
+  // 'curl' (curled up), 'deep' (fully asleep), 'waking' (cross-fade out).
+  sleepStage: 'idle' | 'loaf' | 'curl' | 'deep' | 'waking';
+  setSleepStage: (s: 'idle' | 'loaf' | 'curl' | 'deep' | 'waking') => void;
   dreamText: string;
   setDreamText: (s: string) => void;
+
+  // Gathering cutscene — true while the player is searching for herbs.
+  // Prevents stacking multiple gathers and gates the overlay.
+  gathering: boolean;
+  setGathering: (v: boolean) => void;
 
   // Rotating ambient task board — three quests at a time, auto-completing
   // as the player plays. Completed tasks are replaced with fresh ones.
@@ -142,8 +151,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   sleeping: false,
   setSleeping: (v) => set({ sleeping: v }),
+  sleepStage: 'idle',
+  setSleepStage: (s) => set({ sleepStage: s }),
   dreamText: '',
   setDreamText: (s) => set({ dreamText: s }),
+
+  gathering: false,
+  setGathering: (v) => set({ gathering: v }),
 
   tasks: generateTaskBoard(3),
   reseedTasks: () => set({ tasks: generateTaskBoard(3) }),

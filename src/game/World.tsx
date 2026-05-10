@@ -388,7 +388,7 @@ function Camps() {
             </mesh>
           </group>
 
-          {/* Apprentices' / nursery den — left side */}
+          {/* Apprentices' den — left side */}
           <group position={[-5.5, 0, 4]}>
             <mesh position={[0, 0.7, 0]}>
               <sphereGeometry args={[1.4, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
@@ -397,6 +397,68 @@ function Camps() {
             <mesh position={[0, 0.45, 1.15]}>
               <boxGeometry args={[1.0, 0.7, 0.1]} />
               <meshStandardMaterial color={'#1c1814'} />
+            </mesh>
+          </group>
+
+          {/* Medicine cat's den — at the back, marked with a small herb
+              bundle (green sphere) above the entrance. Sleeping here heals
+              you a bit faster. */}
+          <group position={[-3.5, 0, -5]}>
+            <mesh position={[0, 0.85, 0]}>
+              <sphereGeometry args={[1.3, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
+              <meshStandardMaterial color={'#3a4a2a'} roughness={0.95} flatShading />
+            </mesh>
+            <mesh position={[0, 0.55, 1.0]}>
+              <boxGeometry args={[0.95, 0.75, 0.1]} />
+              <meshStandardMaterial color={'#1a1410'} />
+            </mesh>
+            <mesh position={[0, 1.45, 0.9]}>
+              <sphereGeometry args={[0.2, 10, 8]} />
+              <meshStandardMaterial color={'#7ab26a'} emissive={'#3a6a3a'} emissiveIntensity={0.25} />
+            </mesh>
+          </group>
+
+          {/* Queens' / nursery den — soft moss green, front-left of camp.
+              The little mushrooms hint that kits live here. */}
+          <group position={[-7, 0, -1]}>
+            <mesh position={[0, 0.75, 0]}>
+              <sphereGeometry args={[1.5, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
+              <meshStandardMaterial color={'#5a6a3a'} roughness={0.95} flatShading />
+            </mesh>
+            <mesh position={[0, 0.5, 1.2]}>
+              <boxGeometry args={[1.05, 0.75, 0.1]} />
+              <meshStandardMaterial color={'#1c1814'} />
+            </mesh>
+            {/* tiny mushrooms */}
+            {[[0.9, 0.05, 0.3], [-0.9, 0.05, 0.5], [0.4, 0.05, 1.5]].map((p, i) => (
+              <group key={i} position={p as [number, number, number]}>
+                <mesh position={[0, 0.06, 0]}>
+                  <cylinderGeometry args={[0.025, 0.03, 0.12, 6]} />
+                  <meshStandardMaterial color={'#e8e0c8'} />
+                </mesh>
+                <mesh position={[0, 0.13, 0]}>
+                  <sphereGeometry args={[0.08, 8, 6]} />
+                  <meshStandardMaterial color={'#c43c3c'} />
+                </mesh>
+              </group>
+            ))}
+          </group>
+
+          {/* Elders' den — front-right, lower & wider, with a sun-bleached
+              log laid out front for napping. */}
+          <group position={[6, 0, -1]}>
+            <mesh position={[0, 0.6, 0]}>
+              <sphereGeometry args={[1.55, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
+              <meshStandardMaterial color={'#5a4a30'} roughness={0.95} flatShading />
+            </mesh>
+            <mesh position={[0, 0.4, 1.25]}>
+              <boxGeometry args={[1.1, 0.6, 0.1]} />
+              <meshStandardMaterial color={'#1c1814'} />
+            </mesh>
+            {/* nap log */}
+            <mesh position={[1.4, 0.18, 1.0]} rotation={[0, 0.3, Math.PI / 2]}>
+              <cylinderGeometry args={[0.18, 0.18, 1.4, 10]} />
+              <meshStandardMaterial color={'#a89878'} roughness={0.95} />
             </mesh>
           </group>
 
