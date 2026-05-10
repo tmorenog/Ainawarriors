@@ -101,12 +101,14 @@ export const PreyMesh = forwardRef<THREE.Group, PreyMeshProps>(function PreyMesh
       const baseSense = state.kind === 'rabbit' ? 16 : state.kind === 'bird' ? 22 : 12;
       // Crouching halves your noise — prey only notice you up close, which
       // is the whole point of stalking.
-      const sense = crouching ? baseSense * 0.5 : baseSense;
+      // Crouching makes the cat almost invisible to prey — they only
+      // notice you up very close, so stalking actually works.
+      const sense = crouching ? baseSense * 0.28 : baseSense;
       if (d < sense) {
         // Flee — crouching also reduces the panic speed because the prey
         // is less alarmed.
         const away = state.pos.clone().sub(threat).setY(0).normalize();
-        const fleeSpeed = (state.kind === 'rabbit' ? 9 : 6) * (crouching ? 0.65 : 1);
+        const fleeSpeed = (state.kind === 'rabbit' ? 9 : 6) * (crouching ? 0.45 : 1);
         desired.copy(away).multiplyScalar(fleeSpeed);
         state.alarmed = true;
       } else {
