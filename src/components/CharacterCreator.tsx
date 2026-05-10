@@ -86,7 +86,7 @@ export function CharacterCreator({ onSave, onCancel }: Props) {
     <div className="absolute inset-0 grid grid-rows-[auto_1fr_auto] md:grid-cols-[1fr_420px] md:grid-rows-1 bg-forest-900 text-bone">
       {/* Preview */}
       <div className="relative md:col-start-1 row-start-2 md:row-start-1 min-h-[40vh] bg-gradient-to-b from-forest-700 to-forest-900">
-        <Canvas camera={{ position: [2.6, 1.4, 2.6], fov: 38 }} shadows>
+        <Canvas camera={{ position: [2.6, 1.4, 2.6], fov: 38 }} shadows dpr={[1, 1.5]}>
           <ambientLight intensity={0.7} />
           <directionalLight position={[3, 5, 4]} intensity={1} castShadow />
           <Cat cat={cat} anim="idle" />
@@ -94,7 +94,7 @@ export function CharacterCreator({ onSave, onCancel }: Props) {
             <circleGeometry args={[5, 32]} />
             <meshStandardMaterial color={'#3b4d2c'} roughness={1} />
           </mesh>
-          <OrbitControls enablePan={false} minDistance={2} maxDistance={6} target={[0, 0.4, 0]} />
+          <OrbitControls enablePan={false} minDistance={2} maxDistance={6} />
         </Canvas>
         <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/40 text-xs">
           {cat.name} · {clan.name} · {cat.role}

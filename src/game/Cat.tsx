@@ -81,6 +81,7 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
   const patternStrength = PATTERN_TINT[cat.furPattern] ?? 0;
 
   useFrame((_, dt) => {
+    try {
     t.current += dt;
     const time = t.current;
 
@@ -139,6 +140,10 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
       groupRef.current.position.set(position[0], position[1] + pounceY + jumpY, position[2]);
       groupRef.current.rotation.y = rotation;
     }
+    } catch (e) {
+      // never let an animation hiccup crash the whole render tree
+      if (typeof console !== 'undefined') console.warn('[wotc] cat frame error', e);
+    }
   });
 
   // body material with pattern tint
@@ -180,13 +185,14 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
     }
   })();
 
+  const safe = (n: number, fallback: number) => (Number.isFinite(n) ? n : fallback);
   const tailLen = cat.tail === 'short' ? 5 : cat.tail === 'long' ? 11 : cat.tail === 'fluffy' ? 8 : 7;
   const tailFluff = cat.tail === 'fluffy' ? 1.6 : 1;
-  const fluff = 1 + cat.fluffiness * 0.35;
+  const fluff = safe(1 + cat.fluffiness * 0.35, 1);
 
-  // Body length and proportions
-  const bodyLen = 0.95 * buildScale;
-  const bodyR = 0.18 * fluff * buildScale;
+  // Body length and proportions (clamped to avoid NaN/0 reaching Three.js geometries)
+  const bodyLen = Math.max(0.4, safe(0.95 * buildScale, 0.95));
+  const bodyR = Math.max(0.08, safe(0.18 * fluff * buildScale, 0.18));
 
   return (
     <group ref={groupRef} scale={scale}>

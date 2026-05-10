@@ -9,6 +9,7 @@ import { HUD } from '@/components/HUD';
 import { SettingsPanel } from '@/components/Settings';
 import { LeaderPanel } from '@/components/LeaderPanel';
 import { MobileControls } from '@/components/MobileControls';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useGameStore } from '@/game/useGameStore';
 import { useMultiplayer } from '@/game/useMultiplayer';
 import { patchSave, loadSave } from '@/lib/persist';
@@ -42,22 +43,32 @@ export default function Page() {
       )}
 
       {screen === 'creator' && (
-        <CharacterCreator
-          onSave={(c) => {
-            setCat(c);
-            patchSave({ cat: c });
-            setScreen('game');
+        <ErrorBoundary
+          label="creator"
+          onReset={() => {
+            try { localStorage.removeItem('wotc_save_v1'); } catch {}
+            setCat(null);
           }}
-          onCancel={() => {
-            const has = !!loadSave().cat;
-            setScreen(has ? 'game' : 'title');
-          }}
-        />
+        >
+          <CharacterCreator
+            onSave={(c) => {
+              setCat(c);
+              patchSave({ cat: c });
+              setScreen('game');
+            }}
+            onCancel={() => {
+              const has = !!loadSave().cat;
+              setScreen(has ? 'game' : 'title');
+            }}
+          />
+        </ErrorBoundary>
       )}
 
       {screen === 'game' && cat && (
         <>
-          <Game room={room} net={{ sendMove: mp.sendMove, sendCatch: mp.sendCatch }} />
+          <ErrorBoundary label="game" onReset={() => setScreen('title')}>
+            <Game room={room} net={{ sendMove: mp.sendMove, sendCatch: mp.sendCatch }} />
+          </ErrorBoundary>
           <HUD onOpenSettings={() => setShowSettings(true)} onOpenLeader={() => setShowLeader(true)} />
           <Chat
             onSend={(text, scope) => mp.sendChat(text, scope)}
