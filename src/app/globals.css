@@ -13,6 +13,15 @@ html, body {
   touch-action: none;
 }
 
+/* On mobile browsers (iOS Safari especially), 100vh includes the area under
+   the address bar / bottom toolbar, which would push our footer off screen.
+   Use dynamic viewport height when available. */
+@supports (height: 100dvh) {
+  html, body {
+    height: 100dvh;
+  }
+}
+
 #__next, body {
   height: 100%;
 }

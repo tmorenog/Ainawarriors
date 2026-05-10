@@ -180,8 +180,10 @@ export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
         </div>
       </div>
 
-      {/* Controls — flex-1 fills remaining height; footer is always visible at the bottom */}
-      <div className="md:col-start-2 flex-1 min-h-0 flex flex-col bg-forest-900 border-t md:border-t-0 md:border-l border-white/10 overflow-hidden">
+      {/* Controls — flex-1 fills remaining height; footer is always visible at the bottom.
+          On md+ the parent is grid so the row already constrains height; on mobile the parent
+          is flex column and flex-1 + min-h-0 lets the panel shrink to whatever's left. */}
+      <div className="md:col-start-2 flex-1 min-h-0 md:h-full flex flex-col bg-forest-900 border-t md:border-t-0 md:border-l border-white/10 overflow-hidden">
         <header className="p-4 border-b border-white/10">
           <div className="font-display text-2xl">Create your Warrior</div>
           <div className="text-xs opacity-70">All choices save locally and persist between sessions.</div>
@@ -380,7 +382,7 @@ export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
           )}
         </div>
 
-        <footer className="shrink-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-white/15 bg-forest-900/95 backdrop-blur space-y-2">
+        <footer className="sticky bottom-0 left-0 right-0 z-10 shrink-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-white/15 bg-forest-900/95 backdrop-blur space-y-2">
           {savedToast && (
             <div className="rounded-lg bg-forest-500/40 border border-forest-300/50 text-forest-50 text-xs text-center py-1.5 animate-fade-in">
               ✓ Morph saved. Keep tweaking, or press Play to enter the forest.
