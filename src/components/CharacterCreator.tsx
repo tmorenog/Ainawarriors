@@ -180,10 +180,10 @@ export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
         </div>
       </div>
 
-      {/* Controls — flex-1 fills remaining height; footer is always visible at the bottom.
-          On md+ the parent is grid so the row already constrains height; on mobile the parent
-          is flex column and flex-1 + min-h-0 lets the panel shrink to whatever's left. */}
-      <div className="md:col-start-2 flex-1 min-h-0 md:h-full flex flex-col bg-forest-900 border-t md:border-t-0 md:border-l border-white/10 overflow-hidden">
+      {/* Controls — internal grid: header (auto) · nav (auto) · scrollable middle (1fr, scrolls)
+          · footer (auto, always pinned at the bottom). 1fr middle is the only row that flexes,
+          everything else stays its content size, so the footer can never disappear. */}
+      <div className="md:col-start-2 flex-1 min-h-0 md:h-full grid grid-rows-[auto_auto_minmax(0,1fr)_auto] bg-forest-900 border-t md:border-t-0 md:border-l border-white/10 overflow-hidden">
         <header className="p-4 border-b border-white/10">
           <div className="font-display text-2xl">Create your Warrior</div>
           <div className="text-xs opacity-70">All choices save locally and persist between sessions.</div>
@@ -201,7 +201,7 @@ export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
           ))}
         </nav>
 
-        <div className="p-4 overflow-y-auto flex-1 min-h-0 space-y-4 text-sm">
+        <div className="p-4 overflow-y-auto space-y-4 text-sm min-h-0">
           {tab === 'fur' && (
             <>
               <button
@@ -382,7 +382,7 @@ export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
           )}
         </div>
 
-        <footer className="sticky bottom-0 left-0 right-0 z-10 shrink-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-white/15 bg-forest-900/95 backdrop-blur space-y-2">
+        <footer className="p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t-2 border-thunder/40 bg-forest-900 space-y-2 shadow-[0_-8px_24px_rgba(0,0,0,0.4)]">
           {savedToast && (
             <div className="rounded-lg bg-forest-500/40 border border-forest-300/50 text-forest-50 text-xs text-center py-1.5 animate-fade-in">
               ✓ Morph saved. Keep tweaking, or press Play to enter the forest.
