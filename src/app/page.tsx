@@ -95,6 +95,7 @@ export default function Page() {
       {screen === 'game' && cat && (
         <>
           <VisionOverlay />
+          <GatherOverlay />
           <SleepOverlay />
           <ErrorBoundary label="game" onReset={() => setScreen('title')}>
             {/* WebGLGuard probes for a usable WebGL context BEFORE we mount the
@@ -223,6 +224,34 @@ function VisionOverlay() {
   return <>{layers}</>;
 }
 
+// Brief cutscene overlay shown while the player searches a clump of leaves
+// for herbs. Visually matches the sleep overlay but lighter, with a leaf
+// icon and a progress sweep so the player knows something is happening.
+function GatherOverlay() {
+  const gathering = useGameStore((s) => s.gathering);
+  return (
+    <div
+      className="absolute inset-0 z-40 pointer-events-none transition-opacity duration-300"
+      style={{
+        opacity: gathering ? 1 : 0,
+        background: 'radial-gradient(ellipse at center, rgba(30,40,18,0.55), rgba(0,0,0,0.4))',
+      }}
+    >
+      <div className="h-full grid place-items-center text-bone p-6">
+        <div className="text-center max-w-sm">
+          <div className="text-5xl mb-2 animate-pulse-soft">🌿</div>
+          <div className="font-display text-2xl mb-2">Searching the undergrowth…</div>
+          <div className="text-sm opacity-80">Sniffing for marigold, juniper, catmint…</div>
+          <div className="mt-4 h-1 w-48 mx-auto rounded-full overflow-hidden bg-white/10">
+            <div className="h-full bg-forest-300 animate-[gatherbar_2s_linear_forwards]" />
+          </div>
+        </div>
+      </div>
+      <style>{`@keyframes gatherbar { from { width: 0% } to { width: 100% } }`}</style>
+    </div>
+  );
+}
+
 // StarClan dream pool — rotated through during the sleep cutscene. Original
 // short paraphrasings, never copies of book prose.
 const STARCLAN_DREAMS = [
@@ -241,13 +270,12 @@ const STARCLAN_DREAMS = [
 // through this — see audio.ts.
 function SleepOverlay() {
   const sleeping = useGameStore((s) => s.sleeping);
+  const stage = useGameStore((s) => s.sleepStage);
   const dreamText = useGameStore((s) => s.dreamText);
   const setDreamText = useGameStore((s) => s.setDreamText);
 
   useEffect(() => {
     if (!sleeping) { setDreamText(''); return; }
-    // Show a fresh dream every 2.5s while the cat is asleep, and bump the
-    // "rest at camp" ambient task once on entry.
     useGameStore.getState().bumpTask('sleep', 1);
     const pick = () => setDreamText(STARCLAN_DREAMS[Math.floor(Math.random() * STARCLAN_DREAMS.length)]);
     pick();
@@ -255,22 +283,40 @@ function SleepOverlay() {
     return () => clearInterval(id);
   }, [sleeping, setDreamText]);
 
+  // Darkness ramps up across the stages and fades back down on waking.
+  const opacity =
+    !sleeping ? 0 :
+    stage === 'loaf' ? 0.45 :
+    stage === 'curl' ? 0.75 :
+    stage === 'waking' ? 0.55 :
+    1;
+
+  const heading =
+    stage === 'loaf' ? 'You loaf in the warm dust…' :
+    stage === 'curl' ? 'Curling up tight…' :
+    stage === 'waking' ? 'Dawn breaks over the trees.' :
+    'A warrior’s rest…';
+
   return (
     <div
       className="absolute inset-0 z-40 pointer-events-none transition-opacity duration-700"
       style={{
-        opacity: sleeping ? 1 : 0,
+        opacity,
         background: 'radial-gradient(ellipse at center, rgba(8,12,30,0.85), rgba(0,0,0,0.98))',
       }}
     >
       <div className="h-full grid place-items-center text-bone p-6">
         <div className="text-center max-w-md">
-          <div className="font-display text-3xl mb-3 animate-pulse-soft">A warrior&rsquo;s rest&hellip;</div>
-          <div className="text-xs uppercase tracking-[0.4em] opacity-60 mb-3">StarClan whispers</div>
-          {dreamText && (
-            <p key={dreamText} className="italic text-sm opacity-90 animate-fade-in leading-relaxed">
-              {dreamText}
-            </p>
+          <div className="font-display text-3xl mb-3 animate-pulse-soft">{heading}</div>
+          {(stage === 'deep' || stage === 'waking') && (
+            <>
+              <div className="text-xs uppercase tracking-[0.4em] opacity-60 mb-3">StarClan whispers</div>
+              {dreamText && (
+                <p key={dreamText} className="italic text-sm opacity-90 animate-fade-in leading-relaxed">
+                  {dreamText}
+                </p>
+              )}
+            </>
           )}
         </div>
       </div>

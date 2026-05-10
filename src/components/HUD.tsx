@@ -4,6 +4,7 @@ import { useGameStore } from '@/game/useGameStore';
 import { CLANS } from '@/lib/clans';
 import { HERBS } from '@/lib/herbs';
 import { adjustCameraZoom } from '@/game/CameraRig';
+import { getAudioEngine } from '@/game/audio';
 import { useState } from 'react';
 
 export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => void; onOpenLeader: () => void }) {
@@ -39,12 +40,34 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
     pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: `You added a ${carrying} to the fresh-kill pile.`, at: Date.now() });
   };
 
+  const gathering = useGameStore((s) => s.gathering);
+  const setGathering = useGameStore((s) => s.setGathering);
+
   const gather = () => {
-    const pool = HERBS;
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    addHerb(pick.id, 1);
-    useGameStore.getState().bumpTask('gather-herbs-n', 1);
-    pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: `You found ${pick.name}.`, at: Date.now() });
+    if (gathering) return; // already searching
+    setGathering(true);
+    // ~2 second forage cutscene. Roughly 70% chance of finding something
+    // useful, otherwise the player comes up empty — gathering should feel
+    // like a real little ritual instead of free clicks.
+    setTimeout(() => {
+      const success = Math.random() < 0.7;
+      if (success) {
+        const pool = HERBS;
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        addHerb(pick.id, 1);
+        useGameStore.getState().bumpTask('gather-herbs-n', 1);
+        pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: `You found ${pick.name}.`, at: Date.now() });
+      } else {
+        const reasons = [
+          'Nothing useful grows here today.',
+          'A twoleg has trampled the patch — try elsewhere.',
+          'You sniff and dig, but the leaves are already gone.',
+          'Only ragwort here, and that’s no use.',
+        ];
+        pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: reasons[Math.floor(Math.random() * reasons.length)], at: Date.now() });
+      }
+      setGathering(false);
+    }, 2000);
   };
 
   return (
@@ -85,9 +108,18 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
         {carrying && (
           <button onClick={drop} className="rounded-full bg-thunder px-3 py-2 text-xs shadow">Drop {carrying} at camp pile</button>
         )}
-        <button onClick={gather} className="rounded-full bg-forest-700 px-3 py-2 text-xs shadow">Gather herbs</button>
+        <button onClick={gather} disabled={gathering} className={`rounded-full px-3 py-2 text-xs shadow ${gathering ? 'bg-forest-700/40 cursor-wait' : 'bg-forest-700'}`}>
+          {gathering ? 'Searching the undergrowth…' : 'Gather herbs'}
+        </button>
         <button onClick={() => setShowHerbs((v) => !v)} className="rounded-full bg-forest-700 px-3 py-2 text-xs shadow">
           Herb pouch ({Object.values(herbInventory).reduce((a, b) => a + b, 0)})
+        </button>
+        <button
+          onClick={triggerSleep}
+          className="rounded-full bg-river/80 hover:bg-river px-3 py-2 text-xs shadow"
+          title="Sleep — runs the loaf → curl → deep cutscene and skips to dawn"
+        >
+          Sleep at den
         </button>
         {(isLeader || isDeputy) && (
           <button onClick={onOpenLeader} className="rounded-full bg-river px-3 py-2 text-xs shadow">Leader actions</button>
@@ -148,7 +180,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-10 · easier hunt + tasks
+        wotc-11 · dens + cutscenes
       </div>
     </div>
   );
@@ -177,6 +209,35 @@ function KeyHints() {
       <span>WASD move</span><span>Shift sprint</span><span>C / Ctrl crouch</span><span>Q pounce</span><span>E interact</span><span>V camera</span>
     </div>
   );
+}
+
+// Multi-stage sleep cutscene shared between the HUD's "Sleep at den" button
+// and Book Mode's curl-up objective. Stages: loaf → curl → deep → wake at
+// dawn. The cat's anim is driven by sleepStage in the game frame loop.
+function triggerSleep() {
+  const s = useGameStore.getState();
+  if (s.sleeping) return;
+  try { getAudioEngine().setMode('sleep'); } catch {}
+  s.setSleeping(true);
+  s.setSleepStage('loaf');
+  setTimeout(() => useGameStore.getState().setSleepStage('curl'), 1500);
+  setTimeout(() => useGameStore.getState().setSleepStage('deep'), 3000);
+  setTimeout(() => {
+    const cur = useGameStore.getState();
+    cur.setSleepStage('waking');
+    const room = cur.room;
+    if (room) cur.setRoom({ ...room, timeOfDay: 0.27 });
+    // Sleep restores HP/stamina/hunger a bit
+    cur.setHud({
+      hp: Math.min(100, cur.hud.hp + 30),
+      stamina: 100,
+      hunger: Math.min(100, cur.hud.hunger + 12),
+    });
+  }, 7000);
+  setTimeout(() => {
+    useGameStore.getState().setSleepStage('idle');
+    useGameStore.getState().setSleeping(false);
+  }, 7800);
 }
 
 function formatTime(t: number) {
