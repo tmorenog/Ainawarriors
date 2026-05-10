@@ -130,7 +130,12 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
       rot: 0,
       anim: 'idle',
       hp: 100, hunger: 60, stamina: 100, reputation: 50,
-      isLeader: false, isDeputy: false,
+      // In the BroadcastChannel / offline path there's no real server to
+      // assign clan leadership, so we treat the local player as leader of
+      // their own clan by default. That's what unlocks the Leader actions
+      // button in the HUD.
+      isLeader: true,
+      isDeputy: false,
     };
 
     setPlayers({ [myId]: me });
