@@ -227,7 +227,13 @@ export function Game({ room, net }: GameProps) {
       shadows={shadows}
       dpr={dpr}
       camera={{ fov: 60, near: 0.1, far: 600, position: [0, 6, 8] }}
-      gl={{ antialias: settings.graphics !== 'low', powerPreference: 'high-performance' }}
+      gl={{
+        antialias: settings.graphics !== 'low',
+        powerPreference: settings.graphics === 'high' ? 'high-performance' : 'default',
+        failIfMajorPerformanceCaveat: false,
+        alpha: false,
+        preserveDrawingBuffer: false,
+      }}
     >
       <Suspense fallback={null}>
         <World

@@ -14,6 +14,7 @@ import { useGameStore } from '@/game/useGameStore';
 import { loadSave, patchSave } from '@/lib/persist';
 import { safeUsername } from '@/lib/chatFilter';
 import { normalizeCat } from '@/lib/normalizeCat';
+import { WebGLGuard } from '@/components/WebGLGuard';
 
 const FUR_BASES = ['#3a2618','#5b3a25','#7a5a3a','#9c8268','#c9b59b','#e3d5b8','#1d1d1d','#444','#888','#bdbdbd','#f4f1ea','#9c4a22','#c46a32','#e2a456','#5a4a2a'];
 const FUR_BELLY = ['#f4f1ea','#e3d5b8','#c9b59b','#9c8268','#444'];
@@ -86,16 +87,29 @@ export function CharacterCreator({ onSave, onCancel }: Props) {
     <div className="absolute inset-0 grid grid-rows-[auto_1fr_auto] md:grid-cols-[1fr_420px] md:grid-rows-1 bg-forest-900 text-bone">
       {/* Preview */}
       <div className="relative md:col-start-1 row-start-2 md:row-start-1 min-h-[40vh] bg-gradient-to-b from-forest-700 to-forest-900">
-        <Canvas camera={{ position: [2.6, 1.4, 2.6], fov: 38 }} shadows dpr={[1, 1.5]}>
-          <ambientLight intensity={0.7} />
-          <directionalLight position={[3, 5, 4]} intensity={1} castShadow />
-          <Cat cat={cat} anim="idle" />
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-            <circleGeometry args={[5, 32]} />
-            <meshStandardMaterial color={'#3b4d2c'} roughness={1} />
-          </mesh>
-          <OrbitControls enablePan={false} minDistance={2} maxDistance={6} />
-        </Canvas>
+        <WebGLGuard>
+          <Canvas
+            camera={{ position: [2.6, 1.4, 2.6], fov: 38 }}
+            shadows={false}
+            dpr={[1, 1.5]}
+            gl={{
+              antialias: false,
+              alpha: false,
+              powerPreference: 'default',
+              failIfMajorPerformanceCaveat: false,
+              preserveDrawingBuffer: false,
+            }}
+          >
+            <ambientLight intensity={0.7} />
+            <directionalLight position={[3, 5, 4]} intensity={1} />
+            <Cat cat={cat} anim="idle" />
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+              <circleGeometry args={[5, 32]} />
+              <meshStandardMaterial color={'#3b4d2c'} roughness={1} />
+            </mesh>
+            <OrbitControls enablePan={false} minDistance={2} maxDistance={6} />
+          </Canvas>
+        </WebGLGuard>
         <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/40 text-xs">
           {cat.name} · {clan.name} · {cat.role}
         </div>

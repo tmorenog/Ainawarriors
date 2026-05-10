@@ -10,6 +10,7 @@ import { SettingsPanel } from '@/components/Settings';
 import { LeaderPanel } from '@/components/LeaderPanel';
 import { MobileControls } from '@/components/MobileControls';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { WebGLGuard } from '@/components/WebGLGuard';
 import { useGameStore } from '@/game/useGameStore';
 import { useMultiplayer } from '@/game/useMultiplayer';
 import { patchSave, loadSave } from '@/lib/persist';
@@ -67,7 +68,9 @@ export default function Page() {
       {screen === 'game' && cat && (
         <>
           <ErrorBoundary label="game" onReset={() => setScreen('title')}>
-            <Game room={room} net={{ sendMove: mp.sendMove, sendCatch: mp.sendCatch }} />
+            <WebGLGuard>
+              <Game room={room} net={{ sendMove: mp.sendMove, sendCatch: mp.sendCatch }} />
+            </WebGLGuard>
           </ErrorBoundary>
           <HUD onOpenSettings={() => setShowSettings(true)} onOpenLeader={() => setShowLeader(true)} />
           <Chat
