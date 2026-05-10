@@ -308,6 +308,8 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
       try { bcRef.current?.postMessage({ kind: 'chat', msg } as BcMessage); } catch {}
     },
     sendEmote: (emote) => {
+      // Both online and offline: count it for the rotating "use N emotes" task.
+      try { useGameStore.getState().bumpTask('emote-n', 1); } catch {}
       if (socketRef.current) {
         socketRef.current.emit('emote', { emote });
         return;

@@ -37,6 +37,9 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
     if (!carrying) return;
     setCarrying(null);
     setHud({ hunger: Math.min(100, hud.hunger + 8) });
+    // Earn the right to eat later from the pile by contributing to it now.
+    useGameStore.getState().bumpPileContrib(1);
+    useGameStore.getState().bumpTask('drop-pile-n', 1);
     pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: `You added a ${carrying} to the fresh-kill pile.`, at: Date.now() });
   };
 
@@ -198,7 +201,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-28 · slim fluff
+        wotc-29 · pile rules + many tasks
       </div>
     </div>
   );
