@@ -66,7 +66,10 @@ function PlayerController({
     if (cat) {
       const [cx, , cz] = CLANS[cat.clan].campCenter as [number, number, number];
       pos.current.set(cx, terrainHeightAt(cx, cz), cz);
-      catYaw.current = yaw.current; // start aligned with the camera
+      // Cat geometry forward is local +X. To make the cat face the camera's
+      // forward direction (sin(yaw), 0, cos(yaw)) we need rotation.y so that
+      // R_Y(θ)·(1,0,0) = (sin yaw, 0, cos yaw), i.e. θ = atan2(-cos(yaw), sin(yaw)).
+      catYaw.current = Math.atan2(-Math.cos(yaw.current), Math.sin(yaw.current));
     }
   }, [cat, catYaw, yaw]);
 
@@ -89,10 +92,16 @@ function PlayerController({
     const fwd = c.forward;
     const sd = c.strafe;
 
+    // Movement direction in world space.
+    //   forward (W) goes in the camera's forward direction (sin(yaw), 0, cos(yaw))
+    //   strafe  (D = +1) goes to the camera's RIGHT, which in our setup
+    //   (camera at (-sin·d, h, -cos·d) looking at origin) is world (-cos(yaw), 0, sin(yaw)).
+    //   The previous formula inverted strafe — pressing A walked the cat
+    //   to the right of the screen.
     const dir = new THREE.Vector3(
-      Math.sin(yaw.current) * fwd + Math.cos(yaw.current) * sd,
+      Math.sin(yaw.current) * fwd - Math.cos(yaw.current) * sd,
       0,
-      Math.cos(yaw.current) * fwd - Math.sin(yaw.current) * sd
+      Math.cos(yaw.current) * fwd + Math.sin(yaw.current) * sd
     );
     if (dir.lengthSq() > 0) dir.normalize();
     pos.current.addScaledVector(dir, speed * dt);
@@ -183,8 +192,15 @@ function PlayerController({
     // Cat body rotation: only follow the movement direction, NOT the camera.
     // The camera yaw is just for looking around. The cat keeps its own facing
     // and turns smoothly when you actually walk somewhere new.
+    //
+    // The cat geometry's natural forward is local +X (head at +X, tail at -X).
+    // To rotate the body so its +X axis points along (dir.x, 0, dir.z) we need
+    // R_Y(θ)·(1,0,0) = (cos θ, 0, -sin θ) = (dir.x, 0, dir.z), i.e.
+    // θ = atan2(-dir.z, dir.x). The previous atan2(dir.x, dir.z) assumed +Z
+    // forward, which made the cat appear to walk sideways and "forward" feel
+    // broken.
     if (fwd !== 0 || sd !== 0) {
-      const moveYaw = Math.atan2(dir.x, dir.z);
+      const moveYaw = Math.atan2(-dir.z, dir.x);
       // shortest-path lerp
       let delta = moveYaw - catYaw.current;
       while (delta >  Math.PI) delta -= Math.PI * 2;
