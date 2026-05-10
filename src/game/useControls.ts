@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useGameStore } from './useGameStore';
 
 export interface Controls {
   forward: number; // -1..1
@@ -37,11 +38,23 @@ export function useKeyboardControls(controlsRef: React.MutableRefObject<Controls
     }
     function down(e: KeyboardEvent) {
       const k = e.key.toLowerCase();
+      // Don't intercept while typing in chat / input boxes.
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || (t as any).isContentEditable)) {
+        // still let keys[] track Shift for sprint-while-typing, but skip
+        // the special keys below
+      }
       keys[k] = true;
       if (k === 'v') controlsRef.current.toggleCamera = true;
       if (k === 'e') controlsRef.current.interact = true;
       if (k === 'f') controlsRef.current.attack = true;
       if (k === 'q') controlsRef.current.pounce = true;
+      if (k === 'p' || k === 'escape') {
+        try {
+          const s = useGameStore.getState();
+          s.setPaused(!s.paused);
+        } catch {}
+      }
       recompute();
     }
     function up(e: KeyboardEvent) {

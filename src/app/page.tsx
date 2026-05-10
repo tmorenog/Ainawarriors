@@ -19,6 +19,7 @@ import { WaypointArrow } from '@/components/WaypointArrow';
 import { MapPanel } from '@/components/MapPanel';
 import { BattleOverlay } from '@/components/BattleOverlay';
 import { SwipeFX } from '@/components/SwipeFX';
+import { WarriorsGuide } from '@/components/WarriorsGuide';
 import { useGameStore } from '@/game/useGameStore';
 import { useMultiplayer } from '@/game/useMultiplayer';
 import { patchSave, loadSave } from '@/lib/persist';
@@ -102,6 +103,8 @@ export default function Page() {
           <VisionOverlay />
           <GatherOverlay />
           <FishOverlay />
+          <DisasterOverlay />
+          <PauseOverlay />
           <SleepOverlay />
           <ErrorBoundary label="game" onReset={() => setScreen('title')}>
             {/* WebGLGuard probes for a usable WebGL context BEFORE we mount the
@@ -142,6 +145,7 @@ export default function Page() {
           <MapPanel />
           <BattleOverlay />
           <SwipeFX />
+          <WarriorsGuide />
         </>
       )}
 
@@ -293,18 +297,52 @@ function FishOverlay() {
 // Pure-visual vignette overlay. The actual cinematic happens via the
 // orbiting CameraRig camera, the cat's `doze` / `sleep` animations, and
 // the time-of-day sweep — no text on the player's screen.
+// Banner overlay for active disasters. Tints the screen colour by kind
+// and floats a warning ribbon at the top.
+function DisasterOverlay() {
+  const disaster = useGameStore((s) => s.disaster);
+  if (!disaster) return null;
+  const tint =
+    disaster.kind === 'fire'   ? 'rgba(180,70,30,0.18)' :
+    disaster.kind === 'flood'  ? 'rgba(60,120,170,0.20)' :
+                                 'rgba(120,40,40,0.22)';
+  const icon = disaster.kind === 'fire' ? '🔥' : disaster.kind === 'flood' ? '🌊' : '🚛';
+  return (
+    <div className="absolute inset-0 z-40 pointer-events-none">
+      <div className="absolute inset-0" style={{ background: tint, mixBlendMode: 'multiply' }} />
+      <div className="absolute left-1/2 -translate-x-1/2 top-12 max-w-[88vw] px-4 py-2 rounded-2xl bg-black/75 border border-thunder/60 text-bone text-sm shadow-2xl flex items-center gap-2">
+        <span className="text-xl">{icon}</span>
+        <span className="font-display">{disaster.message}</span>
+      </div>
+    </div>
+  );
+}
+
+function PauseOverlay() {
+  const paused = useGameStore((s) => s.paused);
+  const setPaused = useGameStore((s) => s.setPaused);
+  if (!paused) return null;
+  return (
+    <div className="absolute inset-0 z-50 grid place-items-center bg-black/70 backdrop-blur-sm pointer-events-auto">
+      <div className="text-center text-bone">
+        <div className="font-display text-5xl mb-2">PAUSED</div>
+        <div className="opacity-80 mb-6 text-sm">Press P or tap below to resume.</div>
+        <button onClick={() => setPaused(false)} className="rounded-xl bg-thunder hover:bg-thunder/90 px-6 py-3 font-display text-lg shadow">Resume</button>
+      </div>
+    </div>
+  );
+}
+
 function SleepOverlay() {
   const sleeping = useGameStore((s) => s.sleeping);
   const stage = useGameStore((s) => s.sleepStage);
+  const dreamLine = useGameStore((s) => s.dreamLine);
 
   useEffect(() => {
     if (!sleeping) return;
     useGameStore.getState().bumpTask('sleep', 1);
   }, [sleeping]);
 
-  // Pure-visual vignette — no text, no headings, no dream lines. The
-  // orbiting camera + the cat's eye-droop / sleep animation tell the
-  // story on their own.
   const opacity =
     !sleeping ? 0 :
     stage === 'loaf' ? 0.18 :
@@ -319,6 +357,18 @@ function SleepOverlay() {
         opacity,
         background: 'radial-gradient(ellipse at center, rgba(8,12,30,0.6), rgba(0,0,0,0.9))',
       }}
-    />
+    >
+      {/* StarClan dream card — only during the deep stage, only if a dead
+          clanmate sent one. The text is intentionally cryptic for warnings,
+          glowing for prophecies of greatness. */}
+      {sleeping && stage === 'deep' && dreamLine && (
+        <div className="h-full grid place-items-center p-6">
+          <div className="max-w-md text-center text-bone animate-fade-in" style={{ textShadow: '0 4px 24px rgba(0,0,0,0.85)' }}>
+            <div className="text-[10px] uppercase tracking-[0.5em] opacity-70 mb-2">A dream from StarClan</div>
+            <p className="italic text-base md:text-lg leading-relaxed">{dreamLine}</p>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

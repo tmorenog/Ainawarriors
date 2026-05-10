@@ -1,11 +1,96 @@
 'use client';
 
+import { useState } from 'react';
 import { useGameStore } from '@/game/useGameStore';
 import { NPCS, type NpcId } from '@/lib/npcs';
 
+// Lightweight keyword-driven reply for the free-text input. We don't have
+// a real LLM in here — pick the first phrase that matches the player's
+// words, otherwise fall back to a per-NPC neutral answer.
+function npcReply(id: NpcId, text: string): string {
+  const t = text.toLowerCase();
+  const greetings = ['hi', 'hello', 'hey', 'greet', 'mew'];
+  const farewells = ['bye', 'goodbye', 'farewell', 'leave'];
+  const battle = ['battle', 'fight', 'war', 'kill', 'claws'];
+  const food = ['hungry', 'food', 'prey', 'eat', 'mouse', 'fish', 'rabbit'];
+  const starclan = ['starclan', 'stars', 'dream', 'spirit', 'omen'];
+  const moon = ['gathering', 'moon', 'fourtrees'];
+  const friend = ['friend', 'love', 'mate'];
+  const help = ['help', 'lost', 'where', 'how'];
+
+  const has = (list: string[]) => list.some((k) => t.includes(k));
+
+  // Per-NPC voice tweaks
+  const voices: Record<NpcId, Record<string, string>> = {
+    firestar: {
+      greet: 'Welcome to ThunderClan, young one. Walk softly.',
+      bye: 'StarClan light your path.',
+      battle: 'A warrior fights only when there is no other way. Train your claws — but keep your heart calm.',
+      food: 'The fresh-kill pile is in the centre of camp. Bring something for the elders before you eat.',
+      starclan: 'StarClan watches every paw-print. Listen, and they will speak.',
+      moon: 'At the full moon every clan walks in peace at Fourtrees. Bring no claws.',
+      friend: 'Loyalty is the warrior code\'s heart. Choose your friends carefully.',
+      help: 'Ask Spottedleaf for herbs, the warriors for a patrol, and your own paws for the rest.',
+      _: 'A clan is only as strong as its quietest cat.',
+    },
+    tigerstar: {
+      greet: 'You waste my time, kit.',
+      bye: 'Run, then. Run.',
+      battle: 'Then come at me. I am not afraid of ThunderClan.',
+      food: 'Eat from your own pile. ShadowClan does not feed strays.',
+      starclan: 'StarClan is for cats too weak to take what they want.',
+      moon: 'A truce of cowards. I will be there — for now.',
+      friend: 'Friendship is a leash. I wear no leash.',
+      help: 'No.',
+      _: 'You are still here. Why?',
+    },
+    blackstar: {
+      greet: 'Greetings. ShadowClan honours the truce.',
+      bye: 'Walk safe, ThunderClan.',
+      battle: 'My warriors are ready. Hopefully we will not need them.',
+      food: 'There is good prey in the pine forest. We share, sometimes.',
+      starclan: 'StarClan kept us through the worst. I will not forget.',
+      moon: 'I will speak for ShadowClan at the moon. We have a new beginning.',
+      friend: 'A leader has many warriors and few friends.',
+      help: 'Ask honestly and ShadowClan answers honestly.',
+      _: 'Speak plainly. I have a clan to feed.',
+    },
+    leopardstar: {
+      greet: 'RiverClan greets you, traveller.',
+      bye: 'May the river guide your paws.',
+      battle: 'We fight only at the water\'s edge — and we win there.',
+      food: 'The river is full this season. Try fish if you have not.',
+      starclan: 'The river mirrors the sky. We see StarClan in it nightly.',
+      moon: 'I will be at Fourtrees, as is the custom.',
+      friend: 'My warriors are my kin.',
+      help: 'Ask any RiverClan cat for directions to the bank.',
+      _: 'You may stay a moment, but our reeds are not your reeds.',
+    },
+    tallstar: {
+      greet: 'The wind brought you.',
+      bye: 'Run swift on your way home.',
+      battle: 'WindClan does not start fights — but we finish them.',
+      food: 'Rabbits run thick on the moor. If you can catch one.',
+      starclan: 'I have walked with StarClan in my dreams. They walk with us all.',
+      moon: 'At the full moon I speak for the moor.',
+      friend: 'My deputy is my closest friend. That is enough.',
+      help: 'Stay clear of the gorse traps — and the Twoleg fences.',
+      _: 'Be brief, traveller. The wind is calling.',
+    },
+  };
+  const v = voices[id];
+  if (has(greetings)) return v.greet;
+  if (has(farewells)) return v.bye;
+  if (has(battle)) return v.battle;
+  if (has(food)) return v.food;
+  if (has(starclan)) return v.starclan;
+  if (has(moon)) return v.moon;
+  if (has(friend)) return v.friend;
+  if (has(help)) return v.help;
+  return v._;
+}
+
 // Modal dialog shown when the player taps "Talk to <name>" above an NPC.
-// Lets the player accept Firestar's mission or pick a fight with Tigerstar.
-// Visually a centered card with the NPC's greeting and 1–2 reply buttons.
 export function NpcDialog() {
   const id = useGameStore((s) => s.npcDialogId) as NpcId | null;
   const setId = useGameStore((s) => s.setNpcDialogId);
@@ -15,15 +100,13 @@ export function NpcDialog() {
   const setTigerstarHp = useGameStore((s) => s.setTigerstarHp);
   const tigerstarHp = useGameStore((s) => s.tigerstarHp);
   const pushChat = useGameStore((s) => s.pushChat);
+  const [input, setInput] = useState('');
+  const [reply, setReply] = useState<string | null>(null);
 
   if (!id) return null;
-  // Greeting any leader counts toward the "meet 3 leaders" task. We bump
-  // here on every open — the predicate would need a Set per task to dedupe
-  // so we just live with the optimistic count for now.
   useGameStore.getState().bumpTask('meet-leader-n', 1);
   const npc = NPCS[id];
 
-  // Adjust greeting based on mission state so it doesn't sound stuck.
   let greeting = npc.greeting;
   if (id === 'firestar' && mission === 'accepted') {
     greeting = 'You have my trust. Find Tigerstar in ShadowClan camp and end this — for all the clans.';
@@ -38,8 +121,6 @@ export function NpcDialog() {
     greeting = 'You\'ve drawn blood, kit. But I have nine lives — you have one. Strike again if you dare.';
   }
 
-  // Compose options dynamically — once the mission is accepted Firestar
-  // doesn't need to ask again, and after victory Tigerstar shouldn't fight.
   const options = (() => {
     if (id === 'firestar') {
       if (mission === 'won') return [{ label: 'StarClan smile on you, Firestar.', result: 'goodbye' as const }];
@@ -53,7 +134,17 @@ export function NpcDialog() {
     return npc.options;
   })();
 
-  const close = () => setId(null);
+  const close = () => { setId(null); setInput(''); setReply(null); };
+
+  const submitFreeText = () => {
+    const text = input.trim();
+    if (!text) return;
+    const r = npcReply(id, text);
+    setReply(r);
+    pushChat({ id: 'me' + Date.now(), fromId: 'self', fromName: 'You', scope: 'nearby', text, at: Date.now() });
+    pushChat({ id: 'npc' + Date.now(), fromId: 'npc:' + id, fromName: npc.cat.name, scope: 'nearby', text: r, at: Date.now() });
+    setInput('');
+  };
 
   return (
     <div className="absolute inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm pointer-events-auto p-6">
@@ -62,16 +153,27 @@ export function NpcDialog() {
           <div className="font-display text-2xl">{npc.cat.name}</div>
           <div className="text-[10px] uppercase tracking-[0.4em] opacity-60">{npc.cat.role}</div>
         </div>
-        <p className="text-sm leading-relaxed mb-4 italic opacity-90">{greeting}</p>
+        <p className="text-sm leading-relaxed mb-3 italic opacity-90">{reply ?? greeting}</p>
+
+        {/* Free-text input — say anything to the leader */}
+        <div className="flex gap-1 mb-3">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') submitFreeText(); }}
+            placeholder={`Say something to ${npc.cat.name}…`}
+            maxLength={160}
+            className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1.5 text-sm"
+          />
+          <button onClick={submitFreeText} className="rounded bg-thunder hover:bg-thunder/90 px-2 py-1.5 text-xs">Mew</button>
+        </div>
+
         <div className="flex flex-col gap-2">
           {options.map((opt, i) => (
             <button
               key={i}
               onClick={() => {
-                if (opt.result === 'goodbye') {
-                  close();
-                  return;
-                }
+                if (opt.result === 'goodbye') { close(); return; }
                 if (opt.result === 'accept-battle') {
                   setMission('accepted');
                   useGameStore.getState().bumpTask('accept-mission', 1);
@@ -91,9 +193,6 @@ export function NpcDialog() {
                   useGameStore.getState().bumpTask('accept-mission', 1);
                   setTigerstarHp(100);
                   setBattleActive(true);
-                  // Run the cinematic intro before letting the player swing.
-                  // The fight banner is up for 2s; the rest of the time the
-                  // player has full control via Q (pounce) and F (swipe).
                   const s = useGameStore.getState();
                   s.setBattlePhase('intro');
                   setTimeout(() => useGameStore.getState().setBattlePhase('fighting'), 2000);

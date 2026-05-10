@@ -149,6 +149,13 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
 
       {/* bottom-right action buttons */}
       <div className="absolute right-3 bottom-3 flex flex-col gap-2 pointer-events-auto">
+        <button
+          onClick={() => useGameStore.getState().setPaused(true)}
+          className="rounded-full bg-black/55 hover:bg-black/75 px-3 py-2 text-xs shadow"
+          title="Pause (P / Esc)"
+        >
+          ⏸ Pause
+        </button>
         <div className="flex flex-col gap-1 items-stretch">
           <button
             onClick={() => adjustCameraZoom(-1.2)}
@@ -201,7 +208,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-30 · gathering, leaders, more tasks
+        wotc-31 · dreams, disasters, pause, guide
       </div>
     </div>
   );
@@ -320,7 +327,37 @@ function triggerSleep() {
   }, 90);
 
   setTimeout(() => useGameStore.getState().setSleepStage('curl'), 2500);
-  setTimeout(() => useGameStore.getState().setSleepStage('deep'), 5000);
+  setTimeout(() => {
+    const cur = useGameStore.getState();
+    cur.setSleepStage('deep');
+    // 50% chance StarClan sends a dream from a dead clanmate.
+    if (Math.random() < 0.5) {
+      const elders = ['Spottedleaf', 'Yellowfang', 'Bluestar', 'Lionheart', 'Redtail', 'Silverstream', 'Whitestorm'];
+      const warnings = [
+        'A shadow walks among the warriors — but I cannot see its face.',
+        'Three rivers will run red before the next leaf-fall.',
+        'Beware the cat with sky in its eyes — and a tongue smoother than a fish.',
+        'The wind smells of fire. A patrol you trust will be lost.',
+        'Where the brambles part, an old wound opens. Mend it, or bleed.',
+      ];
+      const greatness = [
+        'will be the greatest leader the forest has ever known.',
+        'has a fire in their heart that will save your clan.',
+        'walks with the courage of three warriors. Trust them.',
+        'is more than they seem — listen to their dreams.',
+        'will be remembered by every kit for many moons.',
+      ];
+      const speaker = elders[Math.floor(Math.random() * elders.length)];
+      const subject = ['Bramblepaw', 'Cinderpelt', 'Sandstorm', 'Graystripe', 'a young apprentice you have not yet met'][Math.floor(Math.random() * 5)];
+      const isGreat = Math.random() < 0.4;
+      const text = isGreat
+        ? `${speaker}: "${subject} ${greatness[Math.floor(Math.random() * greatness.length)]}"`
+        : `${speaker}: "${warnings[Math.floor(Math.random() * warnings.length)]}"`;
+      cur.setDreamLine(text);
+    } else {
+      cur.setDreamLine(null);
+    }
+  }, 5000);
   setTimeout(() => {
     const cur = useGameStore.getState();
     cur.setSleepStage('waking');
@@ -332,8 +369,10 @@ function triggerSleep() {
     });
   }, 13000);
   setTimeout(() => {
-    useGameStore.getState().setSleepStage('idle');
-    useGameStore.getState().setSleeping(false);
+    const s2 = useGameStore.getState();
+    s2.setSleepStage('idle');
+    s2.setSleeping(false);
+    s2.setDreamLine(null);
   }, 14500);
 }
 

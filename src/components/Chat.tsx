@@ -18,7 +18,8 @@ export function Chat({ onSend, onEmote }: Props) {
   const friends = useGameStore((s) => s.friends);
   const toggleFriend = useGameStore((s) => s.toggleFriend);
   const selfId = useGameStore((s) => s.selfId);
-  const [open, setOpen] = useState(true);
+  // Default closed — show a small 💬 button. Tap it to expand the chat.
+  const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [scope, setScope] = useState<'nearby' | 'clan'>('nearby');
   const endRef = useRef<HTMLDivElement>(null);
@@ -109,7 +110,12 @@ export function Chat({ onSend, onEmote }: Props) {
           </div>
         </div>
       ) : (
-        <button onClick={() => setOpen(true)} className="rounded-full bg-black/55 px-3 py-1 text-xs text-bone">show chat</button>
+        <button
+          onClick={() => setOpen(true)}
+          className="w-10 h-10 rounded-full bg-black/55 hover:bg-black/75 grid place-items-center text-bone text-base shadow border border-white/15"
+          aria-label="Open chat"
+          title="Open chat"
+        >💬</button>
       )}
     </div>
   );
