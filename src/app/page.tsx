@@ -38,7 +38,15 @@ export default function Page() {
   const mp = useMultiplayer(cat, room, screen === 'game');
 
   return (
-    <main className="relative w-screen h-screen [@supports(height:100dvh)]:h-[100dvh] overflow-hidden no-select">
+    <main
+      className="fixed inset-0 overflow-hidden no-select"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingRight: 'env(safe-area-inset-right)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+      }}
+    >
       {screen === 'title' && (
         <TitleScreen onStart={(r) => { setRoom(r); setScreen('game'); }} />
       )}

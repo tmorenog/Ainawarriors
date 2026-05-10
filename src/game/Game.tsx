@@ -234,6 +234,12 @@ export function Game({ room, net }: GameProps) {
         alpha: false,
         preserveDrawingBuffer: false,
       }}
+      onCreated={({ gl }) => {
+        // Always-visible sky-blue fallback so the canvas is never pure black even
+        // for the first frame before the World mounts.
+        try { gl.setClearColor(new THREE.Color('#7ec8e3')); } catch {}
+      }}
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
     >
       <Suspense fallback={null}>
         <World

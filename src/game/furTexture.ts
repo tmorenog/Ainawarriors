@@ -60,41 +60,77 @@ export function buildFurTexture(input: FurInputs): THREE.CanvasTexture | null {
 
   switch (pattern) {
     case 'tabby': {
-      // Primary mackerel stripes in patternColor
-      ctx.strokeStyle = patternColor;
-      ctx.lineWidth = 5;
-      ctx.lineCap = 'round';
-      const stripes = 22;
-      for (let i = 0; i < stripes; i++) {
-        const baseX = (i / stripes) * W + (rand() - 0.5) * 6;
-        ctx.beginPath();
-        for (let y = -8; y <= H + 8; y += 6) {
-          const x = baseX + Math.sin(y * 0.045 + i * 0.6) * 9;
-          if (y === -8) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-      }
-      // Secondary thinner accent stripes in patternColor2 between primaries
-      ctx.strokeStyle = c2;
-      ctx.lineWidth = 2.2;
-      for (let i = 0; i < stripes; i++) {
-        const baseX = (i / stripes) * W + W / (stripes * 2);
-        ctx.beginPath();
-        for (let y = -8; y <= H + 8; y += 6) {
-          const x = baseX + Math.sin(y * 0.06 + i * 1.1) * 7;
-          if (y === -8) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-      }
-      // Spine band uses patternColor3 as the deepest shade if provided
+      // Bold tiger stripes that radiate sideways from a darker spine band along the top of the texture.
+      // The texture wraps around the body so the top of the canvas maps to the cat's spine.
+
+      // 1. Deep spine band in patternColor3 (or fallback)
       const spine = ctx.createLinearGradient(0, 0, 0, H);
       spine.addColorStop(0, c3);
-      spine.addColorStop(0.4, 'rgba(0,0,0,0)');
+      spine.addColorStop(0.18, c3);
+      spine.addColorStop(0.55, 'rgba(0,0,0,0)');
       ctx.fillStyle = spine;
-      ctx.globalAlpha = 0.35;
-      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 0.7;
+      ctx.fillRect(0, 0, W, H * 0.5);
+      ctx.globalAlpha = 1;
+
+      // 2. Bold dark stripes in patternColor — wider, jagged, dropping from spine down the flanks
+      ctx.fillStyle = patternColor;
+      const count = 24;
+      for (let i = 0; i < count; i++) {
+        const cx = (i / count) * W + (rand() - 0.5) * 6;
+        const topY = 0;
+        const bottomY = H * (0.55 + rand() * 0.4);  // varying length
+        const baseW = 6 + rand() * 7;               // wide stroke
+        ctx.beginPath();
+        // Left edge of stripe (jagged)
+        for (let y = topY; y <= bottomY; y += 4) {
+          const wig = Math.sin(y * 0.18 + i) * 2.5 + (rand() - 0.5) * 1.5;
+          const x = cx - baseW / 2 + wig;
+          if (y === topY) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        // Right edge back up
+        for (let y = bottomY; y >= topY; y -= 4) {
+          const wig = Math.sin(y * 0.22 + i + 1.7) * 2.5 + (rand() - 0.5) * 1.5;
+          const x = cx + baseW / 2 + wig;
+          ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // 3. Secondary thinner accent stripes in patternColor2 between primaries
+      ctx.fillStyle = c2;
+      ctx.globalAlpha = 0.85;
+      for (let i = 0; i < count; i++) {
+        const cx = (i / count) * W + W / (count * 2);
+        const topY = H * 0.05;
+        const bottomY = H * (0.45 + rand() * 0.35);
+        const baseW = 2 + rand() * 2.5;
+        ctx.beginPath();
+        for (let y = topY; y <= bottomY; y += 4) {
+          const wig = Math.sin(y * 0.25 + i * 1.3) * 2;
+          const x = cx - baseW / 2 + wig;
+          if (y === topY) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        for (let y = bottomY; y >= topY; y -= 4) {
+          const wig = Math.sin(y * 0.28 + i * 1.3 + 1.5) * 2;
+          const x = cx + baseW / 2 + wig;
+          ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      // 4. Lighter belly strip (bottom of texture) so the underside reads brighter
+      const belly2 = ctx.createLinearGradient(0, H * 0.65, 0, H);
+      belly2.addColorStop(0, 'rgba(255,255,255,0)');
+      belly2.addColorStop(1, belly || '#f5efe2');
+      ctx.fillStyle = belly2;
+      ctx.globalAlpha = 0.5;
+      ctx.fillRect(0, H * 0.65, W, H * 0.35);
       ctx.globalAlpha = 1;
       break;
     }
