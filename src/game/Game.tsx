@@ -118,6 +118,22 @@ function PlayerController({
       useGameStore.getState().setSettings({ cameraMode: settings.cameraMode === 'first' ? 'third' : 'first' });
     }
 
+    // E (interact) — at the moment the only interaction is "eat from the
+    // fresh-kill pile", which fires when E is pressed within ~3 units of
+    // the player's own clan camp pile. The same pile shows a tappable
+    // button on touch devices via FreshKillPile.
+    if (c.interact) {
+      c.interact = false;
+      const myClan = CLANS[cat.clan];
+      if (myClan) {
+        const px = myClan.campCenter[0];
+        const pz = myClan.campCenter[2] + 2;
+        const dx = pos.current.x - px;
+        const dz = pos.current.z - pz;
+        if (dx * dx + dz * dz < 3 * 3) eatFromPile();
+      }
+    }
+
     const stats = SIZE_STATS[cat.size];
     const clanBonus = (CLANS[cat.clan].bonuses.speed ?? 1) as number;
     const base = 6 * stats.speed * clanBonus;
@@ -533,6 +549,90 @@ function PlayerController({
 // at 12fps. RemoteCat wraps each remote player and runs a per-frame lerp
 // toward the latest target position/rotation so movement looks smooth even
 // though the network stream is sparse.
+// Floating "Eat" button anchored above the player's own clan fresh-kill
+// pile. Visible only when the player is within ~3 units of the pile. Tap
+// it on mobile (or press E on a keyboard — wired in PlayerController) to
+// eat a piece of prey: hunger goes up, a system chat fires, and a small
+// throttle prevents spam.
+function FreshKillPile({ viewerRef }: { viewerRef: React.MutableRefObject<THREE.Object3D | null> }) {
+  const cat = useGameStore((s) => s.cat);
+  const ref = useRef<THREE.Group>(null);
+  const [near, setNear] = useState(false);
+
+  // Each clan's pile sits at camp.centre + (0, 0, 2) — see World.tsx Camps.
+  // Players only see/interact with their OWN clan's pile.
+  const pile = useMemo(() => {
+    if (!cat) return null;
+    const c = CLANS[cat.clan];
+    if (!c) return null;
+    return { x: c.campCenter[0], z: c.campCenter[2] + 2 };
+  }, [cat]);
+
+  useFrame(() => {
+    const me = viewerRef.current?.position;
+    if (!me || !pile) return;
+    const dx = me.x - pile.x;
+    const dz = me.z - pile.z;
+    const close = dx * dx + dz * dz < 3 * 3;
+    if (close !== near) setNear(close);
+  });
+
+  if (!pile) return null;
+  return (
+    <group ref={ref} position={[pile.x, terrainHeightAt(pile.x, pile.z) + 0.4, pile.z]}>
+      {near && (
+        <Html position={[0, 1.2, 0]} center distanceFactor={9}>
+          <button
+            onClick={() => eatFromPile()}
+            className="px-3 py-1 rounded-full bg-thunder/95 hover:bg-thunder text-bone text-[11px] font-display shadow border border-thunder/60 pointer-events-auto whitespace-nowrap"
+          >
+            🍖 Eat from pile (E)
+          </button>
+        </Html>
+      )}
+    </group>
+  );
+}
+
+// Shared "eat from the fresh-kill pile" action — used by both the on-screen
+// button and the E key in PlayerController. Mild throttle so it can't be
+// spammed every frame. If you're already carrying prey, dropping it onto
+// the pile gives a richer meal.
+let _lastEatAt = 0;
+function eatFromPile() {
+  const now = performance.now();
+  if (now - _lastEatAt < 800) return;
+  _lastEatAt = now;
+  const s = useGameStore.getState();
+  if (s.hud.hunger >= 100) {
+    s.pushChat({
+      id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
+      text: 'Your belly is already full — leave some for the elders.',
+      at: Date.now(),
+    });
+    return;
+  }
+  if (s.carrying) {
+    // Drop your prey first → a real meal. Hunger restores 35.
+    const piece = s.carrying;
+    s.setCarrying(null);
+    s.setHud({ hunger: Math.min(100, s.hud.hunger + 35) });
+    s.pushChat({
+      id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
+      text: `You eat the ${piece} you brought in. Strength returns to your paws.`,
+      at: Date.now(),
+    });
+    return;
+  }
+  // Take a small share from the existing pile — 18 hunger.
+  s.setHud({ hunger: Math.min(100, s.hud.hunger + 18) });
+  s.pushChat({
+    id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
+    text: 'You take a vole from the fresh-kill pile and crunch it down.',
+    at: Date.now(),
+  });
+}
+
 function RemoteCat({ player, bubble, viewerRef }: { player: PlayerState; bubble?: string; viewerRef: React.MutableRefObject<THREE.Object3D | null> }) {
   const ref = useRef<THREE.Group>(null);
   const target = useRef({
@@ -796,6 +896,9 @@ export function Game({ room, net }: GameProps) {
 
         {/* NPCs — Firestar in ThunderClan camp, Tigerstar in ShadowClan camp */}
         <Npcs viewerRef={selfRef} />
+
+        {/* Tap-to-eat prompt over the player's own fresh-kill pile */}
+        <FreshKillPile viewerRef={selfRef} />
 
         <CameraRig target={selfRef as any} yaw={yaw} pitch={pitch} mode={settings.cameraMode} />
         <PlayerController
