@@ -13,6 +13,7 @@ import { ROLE_LIST, defaultRoleForClan, type RoleId } from '@/lib/roles';
 import { useGameStore } from '@/game/useGameStore';
 import { loadSave, patchSave } from '@/lib/persist';
 import { safeUsername } from '@/lib/chatFilter';
+import { normalizeCat } from '@/lib/normalizeCat';
 
 const FUR_BASES = ['#3a2618','#5b3a25','#7a5a3a','#9c8268','#c9b59b','#e3d5b8','#1d1d1d','#444','#888','#bdbdbd','#f4f1ea','#9c4a22','#c46a32','#e2a456','#5a4a2a'];
 const FUR_BELLY = ['#f4f1ea','#e3d5b8','#c9b59b','#9c8268','#444'];
@@ -60,7 +61,7 @@ function makeDefault(): CatAppearance {
 
 export function CharacterCreator({ onSave, onCancel }: Props) {
   const existing = useGameStore((s) => s.cat);
-  const [cat, setCat] = useState<CatAppearance>(() => existing ?? makeDefault());
+  const [cat, setCat] = useState<CatAppearance>(() => existing ? normalizeCat(existing) : makeDefault());
   const [tab, setTab] = useState<'fur' | 'shape' | 'size' | 'clan' | 'name' | 'voice'>('fur');
   const [nameError, setNameError] = useState('');
 

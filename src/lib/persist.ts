@@ -1,4 +1,5 @@
 import type { CatAppearance } from '@/game/types';
+import { normalizeCat } from '@/lib/normalizeCat';
 
 const KEY = 'wotc_save_v1';
 
@@ -68,14 +69,14 @@ export function loadSave(): SaveData {
     }
     const parsed = JSON.parse(raw) as Partial<SaveData>;
     return {
-      cat: parsed.cat ?? null,
+      cat: parsed.cat ? normalizeCat(parsed.cat) : null,
       settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
-      friends: parsed.friends ?? [],
-      muted: parsed.muted ?? [],
-      reputation: parsed.reputation ?? 50,
-      unlocks: parsed.unlocks ?? [],
-      lastClan: parsed.lastClan ?? null,
-      guestId: parsed.guestId ?? newGuestId(),
+      friends: Array.isArray(parsed.friends) ? parsed.friends : [],
+      muted: Array.isArray(parsed.muted) ? parsed.muted : [],
+      reputation: typeof parsed.reputation === 'number' ? parsed.reputation : 50,
+      unlocks: Array.isArray(parsed.unlocks) ? parsed.unlocks : [],
+      lastClan: typeof parsed.lastClan === 'string' ? parsed.lastClan : null,
+      guestId: typeof parsed.guestId === 'string' ? parsed.guestId : newGuestId(),
     };
   } catch {
     return {

@@ -5,6 +5,7 @@ import { forwardRef, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { CatAppearance } from './types';
 import { SIZE_STATS } from './types';
+import { normalizeCat } from '@/lib/normalizeCat';
 
 interface CatProps {
   cat: CatAppearance;
@@ -56,7 +57,8 @@ const Leg = forwardRef<THREE.Group, LegProps>(function Leg({ position, material,
   );
 });
 
-export function Cat({ cat, position = [0, 0, 0], rotation = 0, anim = 'idle', injured = false, carrying = null }: CatProps) {
+export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'idle', injured = false, carrying = null }: CatProps) {
+  const cat = useMemo(() => normalizeCat(rawCat), [rawCat]);
   const groupRef = useRef<THREE.Group>(null);
   const tailRefs = useRef<THREE.Mesh[]>([]);
   const earL = useRef<THREE.Mesh>(null);
