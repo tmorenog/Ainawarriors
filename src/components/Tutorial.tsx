@@ -35,6 +35,11 @@ const STEPS: Step[] = [
     body:
       'Tap the 📖 button on the right edge to enter Book Mode. Each chapter gives you a small in-game objective and tells a story. You can choose to read it yourself, or let the wind read it to you.',
   },
+  {
+    title: 'Stuck? Just press X.',
+    body:
+      'Press X on a keyboard, or tap the round "?" button on the right of the screen, to bring this hint screen back any time.',
+  },
 ];
 
 export function Tutorial() {
@@ -49,6 +54,22 @@ export function Tutorial() {
     } catch {}
   }, []);
 
+  // Press X (or ?) on a keyboard to toggle the hint screen.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onKey = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (k === 'x' || k === '?') {
+        // Don't fire when typing in chat or any other input
+        const t = e.target as HTMLElement | null;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || (t as any).isContentEditable)) return;
+        setOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const dismiss = () => {
     setOpen(false);
     try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch {}
@@ -58,10 +79,11 @@ export function Tutorial() {
     return (
       <button
         onClick={() => { setStep(0); setOpen(true); }}
-        className="absolute bottom-3 right-1/2 translate-x-[120px] z-30 rounded-full bg-black/45 hover:bg-black/65 text-bone text-[10px] px-3 py-1.5 pointer-events-auto hidden md:block"
-        title="Replay tutorial"
+        className="absolute right-3 bottom-[200px] z-30 rounded-full bg-black/55 hover:bg-black/75 backdrop-blur w-12 h-12 grid place-items-center text-bone text-lg font-display shadow-lg pointer-events-auto border border-white/15"
+        title="Hint / tutorial — press X on a keyboard"
+        aria-label="Show hints"
       >
-        ? tutorial
+        ?
       </button>
     );
   }
