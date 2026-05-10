@@ -252,18 +252,15 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
       <color attach="background" args={[skyTop]} />
       <fog attach="fog" args={[fogColor, 30, fog]} />
 
-      {/* sky dome with gradient */}
+      {/* sky dome — simple two-color gradient using a single vertex-color
+          mesh (no custom shader, so no GLSL compatibility issues across devices) */}
       <mesh>
         <sphereGeometry args={[490, 32, 24]} />
-        <shaderMaterial
-          side={THREE.BackSide}
-          uniforms={{
-            top: { value: new THREE.Color(skyTop) },
-            bot: { value: new THREE.Color(skyBot) },
-          }}
-          vertexShader={`varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`}
-          fragmentShader={`uniform vec3 top; uniform vec3 bot; varying vec3 vP; void main(){ float h = clamp((vP.y/490.0)*0.5 + 0.5, 0.0, 1.0); gl_FragColor = vec4(mix(bot, top, h), 1.0); }`}
-        />
+        <meshBasicMaterial side={THREE.BackSide} color={skyTop} />
+      </mesh>
+      <mesh position={[0, -240, 0]}>
+        <sphereGeometry args={[480, 24, 12, 0, Math.PI * 2, Math.PI * 0.5, Math.PI * 0.5]} />
+        <meshBasicMaterial side={THREE.BackSide} color={skyBot} />
       </mesh>
 
       {/* sun / moon */}
