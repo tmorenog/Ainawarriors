@@ -198,7 +198,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-26 · slow prey
+        wotc-27 · prey crawl + slim fluff
       </div>
     </div>
   );

@@ -292,7 +292,7 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
   })();
 
   const safe = (n: number, fallback: number) => (Number.isFinite(n) ? n : fallback);
-  const tailFluff = cat.tail === 'fluffy' ? 1.6 : 1;
+  const tailFluff = cat.tail === 'fluffy' ? 1.05 : 1;
   const fluff = safe(1 + cat.fluffiness * 0.35, 1);
 
   // Cute kitten proportions: shorter, chubbier body
@@ -663,9 +663,11 @@ function SmoothTail({ length, baseRadius, tailType, anim, material, attach }: Sm
         //   other  — classic taper, thicker at base, slim at tip.
         let taper: number;
         if (tailType === 'fluffy') {
-          const base = 1.55 - tt * 0.35;                      // thick along the length
-          const mid  = Math.sin(tt * Math.PI) * 0.85;          // big middle bulge
-          const tip  = tt > 0.78 ? (tt - 0.78) * 2.4 : 0;      // flared brushy plume
+          // Modest fluff — slim taper with a small mid-bulge and a small
+          // tip plume. Way smaller than the previous flame-shape.
+          const base = 0.95 - tt * 0.45;
+          const mid  = Math.sin(tt * Math.PI) * 0.18;
+          const tip  = tt > 0.85 ? (tt - 0.85) * 0.6 : 0;
           taper = base + mid + tip;
         } else {
           taper = 1 - tt * 0.78;
@@ -694,8 +696,8 @@ function SmoothTail({ length, baseRadius, tailType, anim, material, attach }: Sm
         // Cap the tip with a small sphere for a clean rounded end
         if (i === segments && tipRef.current) {
           tipRef.current.position.set(tmp.p.x, tmp.p.y, tmp.p.z);
-          // Fluffy tails get a prominent plume sphere at the end.
-          const tipR = Math.max(0.01, baseRadius * 0.22 + (tailType === 'fluffy' ? 0.18 : 0));
+          // Fluffy tails get a small plume bump at the end.
+          const tipR = Math.max(0.01, baseRadius * 0.22 + (tailType === 'fluffy' ? 0.05 : 0));
           tipRef.current.scale.setScalar(tipR / 0.05); // base sphere is r=0.05
         }
       }
