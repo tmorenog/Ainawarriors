@@ -5,7 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import { useRef } from 'react';
 import * as THREE from 'three';
 import { Cat } from './Cat';
-import { NPCS, type NpcId } from '@/lib/npcs';
+import { NPCS, type NpcId, GATHERING_POS, GATHERING_SEATS } from '@/lib/npcs';
 import { useGameStore } from './useGameStore';
 import { terrainHeightAt } from './terrain';
 
@@ -64,7 +64,13 @@ function NpcInstance({
     let targetX = npc.pos[0];
     let targetZ = npc.pos[2];
 
-    if (id === 'firestar') {
+    // Full-moon Gathering takes priority — every leader (NPC) walks to
+    // their seat at Fourtrees while clanGathering is true.
+    if (store.clanGathering && GATHERING_SEATS[id]) {
+      const [ox, oz] = GATHERING_SEATS[id];
+      targetX = GATHERING_POS[0] + ox;
+      targetZ = GATHERING_POS[2] + oz;
+    } else if (id === 'firestar') {
       if (store.mission === 'accepted' && me) {
         const tx = NPCS.tigerstar.pos[0];
         const tz = NPCS.tigerstar.pos[2];
@@ -86,6 +92,9 @@ function NpcInstance({
         targetZ = npc.pos[2];
       }
     }
+    // The other two new leaders (leopardstar / tallstar) just stay at their
+    // own clan camps when there's no gathering — handled by the default
+    // target above.
 
     const desiredY = terrainHeightAt(targetX, targetZ);
     const a = Math.min(1, dt * 2.5);

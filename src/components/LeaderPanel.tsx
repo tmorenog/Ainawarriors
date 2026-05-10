@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useGameStore } from '@/game/useGameStore';
 
 interface Props {
@@ -10,10 +11,41 @@ interface Props {
 export function LeaderPanel({ onClose, onCommand }: Props) {
   const players = useGameStore((s) => s.players);
   const selfId = useGameStore((s) => s.selfId);
+  const pushChat = useGameStore((s) => s.pushChat);
   const me = players[selfId];
+  const [announcement, setAnnouncement] = useState('');
+  const [battleTarget, setBattleTarget] = useState('ShadowClan');
   if (!me) return null;
   const isLeader = me.isLeader;
   const others = Object.values(players).filter((p) => p.socketId !== selfId);
+
+  const sendAnnouncement = () => {
+    const text = announcement.trim();
+    if (!text) return;
+    onCommand('announce', { text });
+    pushChat({
+      id: 'sys' + Date.now(),
+      fromId: 'system',
+      fromName: `★ ${me.cat.name}`,
+      scope: 'clan',
+      text: `📣 ${text}`,
+      at: Date.now(),
+    });
+    setAnnouncement('');
+  };
+
+  const declareBattle = () => {
+    onCommand('battle-declare', { target: battleTarget });
+    pushChat({
+      id: 'sys' + Date.now(),
+      fromId: 'system',
+      fromName: `★ ${me.cat.name}`,
+      scope: 'system',
+      text: `${me.cat.clan} declares battle on ${battleTarget}! Warriors, to me!`,
+      at: Date.now(),
+    });
+    useGameStore.getState().bumpTask('declare-battle', 1);
+  };
 
   return (
     <div className="absolute inset-0 z-40 bg-black/65 backdrop-blur grid place-items-center text-bone p-4 pointer-events-auto">
@@ -27,11 +59,49 @@ export function LeaderPanel({ onClose, onCommand }: Props) {
         <Action label="Organize a border patrol" onClick={() => onCommand('patrol', { kind: 'border' })} />
         {isLeader && (
           <>
+            {/* Free-form clan announcement */}
+            <div className="mt-3">
+              <div className="text-xs uppercase tracking-wide opacity-70 mb-1">Announcement</div>
+              <textarea
+                value={announcement}
+                onChange={(e) => setAnnouncement(e.target.value)}
+                placeholder="Speak from the High Rock…"
+                rows={2}
+                className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-sm"
+                maxLength={240}
+              />
+              <button
+                onClick={sendAnnouncement}
+                disabled={!announcement.trim()}
+                className="mt-1 w-full rounded bg-thunder hover:bg-thunder/90 disabled:bg-thunder/30 px-3 py-2 text-sm font-display"
+              >
+                📣 Announce to the clan
+              </button>
+            </div>
+
+            {/* Declare battle */}
+            <div className="mt-3">
+              <div className="text-xs uppercase tracking-wide opacity-70 mb-1">Declare battle</div>
+              <div className="flex gap-2">
+                <select
+                  value={battleTarget}
+                  onChange={(e) => setBattleTarget(e.target.value)}
+                  className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1.5 text-sm"
+                >
+                  {['ThunderClan', 'RiverClan', 'ShadowClan', 'WindClan']
+                    .filter((c) => c !== me.cat.clan)
+                    .map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <button onClick={declareBattle} className="rounded bg-river hover:bg-river/90 px-3 py-1.5 text-sm font-display">
+                  ⚔ Declare
+                </button>
+              </div>
+              <div className="text-[10px] opacity-60 mt-1">
+                A battle marker drops at the border; warriors who hear it can rally.
+              </div>
+            </div>
+
             <Action label="Call a Gathering" onClick={() => onCommand('gathering')} />
-            <Action label="Declare war on a clan" onClick={() => {
-              const target = prompt('Which clan? (ThunderClan, RiverClan, ShadowClan, WindClan)') || '';
-              if (target) onCommand('war', { target });
-            }} />
           </>
         )}
 

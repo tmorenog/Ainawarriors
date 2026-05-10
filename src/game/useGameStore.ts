@@ -122,6 +122,12 @@ interface GameStore {
   pileContrib: number;
   bumpPileContrib: (n?: number) => void;
 
+  // Full-moon Gathering — true while the four-clan meeting at Fourtrees
+  // is in progress. The NPC system spawns four clan leaders at the
+  // gathering site whenever this is true so the player can talk to them.
+  clanGathering: boolean;
+  setClanGathering: (v: boolean) => void;
+
   // Rotating ambient task board — three quests at a time, auto-completing
   // as the player plays. Completed tasks are replaced with fresh ones.
   tasks: Task[];
@@ -228,6 +234,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   pileContrib: 0,
   bumpPileContrib: (n = 1) => set((st) => ({ pileContrib: Math.max(0, st.pileContrib + n) })),
+
+  clanGathering: false,
+  setClanGathering: (v) => set({ clanGathering: v }),
 
   tasks: generateTaskBoard(3),
   reseedTasks: () => set({ tasks: generateTaskBoard(3) }),

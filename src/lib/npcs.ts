@@ -2,7 +2,7 @@
 
 import type { CatAppearance } from '@/game/types';
 
-export type NpcId = 'firestar' | 'tigerstar';
+export type NpcId = 'firestar' | 'tigerstar' | 'leopardstar' | 'tallstar';
 
 export interface NpcDef {
   id: NpcId;
@@ -75,10 +75,78 @@ const TIGERSTAR_CAT: CatAppearance = {
   nightVision: true,
 };
 
-// Both are placed at the front of their clan's camp, slightly off the
-// fresh-kill pile so the player can walk up and chat.
-// ThunderClan camp center: see CLANS — 'ThunderClan' is at (0, 0, 0)
-// ShadowClan camp center: see CLANS — 'ShadowClan' is in the north
+const LEOPARDSTAR_CAT: CatAppearance = {
+  id: 'npc_leopardstar',
+  name: 'Leopardstar',
+  prefix: 'Leopard',
+  suffix: 'star',
+  furBase: '#c8a85e',
+  furBelly: '#e8d8a4',
+  furPattern: 'spotted',
+  patternColor: '#3a2a18',
+  patternColor2: '#7a5a30',
+  patternColor3: '#c8a85e',
+  eyeColor: 'amber',
+  earShape: 'standard',
+  tail: 'long',
+  fluffiness: 0.4,
+  size: 'large',
+  height: 1.05,
+  build: 1.05,
+  scars: [],
+  blush: false,
+  clan: 'RiverClan',
+  role: 'Leader',
+  bubbleStyle: 'cloud',
+  voicePitch: 1.0,
+  pupilSize: 0.45,
+  vision: 'normal',
+  nightVision: false,
+};
+
+const TALLSTAR_CAT: CatAppearance = {
+  id: 'npc_tallstar',
+  name: 'Tallstar',
+  prefix: 'Tall',
+  suffix: 'star',
+  furBase: '#1a1a1a',
+  furBelly: '#f4f1ea',
+  furPattern: 'bicolor',
+  patternColor: '#1a1a1a',
+  patternColor2: '#f4f1ea',
+  patternColor3: '#aaaaaa',
+  eyeColor: 'amber',
+  earShape: 'standard',
+  tail: 'long',
+  fluffiness: 0.35,
+  size: 'large',
+  height: 1.15,
+  build: 0.92,
+  scars: [],
+  blush: false,
+  clan: 'WindClan',
+  role: 'Leader',
+  bubbleStyle: 'leaf',
+  voicePitch: 0.9,
+  pupilSize: 0.5,
+  vision: 'normal',
+  nightVision: true,
+};
+
+// World location of the full-moon Gathering (Fourtrees-style clearing). All
+// four clan leaders converge here while clanGathering is true. Picked away
+// from any single camp so it feels neutral.
+export const GATHERING_POS: [number, number, number] = [-100, 0, -90];
+
+// Each leader's seat at the Gathering — small radial offsets so they don't
+// stack on top of each other.
+export const GATHERING_SEATS: Record<NpcId, [number, number]> = {
+  firestar:    [-2, -2],
+  tigerstar:   [ 2, -2],
+  leopardstar: [-2,  2],
+  tallstar:    [ 2,  2],
+};
+
 export const NPCS: Record<NpcId, NpcDef> = {
   firestar: {
     id: 'firestar',
@@ -103,6 +171,26 @@ export const NPCS: Record<NpcId, NpcDef> = {
     options: [
       { label: 'Then taste my claws!', result: 'engage' },
       { label: '…Run.', result: 'goodbye' },
+    ],
+  },
+  leopardstar: {
+    id: 'leopardstar',
+    cat: LEOPARDSTAR_CAT,
+    pos: [180, 0, -28], // RiverClan camp
+    greeting:
+      'RiverClan greets you, traveller. The river runs full this season — we have prey enough to share. What brings you to our reeds?',
+    options: [
+      { label: 'StarClan light your path, Leopardstar.', result: 'goodbye' },
+    ],
+  },
+  tallstar: {
+    id: 'tallstar',
+    cat: TALLSTAR_CAT,
+    pos: [-198, 0, 62], // WindClan camp
+    greeting:
+      'The wind brought your scent before you. WindClan holds the moor — be careful where your paws fall, kin of trees.',
+    options: [
+      { label: 'May your hunt be swift, Tallstar.', result: 'goodbye' },
     ],
   },
 };
