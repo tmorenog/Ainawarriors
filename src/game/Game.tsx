@@ -59,8 +59,10 @@ function PlayerController({
   const pos = useRef(new THREE.Vector3(0, 0, 0));
   const vy = useRef(0);
   const grounded = useRef(true);
+  const lastGroundedAt = useRef(0); // for coyote-frame jump
   const lastSent = useRef(0);
   const lastAnim = useRef('idle');
+  const lastPounceMissAt = useRef(0);
 
   useEffect(() => {
     if (cat) {
@@ -119,8 +121,11 @@ function PlayerController({
     // Ground = analytical terrain height under the cat's feet.
     const groundY = terrainHeightAt(pos.current.x, pos.current.z);
 
-    // Jump physics
-    if (c.jump && grounded.current) {
+    // Jump physics with a 120ms coyote-frame grace window: if you tap jump
+    // a moment AFTER walking off a ledge or after a tiny stamina hop, it
+    // still fires. Makes platforming feel forgiving.
+    const tNow = performance.now() / 1000;
+    if (c.jump && (grounded.current || (tNow - lastGroundedAt.current) < 0.12)) {
       vy.current = 6.5;
       grounded.current = false;
       c.jump = false;
@@ -128,10 +133,14 @@ function PlayerController({
     vy.current -= 18 * dt; // gravity
     pos.current.y += vy.current * dt;
     if (pos.current.y <= groundY) {
-      // Landed (or never left): stick to the terrain — no sky-walking.
       pos.current.y = groundY;
       vy.current = 0;
+      if (!grounded.current) lastGroundedAt.current = tNow;
       grounded.current = true;
+    } else if (grounded.current) {
+      // Just left the ground (e.g. walked off a ledge) — start the grace timer.
+      lastGroundedAt.current = tNow;
+      grounded.current = false;
     }
 
     let anim = 'idle';
@@ -186,6 +195,23 @@ function PlayerController({
         closest.p.alive = false;
         onCatch(closest.p.id, closest.p.kind);
         if (!carrying) setCarrying(closest.p.kind);
+      } else {
+        // Missed — give the player audible + chat feedback so the pounce
+        // doesn't feel like the input vanished. Throttle to once per second
+        // so a held button doesn't spam.
+        const nowS = performance.now() / 1000;
+        if (nowS - lastPounceMissAt.current > 1.0) {
+          lastPounceMissAt.current = nowS;
+          try { getAudioEngine().playStinger('miss'); } catch {}
+          useGameStore.getState().pushChat({
+            id: 'sys' + Date.now(),
+            fromId: 'system',
+            fromName: 'StarClan',
+            scope: 'system',
+            text: 'Missed! Sneak closer next time.',
+            at: Date.now(),
+          });
+        }
       }
     }
 
@@ -205,7 +231,8 @@ function PlayerController({
       let delta = moveYaw - catYaw.current;
       while (delta >  Math.PI) delta -= Math.PI * 2;
       while (delta < -Math.PI) delta += Math.PI * 2;
-      const turnRate = c.sprint ? 10 : 6;
+      // Faster turn so the cat's body doesn't visibly lag behind the input.
+      const turnRate = c.sprint ? 16 : 10;
       catYaw.current += delta * Math.min(1, dt * turnRate);
     }
 
@@ -235,40 +262,50 @@ function PlayerController({
 // at 12fps. RemoteCat wraps each remote player and runs a per-frame lerp
 // toward the latest target position/rotation so movement looks smooth even
 // though the network stream is sparse.
-function RemoteCat({ player, bubble }: { player: PlayerState; bubble?: string }) {
+function RemoteCat({ player, bubble, viewerRef }: { player: PlayerState; bubble?: string; viewerRef: React.MutableRefObject<THREE.Object3D | null> }) {
   const ref = useRef<THREE.Group>(null);
   const target = useRef({
     pos: new THREE.Vector3(player.pos[0], player.pos[1], player.pos[2]),
     rot: player.rot,
   });
-  // Update the target whenever the player record changes (zustand re-renders
-  // pass us a new player prop).
   target.current.pos.set(player.pos[0], player.pos[1], player.pos[2]);
   target.current.rot = player.rot;
+
+  // Distance-based culling for HTML overlays — beyond ~60 forest units the
+  // text is unreadable anyway, and rendering DOM nodes for distant players
+  // hurts perf for nothing visible.
+  const [overlayVisible, setOverlayVisible] = useState(true);
 
   useFrame((_, dt) => {
     const g = ref.current;
     if (!g) return;
-    // Snap to target on first frame, otherwise lerp at ~12 units/sec.
-    const a = Math.min(1, dt * 12);
+    const a = Math.min(1, dt * 14);
     g.position.lerp(target.current.pos, a);
-    // Shortest-path rotation lerp
     let delta = target.current.rot - g.rotation.y;
     while (delta >  Math.PI) delta -= Math.PI * 2;
     while (delta < -Math.PI) delta += Math.PI * 2;
     g.rotation.y += delta * a;
+
+    const me = viewerRef.current?.position;
+    if (me) {
+      const dx = g.position.x - me.x;
+      const dz = g.position.z - me.z;
+      const close = (dx * dx + dz * dz) < (60 * 60);
+      if (close !== overlayVisible) setOverlayVisible(close);
+    }
   });
 
   return (
     <group
       ref={ref}
-      // Initial position so the cat doesn't pop in at the origin
       position={[player.pos[0], player.pos[1], player.pos[2]]}
       rotation={[0, player.rot, 0]}
     >
       <Cat cat={player.cat} anim={player.anim as any} />
-      <NameTag name={player.cat.name} role={player.cat.role} isLeader={player.isLeader} isDeputy={player.isDeputy} />
-      {bubble && <RemoteBubble text={bubble} />}
+      {overlayVisible && (
+        <NameTag name={player.cat.name} role={player.cat.role} isLeader={player.isLeader} isDeputy={player.isDeputy} />
+      )}
+      {overlayVisible && bubble && <RemoteBubble text={bubble} />}
     </group>
   );
 }
@@ -383,7 +420,10 @@ export function Game({ room, net }: GameProps) {
     );
   }
 
-  const dpr: [number, number] = settings.graphics === 'low' ? [1, 1] : settings.graphics === 'medium' ? [1, 1.25] : [1, 1.75];
+  // Higher DPR caps so high-DPI displays (iPad / retina laptops) actually
+  // render at native resolution and stop looking pixelated. Capped at 2 to
+  // keep the GPU budget reasonable.
+  const dpr: [number, number] = settings.graphics === 'low' ? [1, 1.25] : settings.graphics === 'medium' ? [1, 1.6] : [1, 2];
   // Shadows only on the highest graphics setting. On medium/low (and on iPad
   // Safari especially) requesting shadow framebuffers can crash WebGL context
   // creation, leaving an empty black canvas.
@@ -402,9 +442,15 @@ export function Game({ room, net }: GameProps) {
         preserveDrawingBuffer: false,
       }}
       onCreated={({ gl }) => {
-        // Always-visible sky-blue fallback so the canvas is never pure black even
-        // for the first frame before the World mounts.
         try { gl.setClearColor(new THREE.Color('#7ec8e3')); } catch {}
+        // Crisper, more cinematic look. sRGB output makes colours match
+        // their source values; ACES tone mapping gives a soft filmic curve
+        // instead of a harsh linear clamp on bright pixels.
+        try {
+          (gl as any).outputColorSpace = (THREE as any).SRGBColorSpace ?? 'srgb';
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = 1.05;
+        } catch {}
       }}
       onPointerDown={() => {
         // iOS Safari only starts AudioContext from a user gesture
@@ -434,7 +480,7 @@ export function Game({ room, net }: GameProps) {
           {Object.values(players).map((p) => {
             if (p.socketId === selfId) return null;
             return (
-              <RemoteCat key={p.socketId} player={p} bubble={bubbles.get(p.socketId)} />
+              <RemoteCat key={p.socketId} player={p} bubble={bubbles.get(p.socketId)} viewerRef={selfRef} />
             );
           })}
         </SilentErrorBoundary>

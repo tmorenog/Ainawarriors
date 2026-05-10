@@ -400,7 +400,7 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
                 <group ref={eyeLRef} position={[0.18, 0.06, 0.10]}>
                   <mesh rotation={[0, 0.35, 0]}>
                     <sphereGeometry args={[0.052, 16, 14]} />
-                    <meshStandardMaterial color={irisColor} emissive={irisColor} emissiveIntensity={isBlind ? 0.05 : 0.18} roughness={0.3} />
+                    <meshStandardMaterial color={irisColor} emissive={irisColor} emissiveIntensity={isBlind ? 0.02 : 0.10} roughness={0.3} />
                   </mesh>
                   <mesh position={[0.022, 0, 0.012]}>
                     <sphereGeometry args={[pupilR, 12, 12]} />
@@ -422,7 +422,7 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
                     <meshStandardMaterial
                       color={irisColorR}
                       emissive={irisColorR}
-                      emissiveIntensity={isBlind ? 0.05 : 0.18}
+                      emissiveIntensity={isBlind ? 0.02 : 0.10}
                       roughness={0.3}
                     />
                   </mesh>
@@ -611,6 +611,15 @@ function SmoothTail({ length, baseRadius, tailType, anim, material, attach }: Sm
     up: new THREE.Vector3(0, 1, 0),
   }), []);
 
+  // Allocating a CatmullRomCurve3 + Frenet frames every frame, per cat, was
+  // the single biggest perf leak in the scene — multiplied by every remote
+  // player. Build the curve ONCE, mutate the same `points` array each frame,
+  // and call updateArcLengths() so the curve picks up the new positions.
+  const curve = useMemo(
+    () => new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.4),
+    [points]
+  );
+
   useFrame((_, dt) => {
     try {
       t.current += dt;
@@ -634,8 +643,9 @@ function SmoothTail({ length, baseRadius, tailType, anim, material, attach }: Sm
         points[i].set(x, y, z);
       }
 
-      // CatmullRom curve through the points → consistent tangent frames
-      const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.4);
+      // Refresh the cached curve's internal arc-length table for the
+      // mutated control points, then compute one set of Frenet frames.
+      curve.updateArcLengths();
       const segments = TAIL_NODES - 1;
       const frames = curve.computeFrenetFrames(segments, false);
 
