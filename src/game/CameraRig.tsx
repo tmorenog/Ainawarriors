@@ -11,30 +11,35 @@ interface Props {
   mode: 'third' | 'first';
 }
 
-// Camera distance is global so the on-screen + / − buttons in the HUD can
-// adjust it without crossing the R3F boundary. Range 1.5..14: 1.5 brings the
-// camera right onto the cat's shoulders, 14 is a wide forest view.
+// Camera distance is stored on `window` so the on-screen + / − buttons in
+// the HUD share a single source of truth with the camera rig — both modules
+// import this file, but Next's `dynamic()` chunk-splitting can still hand
+// out distinct module instances. Window storage avoids the desync.
 const ZOOM_MIN = 1.5;
 const ZOOM_MAX = 14;
 const ZOOM_DEFAULT = 4.6;
-let _zoomDist = ZOOM_DEFAULT;
+const ZOOM_KEY = '__WOTC_ZOOM__';
 
-export function getCameraZoom() { return _zoomDist; }
-export function setCameraZoom(d: number) {
-  _zoomDist = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, d));
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('wotc-zoom', { detail: { zoom: _zoomDist } }));
-  }
+function readZoom(): number {
+  if (typeof window === 'undefined') return ZOOM_DEFAULT;
+  const w = window as any;
+  if (typeof w[ZOOM_KEY] !== 'number') w[ZOOM_KEY] = ZOOM_DEFAULT;
+  return w[ZOOM_KEY] as number;
 }
-export function adjustCameraZoom(delta: number) {
-  setCameraZoom(_zoomDist + delta);
+function writeZoom(d: number) {
+  if (typeof window === 'undefined') return;
+  (window as any)[ZOOM_KEY] = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, d));
 }
+
+export function getCameraZoom() { return readZoom(); }
+export function setCameraZoom(d: number) { writeZoom(d); }
+export function adjustCameraZoom(delta: number) { writeZoom(readZoom() + delta); }
 
 export function CameraRig({ target, yaw, pitch, mode }: Props) {
   const { camera, gl } = useThree();
   const tmp = useRef(new THREE.Vector3());
   const pinchStart = useRef<number>(0);
-  const pinchStartZoom = useRef<number>(_zoomDist);
+  const pinchStartZoom = useRef<number>(readZoom());
 
   // Wire mouse-wheel and 2-finger pinch to the zoom variable. The R3F canvas
   // is the only DOM element we can attach pointer listeners to inside the
@@ -54,7 +59,7 @@ export function CameraRig({ target, yaw, pitch, mode }: Props) {
       if (pointers.size === 2) {
         const [a, b] = Array.from(pointers.values());
         pinchStart.current = Math.hypot(a.x - b.x, a.y - b.y);
-        pinchStartZoom.current = _zoomDist;
+        pinchStartZoom.current = readZoom();
       }
     };
     const onPointerMove = (e: PointerEvent) => {
@@ -98,7 +103,7 @@ export function CameraRig({ target, yaw, pitch, mode }: Props) {
       );
       camera.lookAt(look);
     } else {
-      const dist = _zoomDist;
+      const dist = readZoom();
       const offY = 1.8 + p * 1.5 + dist * 0.12;
       const cx = t.x - Math.sin(yaw.current) * dist;
       const cz = t.z - Math.cos(yaw.current) * dist;
