@@ -60,7 +60,7 @@ export function Chat({ onSend, onEmote }: Props) {
   };
 
   return (
-    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[min(96vw,540px)] z-30 pointer-events-auto md:bottom-3">
+    <div className="absolute bottom-3 left-3 w-[min(86vw,360px)] z-30 pointer-events-auto">
       {open ? (
         <div className="rounded-2xl bg-black/55 backdrop-blur border border-white/10 text-bone overflow-hidden">
           <div className="max-h-44 overflow-y-auto px-3 py-2 text-xs space-y-0.5">
