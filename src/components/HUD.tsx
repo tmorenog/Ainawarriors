@@ -198,7 +198,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-23 · sleep cinematic
+        wotc-24 · longer sleep, eyes shut
       </div>
     </div>
   );
@@ -301,7 +301,9 @@ function triggerSleep() {
     return d;
   })();
   const startReal = performance.now();
-  const sweepDuration = 7000;
+  // Longer cinematic — 14 seconds instead of 7, so the camera orbit, eye
+  // droop and sky sweep all have room to breathe.
+  const sweepDuration = 14000;
   const sweepInt = window.setInterval(() => {
     const k = Math.min(1, (performance.now() - startReal) / sweepDuration);
     const cur = useGameStore.getState();
@@ -314,8 +316,8 @@ function triggerSleep() {
     if (k >= 1) clearInterval(sweepInt);
   }, 90);
 
-  setTimeout(() => useGameStore.getState().setSleepStage('curl'), 1500);
-  setTimeout(() => useGameStore.getState().setSleepStage('deep'), 3000);
+  setTimeout(() => useGameStore.getState().setSleepStage('curl'), 2500);
+  setTimeout(() => useGameStore.getState().setSleepStage('deep'), 5000);
   setTimeout(() => {
     const cur = useGameStore.getState();
     cur.setSleepStage('waking');
@@ -325,11 +327,11 @@ function triggerSleep() {
       stamina: 100,
       hunger: Math.min(100, cur.hud.hunger + 12),
     });
-  }, 7000);
+  }, 13000);
   setTimeout(() => {
     useGameStore.getState().setSleepStage('idle');
     useGameStore.getState().setSleeping(false);
-  }, 7800);
+  }, 14500);
 }
 
 function formatTime(t: number) {

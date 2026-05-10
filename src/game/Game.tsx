@@ -246,10 +246,12 @@ function PlayerController({
 
     let anim = 'idle';
     // Sleep cutscene overrides every other animation choice — the cat
-    // loafs, then curls (also rendered as 'sit'), then 'sleep'.
+    // sits (loaf), eyelids droop in 'doze' (curl & waking), eyes fully
+    // close in 'sleep' (deep).
     const sleepStage = useGameStore.getState().sleepStage;
-    if (sleepStage === 'loaf' || sleepStage === 'curl') anim = 'sit';
-    else if (sleepStage === 'deep' || sleepStage === 'waking') anim = 'sleep';
+    if (sleepStage === 'loaf') anim = 'sit';
+    else if (sleepStage === 'curl' || sleepStage === 'waking') anim = 'doze';
+    else if (sleepStage === 'deep') anim = 'sleep';
     else if (!grounded.current) anim = 'jump';
     else if (c.pounce) { anim = 'pounce'; c.pounce = false; }
     else if (c.crouch && (fwd !== 0 || sd !== 0)) anim = 'crouch';
