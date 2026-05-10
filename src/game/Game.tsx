@@ -11,7 +11,7 @@ import { PreyMesh, spawnPrey, type PreyState } from './Prey';
 import { createControls, useKeyboardControls, useMouseLook } from './useControls';
 import { useGameStore } from './useGameStore';
 import { CLANS } from '@/lib/clans';
-import { SIZE_STATS } from './types';
+import { SIZE_STATS, type PlayerState } from './types';
 import { SilentErrorBoundary } from '@/components/SilentErrorBoundary';
 import { terrainHeightAt } from './terrain';
 import { getAudioEngine } from './audio';
@@ -213,6 +213,50 @@ function PlayerController({
   return null;
 }
 
+// Remote players send a position roughly every 80ms via Socket.io or
+// BroadcastChannel. Setting `<group position={p.pos}>` directly only updates
+// when React re-renders, which is fine but produces visibly choppy movement
+// at 12fps. RemoteCat wraps each remote player and runs a per-frame lerp
+// toward the latest target position/rotation so movement looks smooth even
+// though the network stream is sparse.
+function RemoteCat({ player, bubble }: { player: PlayerState; bubble?: string }) {
+  const ref = useRef<THREE.Group>(null);
+  const target = useRef({
+    pos: new THREE.Vector3(player.pos[0], player.pos[1], player.pos[2]),
+    rot: player.rot,
+  });
+  // Update the target whenever the player record changes (zustand re-renders
+  // pass us a new player prop).
+  target.current.pos.set(player.pos[0], player.pos[1], player.pos[2]);
+  target.current.rot = player.rot;
+
+  useFrame((_, dt) => {
+    const g = ref.current;
+    if (!g) return;
+    // Snap to target on first frame, otherwise lerp at ~12 units/sec.
+    const a = Math.min(1, dt * 12);
+    g.position.lerp(target.current.pos, a);
+    // Shortest-path rotation lerp
+    let delta = target.current.rot - g.rotation.y;
+    while (delta >  Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    g.rotation.y += delta * a;
+  });
+
+  return (
+    <group
+      ref={ref}
+      // Initial position so the cat doesn't pop in at the origin
+      position={[player.pos[0], player.pos[1], player.pos[2]]}
+      rotation={[0, player.rot, 0]}
+    >
+      <Cat cat={player.cat} anim={player.anim as any} />
+      <NameTag name={player.cat.name} role={player.cat.role} isLeader={player.isLeader} isDeputy={player.isDeputy} />
+      {bubble && <RemoteBubble text={bubble} />}
+    </group>
+  );
+}
+
 function RemoteBubble({ text }: { text: string }) {
   return (
     <Html position={[0, 1.2, 0]} center distanceFactor={6}>
@@ -374,11 +418,7 @@ export function Game({ room, net }: GameProps) {
           {Object.values(players).map((p) => {
             if (p.socketId === selfId) return null;
             return (
-              <group key={p.socketId} position={p.pos} rotation={[0, p.rot, 0]}>
-                <Cat cat={p.cat} anim={p.anim as any} />
-                <NameTag name={p.cat.name} role={p.cat.role} isLeader={p.isLeader} isDeputy={p.isDeputy} />
-                {bubbles.get(p.socketId) && <RemoteBubble text={bubbles.get(p.socketId)!} />}
-              </group>
+              <RemoteCat key={p.socketId} player={p} bubble={bubbles.get(p.socketId)} />
             );
           })}
         </SilentErrorBoundary>
