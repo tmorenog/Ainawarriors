@@ -27,28 +27,23 @@ const PATTERN_TINT: Record<string, number> = {
 };
 
 // Flat ":3" cat-mouth curve, lying in the YZ plane (the cat faces +X).
-// One continuous path that dips twice — left lobe, joins at the top, then right lobe.
+// Five control points trace a real "3" lying on its side:
+//   left corner — left dip — middle PEAK (the back of the 3) — right dip — right corner.
 const CAT_MOUTH_CURVE = (() => {
-  const pts: THREE.Vector3[] = [];
-  const N = 28;
-  const halfW = 0.030;   // total mouth half-width
-  const dip   = 0.014;   // how deep each lobe sags
-  for (let i = 0; i <= N; i++) {
-    const t = i / N;             // 0 → 1
-    const z = -halfW + t * 2 * halfW;
-    let y: number;
-    if (t <= 0.5) {
-      const s = t * 2;            // 0 → 1 over the left lobe
-      y = -Math.sin(s * Math.PI) * dip;
-    } else {
-      const s = (t - 0.5) * 2;    // 0 → 1 over the right lobe
-      y = -Math.sin(s * Math.PI) * dip;
-    }
-    pts.push(new THREE.Vector3(0, y, z));
-  }
-  return new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
+  const halfW   = 0.034;   // mouth half-width
+  const dip     = 0.013;   // how far each lobe sags
+  const midPeak = 0.010;   // how high the middle joint rises (this makes it a "3")
+  const pts = [
+    new THREE.Vector3(0,        0,        -halfW),           // left corner
+    new THREE.Vector3(0,    -dip * 0.95,  -halfW * 0.55),    // left lobe bottom
+    new THREE.Vector3(0,     midPeak,      0),               // middle peak — back of the 3
+    new THREE.Vector3(0,    -dip * 0.95,   halfW * 0.55),    // right lobe bottom
+    new THREE.Vector3(0,        0,         halfW),           // right corner
+  ];
+  // Lower tension so the corners stay sharp-ish and the dips read clearly
+  return new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.35);
 })();
-const CAT_MOUTH_GEO = new THREE.TubeGeometry(CAT_MOUTH_CURVE, 40, 0.0024, 6, false);
+const CAT_MOUTH_GEO = new THREE.TubeGeometry(CAT_MOUTH_CURVE, 48, 0.003, 6, false);
 
 interface LegProps {
   position: [number, number, number];

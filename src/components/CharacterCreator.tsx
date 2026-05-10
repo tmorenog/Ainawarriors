@@ -27,7 +27,8 @@ const SIZES: SizeTier[] = ['tiny','small','medium','large','massive'];
 const BUBBLES: CatAppearance['bubbleStyle'][] = ['classic','cloud','leaf','stone'];
 
 interface Props {
-  onSave: (cat: CatAppearance) => void;
+  onSave: (cat: CatAppearance) => void;       // save the morph and stay on the editor
+  onPlay: (cat: CatAppearance) => void;       // save and enter the game
   onCancel: () => void;
 }
 
@@ -60,11 +61,12 @@ function makeDefault(): CatAppearance {
   };
 }
 
-export function CharacterCreator({ onSave, onCancel }: Props) {
+export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
   const existing = useGameStore((s) => s.cat);
   const [cat, setCat] = useState<CatAppearance>(() => existing ? normalizeCat(existing) : makeDefault());
   const [tab, setTab] = useState<'fur' | 'shape' | 'size' | 'clan' | 'name' | 'voice'>('fur');
   const [nameError, setNameError] = useState('');
+  const [savedToast, setSavedToast] = useState(false);
 
   useEffect(() => {
     setCat((c) => ({ ...c, name: `${c.prefix}${c.suffix}` }));
@@ -75,12 +77,27 @@ export function CharacterCreator({ onSave, onCancel }: Props) {
 
   const update = (patch: Partial<CatAppearance>) => setCat((c) => ({ ...c, ...patch }));
 
-  const trySave = () => {
+  // Validate the cat and return a normalized copy ready to persist, or null on bad name.
+  const finalize = (): CatAppearance | null => {
     const safe = safeUsername(cat.name);
-    if (!safe) { setNameError('Pick a kinder, simpler name (2–24 letters).'); return; }
-    const final: CatAppearance = { ...cat, name: safe };
+    if (!safe) { setNameError('Pick a kinder, simpler name (2–24 letters).'); return null; }
+    return { ...cat, name: safe };
+  };
+
+  const handleSave = () => {
+    const final = finalize();
+    if (!final) return;
     patchSave({ cat: final });
     onSave(final);
+    setSavedToast(true);
+    setTimeout(() => setSavedToast(false), 1800);
+  };
+
+  const handlePlay = () => {
+    const final = finalize();
+    if (!final) return;
+    patchSave({ cat: final });
+    onPlay(final);
   };
 
   return (
@@ -295,9 +312,34 @@ export function CharacterCreator({ onSave, onCancel }: Props) {
           )}
         </div>
 
-        <footer className="p-3 border-t border-white/10 grid grid-cols-2 gap-2">
-          <button onClick={onCancel} className="rounded-xl border border-white/15 py-2.5">Cancel</button>
-          <button onClick={trySave} className="rounded-xl bg-thunder font-display text-lg py-2.5 shadow">SAVE</button>
+        <footer className="p-3 border-t border-white/10 space-y-2">
+          {savedToast && (
+            <div className="rounded-lg bg-forest-500/30 border border-forest-300/40 text-forest-50 text-xs text-center py-1.5 animate-fade-in">
+              Morph saved. Keep tweaking, or press Play to enter the forest.
+            </div>
+          )}
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={onCancel}
+              className="rounded-xl border border-white/15 hover:bg-white/5 py-2.5 text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              className="rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 font-display text-base py-2.5"
+              title="Save your morph and stay on the editor"
+            >
+              Save
+            </button>
+            <button
+              onClick={handlePlay}
+              className="rounded-xl bg-thunder hover:bg-thunder/90 font-display text-base py-2.5 shadow"
+              title="Save and enter the forest"
+            >
+              Play ▶
+            </button>
+          </div>
         </footer>
       </div>
     </div>

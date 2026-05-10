@@ -53,6 +53,12 @@ export default function Page() {
         >
           <CharacterCreator
             onSave={(c) => {
+              // Persist the morph but stay on the editor.
+              setCat(c);
+              patchSave({ cat: c });
+            }}
+            onPlay={(c) => {
+              // Persist the morph and enter the forest.
               setCat(c);
               patchSave({ cat: c });
               setScreen('game');
