@@ -120,20 +120,11 @@ export function CameraRig({ target, yaw, pitch, mode }: Props) {
     } else {
       const dist = readZoom();
       const offY = 1.8 + p * 1.5 + dist * 0.12;
-      // Shoulder-cam offset — push the camera and the look-at to the
-      // camera's RIGHT in world space, which moves the cat off-centre
-      // toward the bottom-left of the screen. The world ahead becomes
-      // much more visible. The camera's right vector at yaw θ (with the
-      // camera looking from -sin(θ)*d to origin) is (cos θ, 0, -sin θ).
-      const rightX = Math.cos(yaw.current);
-      const rightZ = -Math.sin(yaw.current);
-      const shoulder = 1.2;       // world units to shift right
-      const lookUp = 0.5;         // raise the focus a bit so the cat sits low
-      const cx = t.x - Math.sin(yaw.current) * dist + rightX * shoulder;
-      const cz = t.z - Math.cos(yaw.current) * dist + rightZ * shoulder;
+      const cx = t.x - Math.sin(yaw.current) * dist;
+      const cz = t.z - Math.cos(yaw.current) * dist;
       const a = Math.min(1, dt * 8);
       camera.position.lerp(tmp.current.set(cx + shakeX, t.y + offY + shakeY, cz + shakeZ), a);
-      camera.lookAt(t.x + rightX * shoulder, t.y + 0.6 + lookUp, t.z + rightZ * shoulder);
+      camera.lookAt(t.x, t.y + 0.6, t.z);
     }
   });
 
