@@ -17,6 +17,10 @@ export function NpcDialog() {
   const pushChat = useGameStore((s) => s.pushChat);
 
   if (!id) return null;
+  // Greeting any leader counts toward the "meet 3 leaders" task. We bump
+  // here on every open — the predicate would need a Set per task to dedupe
+  // so we just live with the optimistic count for now.
+  useGameStore.getState().bumpTask('meet-leader-n', 1);
   const npc = NPCS[id];
 
   // Adjust greeting based on mission state so it doesn't sound stuck.

@@ -29,7 +29,25 @@ export type TaskKind =
   | 'sprint-distance'
   | 'accept-mission'
   | 'defeat-tigerstar'
-  | 'use-waypoint';
+  | 'use-waypoint'
+  | 'declare-battle'
+  | 'attend-gathering'
+  | 'announce-n'
+  | 'meet-leader-n'
+  | 'eat-fish'
+  | 'eat-rabbit'
+  | 'rest-fed'
+  | 'win-pounce-streak'
+  | 'reach-rep'
+  | 'visit-twoleg'
+  | 'time-crouched'
+  | 'pick-up-prey'
+  | 'survive-night'
+  | 'top-of-rock'
+  | 'distance-from-camp'
+  | 'use-emote-variety'
+  | 'walk-on-river-bank'
+  | 'sleep-night-only';
 
 export interface Task {
   id: string;
@@ -183,6 +201,74 @@ export function generateTask(): Task {
     () => ({ id: newId(), kind: 'use-waypoint', goal: 1, progress: 0,
       reward: { rep: 1 },
       description: 'Use the territory map to set a waypoint' }),
+
+    // ── leader / clan politics ───────────────────────────────────────
+    () => ({ id: newId(), kind: 'declare-battle', goal: 1, progress: 0,
+      reward: { rep: 4 },
+      description: 'Declare a battle on a rival clan (leader only)' }),
+    () => ({ id: newId(), kind: 'attend-gathering', goal: 1, progress: 0,
+      reward: { rep: 5 },
+      description: 'Attend the full-moon Gathering at Fourtrees' }),
+    () => ({ id: newId(), kind: 'announce-n', goal: 1, progress: 0,
+      reward: { rep: 2 },
+      description: 'Make an announcement from the High Rock (leader only)' }),
+    () => ({ id: newId(), kind: 'meet-leader-n', goal: 2 + Math.floor(Math.random() * 3), progress: 0,
+      reward: { rep: 3 },
+      description: 'Greet 3 different clan leaders' }),
+
+    // ── meals / hunger ───────────────────────────────────────────────
+    () => ({ id: newId(), kind: 'eat-fish', goal: 1, progress: 0,
+      reward: { hunger: 18, rep: 1 },
+      description: 'Eat a fish (catch one and eat it whole)' }),
+    () => ({ id: newId(), kind: 'eat-rabbit', goal: 1, progress: 0,
+      reward: { hunger: 20, rep: 1 },
+      description: 'Eat a rabbit (catch and feast)' }),
+    () => ({ id: newId(), kind: 'rest-fed', goal: 1, progress: 0,
+      reward: { hp: 14, rep: 1 },
+      description: 'Sleep with a full belly (hunger ≥ 80 when you rest)' }),
+
+    // ── streaks / mastery ────────────────────────────────────────────
+    () => ({ id: newId(), kind: 'win-pounce-streak', goal: 5, progress: 0,
+      reward: { hunger: 25, rep: 4 },
+      description: 'Land 5 pounces in a row without missing' }),
+    () => ({ id: newId(), kind: 'reach-rep', goal: 60 + Math.floor(Math.random() * 30), progress: 0,
+      reward: { rep: 1 },
+      description: rand(['Reach reputation 60 in your clan', 'Reach reputation 80 in your clan', 'Reach reputation 90 in your clan']) }),
+    () => ({ id: newId(), kind: 'time-crouched', goal: 30 + Math.floor(Math.random() * 30), progress: 0,
+      reward: { rep: 2 },
+      description: 'Stalk crouched for 30 seconds total' }),
+
+    // ── exploration ──────────────────────────────────────────────────
+    () => ({ id: newId(), kind: 'visit-twoleg', goal: 1, progress: 0,
+      reward: { rep: 2 },
+      description: 'Cross into the Twoleg place — and come back alive' }),
+    () => ({ id: newId(), kind: 'top-of-rock', goal: 1, progress: 0,
+      reward: { rep: 2 },
+      description: 'Stand on top of your clan\'s High Rock' }),
+    () => ({ id: newId(), kind: 'distance-from-camp', goal: 100 + Math.floor(Math.random() * 80), progress: 0,
+      reward: { rep: 2 },
+      description: rand(['Travel 100 paw-lengths from camp', 'Wander 150 paw-lengths from your camp']) }),
+    () => ({ id: newId(), kind: 'walk-on-river-bank', goal: 1, progress: 0,
+      reward: { rep: 1 },
+      description: 'Walk along the river bank' }),
+
+    // ── carry / drop / share ─────────────────────────────────────────
+    () => ({ id: newId(), kind: 'pick-up-prey', goal: 3 + Math.floor(Math.random() * 3), progress: 0,
+      reward: { rep: 2 },
+      description: rand(['Carry 3 pieces of fresh-kill back to camp', 'Carry 5 pieces of fresh-kill in one day']) }),
+
+    // ── survival ─────────────────────────────────────────────────────
+    () => ({ id: newId(), kind: 'survive-night', goal: 1, progress: 0,
+      reward: { rep: 3 },
+      description: 'Survive a night out of camp without dying' }),
+    () => ({ id: newId(), kind: 'sleep-night-only', goal: 1, progress: 0,
+      reward: { hp: 20 },
+      description: 'Curl up and sleep ONLY at night (begin the rest after sundown)' }),
+
+    // ── flair ────────────────────────────────────────────────────────
+    () => ({ id: newId(), kind: 'use-emote-variety', goal: 4, progress: 0,
+      reward: { rep: 2 },
+      description: 'Use 4 different emotes in a single day (purr, hiss, meow, tail-flick…)' }),
   ];
 
   return rand(generators)();

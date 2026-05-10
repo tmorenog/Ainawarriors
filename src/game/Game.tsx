@@ -213,8 +213,9 @@ function PlayerController({
       }
     }
 
-    // Standing on your own High Rock (camp.x, camp.z - 7) — counts as
-    // "climbing" the rock for the rotating task.
+    // Standing on your own High Rock — counts for both the simple
+    // climb-rock task and the harder "stand ON TOP" task that requires
+    // the player's actual Y to be near the rock's surface.
     {
       const myClan = CLANS[cat.clan];
       if (myClan) {
@@ -224,8 +225,48 @@ function PlayerController({
         const dz = pos.current.z - rz;
         if (dx * dx + dz * dz < 2 * 2) {
           useGameStore.getState().bumpTask('climb-rock', 1);
+          if (pos.current.y > 1.5) {
+            useGameStore.getState().bumpTask('top-of-rock', 1);
+          }
+        }
+        // Distance from camp counts for the wander-far task.
+        const cdx = pos.current.x - myClan.campCenter[0];
+        const cdz = pos.current.z - myClan.campCenter[2];
+        const distFromCamp = Math.hypot(cdx, cdz);
+        if (distFromCamp > 30 && Math.random() < dt * 4) {
+          useGameStore.getState().bumpTask('distance-from-camp', Math.round(distFromCamp));
         }
       }
+      // Walking along the river bank — within ~22 of x=180 in the +Z half.
+      if (Math.abs(pos.current.x - 180) < 22 && Math.random() < dt * 2) {
+        useGameStore.getState().bumpTask('walk-on-river-bank', 1);
+      }
+      // Twoleg place — group at world (260, 240) within 12u.
+      const txl = pos.current.x - 260;
+      const tzl = pos.current.z - 240;
+      if (txl * txl + tzl * tzl < 12 * 12 && Math.random() < dt * 2) {
+        useGameStore.getState().bumpTask('visit-twoleg', 1);
+      }
+    }
+
+    // Stalking time accumulator — credits 1 every second of crouch.
+    if (c.crouch) {
+      const stalkAccum = (state: any) => {};
+      // Use a ref-free counter on the controlsRef shape — accumulate
+      // milliseconds via dt and bump the task every full second.
+      if (typeof (c as any).__stalkAccum !== 'number') (c as any).__stalkAccum = 0;
+      (c as any).__stalkAccum += dt;
+      while ((c as any).__stalkAccum >= 1) {
+        (c as any).__stalkAccum -= 1;
+        useGameStore.getState().bumpTask('time-crouched', 1);
+      }
+    }
+
+    // Reputation milestones — when current reputation reaches the task's
+    // goal, complete it instantly by bumping a large amount (capped at goal).
+    if (Math.random() < dt * 2) {
+      const rep = useGameStore.getState().hud.reputation;
+      useGameStore.getState().bumpTask('reach-rep', 999, (t) => rep >= t.goal && t.progress < t.goal);
     }
 
     // Clamp horizontal position to the playable disk so the cat can't wander
@@ -486,6 +527,8 @@ function PlayerController({
         if (k === 'frog') store.bumpTask('catch-frog-n', 1);
         if (k === 'bird' || k === 'sparrow' || k === 'blackbird') store.bumpTask('catch-bird-n', 1);
         store.bumpTask('pounce-streak', 1);
+        store.bumpTask('win-pounce-streak', 1);
+        store.bumpTask('pick-up-prey', 1);
       } else {
         // Missed — give the player audible + chat feedback so the pounce
         // doesn't feel like the input vanished. Throttle to once per second
@@ -499,7 +542,7 @@ function PlayerController({
           // task system to reset by setting progress to 0 via a fresh roll.
           const cur = useGameStore.getState();
           const reset = cur.tasks.map((t) =>
-            t.kind === 'pounce-streak' ? { ...t, progress: 0 } : t
+            (t.kind === 'pounce-streak' || t.kind === 'win-pounce-streak') ? { ...t, progress: 0 } : t
           );
           (useGameStore as any).setState({ tasks: reset });
           cur.pushChat({
@@ -651,6 +694,8 @@ function eatFromPile() {
     s.setHud({ hunger: Math.min(100, s.hud.hunger + 35) });
     s.bumpPileContrib(1);
     s.bumpTask('drop-pile-n', 1);
+    if (piece === 'fish') s.bumpTask('eat-fish', 1);
+    if (piece === 'rabbit') s.bumpTask('eat-rabbit', 1);
     s.pushChat({
       id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
       text: `You eat the ${piece} you brought in. Strength returns to your paws.`,
@@ -817,6 +862,36 @@ export function Game({ room, net }: GameProps) {
     }, 600);
     return () => clearInterval(id);
   }, [roomState, setRoom]);
+
+  // Full-moon Gathering — every ~2 minutes a meeting opens at Fourtrees
+  // and lasts 90 seconds. All four leader NPCs converge there. Pure
+  // client-side timer so it works in offline mode too.
+  useEffect(() => {
+    const PERIOD = 120_000;   // 2 min
+    const DURATION = 90_000;  // 1.5 min open
+    const tick = () => {
+      const t = Date.now() % PERIOD;
+      const open = t < DURATION;
+      const cur = useGameStore.getState();
+      if (open !== cur.clanGathering) {
+        cur.setClanGathering(open);
+        cur.pushChat({
+          id: 'sys' + Date.now(),
+          fromId: 'system',
+          fromName: 'StarClan',
+          scope: 'system',
+          text: open
+            ? '🌕 The full moon rises — a Gathering begins at Fourtrees. Walk in peace.'
+            : 'The Gathering ends. Each clan returns to its territory.',
+          at: Date.now(),
+        });
+        if (open) cur.bumpTask('attend-gathering', 1);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 5000);
+    return () => clearInterval(id);
+  }, []);
 
   // Audio mode selection — drives crickets at night, dramatic music while
   // hunting (crouch/pounce), battle bed when other cats are very close, and
