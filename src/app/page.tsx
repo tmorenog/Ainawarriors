@@ -10,7 +10,6 @@ import { SettingsPanel } from '@/components/Settings';
 import { LeaderPanel } from '@/components/LeaderPanel';
 import { MobileControls } from '@/components/MobileControls';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { WebGLGuard } from '@/components/WebGLGuard';
 import { useGameStore } from '@/game/useGameStore';
 import { useMultiplayer } from '@/game/useMultiplayer';
 import { patchSave, loadSave } from '@/lib/persist';
@@ -26,6 +25,7 @@ export default function Page() {
   const [room, setRoom] = useState('public-thunderpath');
   const [showSettings, setShowSettings] = useState(false);
   const [showLeader, setShowLeader] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
 
   // attach colorblind filter to body
   useEffect(() => {
@@ -66,9 +66,19 @@ export default function Page() {
               patchSave({ cat: c });
             }}
             onPlay={(c) => {
+              // Move screen off the editor first so its <Canvas> fully unmounts
+              // and iOS Safari can release the WebGL context, THEN mount the
+              // game canvas after a short gap. Without this delay the game's
+              // Canvas can fail to obtain a GL context on iPad Safari because
+              // the previous one is still being torn down.
               setCat(c);
               patchSave({ cat: c });
-              setScreen('game');
+              setTransitioning(true);
+              setScreen('title');
+              setTimeout(() => {
+                setScreen('game');
+                setTransitioning(false);
+              }, 800);
             }}
             onCancel={() => {
               const has = !!loadSave().cat;
@@ -109,6 +119,14 @@ export default function Page() {
             <LeaderPanel onClose={() => setShowLeader(false)} onCommand={(k, p) => mp.sendCommand(k, p)} />
           )}
         </>
+      )}
+
+      {transitioning && (
+        <div className="absolute inset-0 z-50 grid place-items-center bg-forest-900 text-bone">
+          <div className="text-center font-display text-2xl animate-pulse-soft">
+            Slipping into the forest...
+          </div>
+        </div>
       )}
     </main>
   );
