@@ -91,14 +91,17 @@ export function CameraRig({ target, yaw, pitch, mode }: Props) {
     };
   }, [gl]);
 
+  // Slowly advancing angle for the sleep cinematic — the camera orbits
+  // around the cat while it loafs / curls / sleeps.
+  const sleepAngle = useRef(0);
+
   useFrame((_, dt) => {
     if (!target.current) return;
     const t = target.current.position;
     const p = Math.max(-0.9, Math.min(0.9, pitch.current));
 
     // Camera shake — decay the global magnitude each frame and apply a
-    // small randomised offset to the camera's position. Used by hits in
-    // the Tigerstar fight to give every blow some weight.
+    // small randomised offset to the camera's position.
     const store = useGameStore.getState();
     const shake = store.cameraShake;
     let shakeX = 0, shakeY = 0, shakeZ = 0;
@@ -107,6 +110,33 @@ export function CameraRig({ target, yaw, pitch, mode }: Props) {
       shakeY = (Math.random() - 0.5) * shake;
       shakeZ = (Math.random() - 0.5) * shake;
       store.setCameraShake(Math.max(0, shake - dt * 3));
+    }
+
+    // Sleep cinematic — when the player is in any sleep stage, override
+    // the normal follow camera with a tight orbiting close-up of the cat.
+    // Distance and height shift per stage so the framing tightens as the
+    // cat curls down, then opens back up as it wakes.
+    const stage = store.sleepStage;
+    if (stage !== 'idle') {
+      sleepAngle.current += dt * 0.25; // slow orbit, ~25s per revolution
+      const baseDist =
+        stage === 'loaf'   ? 3.6 :
+        stage === 'curl'   ? 2.6 :
+        stage === 'deep'   ? 2.2 :
+        stage === 'waking' ? 4.2 :
+        3.0;
+      const baseHeight =
+        stage === 'loaf'   ? 1.4 :
+        stage === 'curl'   ? 0.9 :
+        stage === 'deep'   ? 0.7 :
+        stage === 'waking' ? 1.6 :
+        1.0;
+      const cx = t.x + Math.sin(sleepAngle.current) * baseDist;
+      const cz = t.z + Math.cos(sleepAngle.current) * baseDist;
+      const a = Math.min(1, dt * 4);
+      camera.position.lerp(tmp.current.set(cx + shakeX, t.y + baseHeight + shakeY, cz + shakeZ), a);
+      camera.lookAt(t.x, t.y + 0.35, t.z);
+      return;
     }
 
     if (mode === 'first') {

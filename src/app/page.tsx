@@ -322,12 +322,15 @@ function SleepOverlay() {
   }, [sleeping, setDreamText]);
 
   // Darkness ramps up across the stages and fades back down on waking.
+  // Lower than before so the orbiting camera lets you actually see the
+  // cat sitting / curled up / sleeping — the overlay is a vignette, not
+  // a wall.
   const opacity =
     !sleeping ? 0 :
-    stage === 'loaf' ? 0.45 :
-    stage === 'curl' ? 0.75 :
-    stage === 'waking' ? 0.55 :
-    1;
+    stage === 'loaf' ? 0.25 :
+    stage === 'curl' ? 0.42 :
+    stage === 'waking' ? 0.32 :
+    0.55;
 
   const heading =
     stage === 'loaf' ? 'You loaf in the warm dust…' :

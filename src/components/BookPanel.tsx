@@ -232,21 +232,35 @@ export function BookPanel() {
 }
 
 function triggerSleep(setSleeping: (v: boolean) => void) {
-  // Multi-stage cutscene: loaf (sit) → curl → deep sleep → wake.
-  // After waking we nudge time-of-day to dawn so the world looks freshly
-  // morning, matching the player expectation that sleeping fast-forwards.
+  // Animated cinematic — orbiting close-up camera (CameraRig watches
+  // sleepStage), staged cat anim (sit → sleep), and a smooth time-of-day
+  // sweep from "now" all the way to dawn so the world visibly darkens
+  // and brightens.
   const store = useGameStore.getState();
+  if (store.sleeping) return;
   try { getAudioEngine().setMode('sleep'); } catch {}
   setSleeping(true);
   store.setSleepStage('loaf');
+
+  const startTod = store.room?.timeOfDay ?? 0.5;
+  const endTod = 0.27;
+  const sweep = (() => { let d = endTod - startTod; if (d <= 0) d += 1; return d; })();
+  const startReal = performance.now();
+  const sweepDuration = 7000;
+  const sweepInt = window.setInterval(() => {
+    const k = Math.min(1, (performance.now() - startReal) / sweepDuration);
+    const cur = useGameStore.getState();
+    if (!cur.sleeping || !cur.room) { clearInterval(sweepInt); return; }
+    cur.setRoom({ ...cur.room, timeOfDay: (startTod + sweep * k) % 1 });
+    if (k >= 1) clearInterval(sweepInt);
+  }, 90);
+
   setTimeout(() => useGameStore.getState().setSleepStage('curl'), 1500);
   setTimeout(() => useGameStore.getState().setSleepStage('deep'), 3000);
   setTimeout(() => {
     const s = useGameStore.getState();
     s.setSleepStage('waking');
-    // Skip the night — wake at the hour just before sunrise.
-    const room = s.room;
-    if (room) s.setRoom({ ...room, timeOfDay: 0.27 });
+    if (s.room) s.setRoom({ ...s.room, timeOfDay: endTod });
   }, 7000);
   setTimeout(() => {
     const s = useGameStore.getState();
