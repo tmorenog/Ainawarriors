@@ -12,6 +12,7 @@ import { MobileControls } from '@/components/MobileControls';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { WebGLGuard } from '@/components/WebGLGuard';
 import { BookPanel } from '@/components/BookPanel';
+import { TasksPanel } from '@/components/TasksPanel';
 import { Tutorial } from '@/components/Tutorial';
 import { useGameStore } from '@/game/useGameStore';
 import { useMultiplayer } from '@/game/useMultiplayer';
@@ -126,6 +127,7 @@ export default function Page() {
             <LeaderPanel onClose={() => setShowLeader(false)} onCommand={(k, p) => mp.sendCommand(k, p)} />
           )}
           <BookPanel />
+          <TasksPanel />
           <Tutorial />
         </>
       )}
@@ -244,7 +246,9 @@ function SleepOverlay() {
 
   useEffect(() => {
     if (!sleeping) { setDreamText(''); return; }
-    // Show a fresh dream every 2.5s while the cat is asleep
+    // Show a fresh dream every 2.5s while the cat is asleep, and bump the
+    // "rest at camp" ambient task once on entry.
+    useGameStore.getState().bumpTask('sleep', 1);
     const pick = () => setDreamText(STARCLAN_DREAMS[Math.floor(Math.random() * STARCLAN_DREAMS.length)]);
     pick();
     const id = setInterval(pick, 2500);

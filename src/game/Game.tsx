@@ -63,6 +63,9 @@ function PlayerController({
   const lastSent = useRef(0);
   const lastAnim = useRef('idle');
   const lastPounceMissAt = useRef(0);
+  const lastTargetAt = useRef(0);
+  const distanceAccum = useRef(0);
+  const lastClanVisited = useRef<string | null>(null);
 
   useEffect(() => {
     if (cat) {
@@ -107,6 +110,60 @@ function PlayerController({
     );
     if (dir.lengthSq() > 0) dir.normalize();
     pos.current.addScaledVector(dir, speed * dt);
+
+    // Tasks — track total distance walked (in 1-unit chunks) and clan camp
+    // visits. We avoid spamming bumpTask by accumulating distance here.
+    if (fwd !== 0 || sd !== 0) {
+      distanceAccum.current += speed * dt;
+      while (distanceAccum.current >= 1) {
+        distanceAccum.current -= 1;
+        useGameStore.getState().bumpTask('walk-distance', 1);
+      }
+    }
+    // Cheap clan-camp proximity check — every 0.5s
+    if (Math.random() < dt * 2) {
+      for (const clanId of Object.keys(CLANS)) {
+        const c = CLANS[clanId as keyof typeof CLANS];
+        const dx = pos.current.x - c.campCenter[0];
+        const dz = pos.current.z - c.campCenter[2];
+        if (dx * dx + dz * dz < 18 * 18 && lastClanVisited.current !== clanId) {
+          lastClanVisited.current = clanId;
+          useGameStore.getState().bumpTask('visit-clan', 1, (t) => t.target === clanId);
+          break;
+        }
+      }
+    }
+
+    // Training post proximity in your own clan camp gives a small stamina
+    // recharge ("you stretch your claws against the post"). Cheap check —
+    // each clan camp has a post at offset (-3.5, -3) from its centre.
+    {
+      const myClan = CLANS[cat.clan];
+      const px = myClan.campCenter[0] - 3.5;
+      const pz = myClan.campCenter[2] - 3;
+      const dx = pos.current.x - px;
+      const dz = pos.current.z - pz;
+      if (dx * dx + dz * dz < 2.4 * 2.4) {
+        // Slowly bring stamina toward 100 while you linger
+        useGameStore.getState().setHud({
+          stamina: Math.min(100, hud.stamina + 12 * dt),
+        });
+      }
+    }
+
+    // Moonpool — at night a slow reputation drift toward 100 (the spirits
+    // approve of cats who walk the silver path).
+    {
+      const dx = pos.current.x - (-220);
+      const dz = pos.current.z - (-220);
+      const tod = useGameStore.getState().room?.timeOfDay ?? 0.5;
+      const isNight = tod < 0.22 || tod > 0.78;
+      if (isNight && dx * dx + dz * dz < 5 * 5) {
+        useGameStore.getState().setHud({
+          reputation: Math.min(100, hud.reputation + 4 * dt),
+        });
+      }
+    }
 
     // Clamp horizontal position to the playable disk so the cat can't wander
     // off the terrain plane.
@@ -185,16 +242,25 @@ function PlayerController({
       });
     }
 
-    // attempt to catch nearest prey when pouncing
+    // attempt to catch nearest prey when pouncing — pounce reach widened
+    // from 1.4 → 2.4 so a well-aimed lunge actually lands. Crouching gives
+    // a small extra reach bonus to reward stalking.
     if (anim === 'pounce') {
       const closest = preyList.current
         .filter((p) => p.alive)
         .map((p) => ({ p, d: p.pos.distanceTo(pos.current) }))
         .sort((a, b) => a.d - b.d)[0];
-      if (closest && closest.d < 1.4) {
+      const reach = c.crouch ? 2.8 : 2.4;
+      if (closest && closest.d < reach) {
         closest.p.alive = false;
         onCatch(closest.p.id, closest.p.kind);
         if (!carrying) setCarrying(closest.p.kind);
+        // Tasks: any catch, kind-specific, and the no-miss streak.
+        const store = useGameStore.getState();
+        store.bumpTask('catch-any-n', 1);
+        if (closest.p.kind === 'mouse') store.bumpTask('catch-mouse-n', 1);
+        if (closest.p.kind === 'fish') store.bumpTask('catch-fish-n', 1);
+        store.bumpTask('pounce-streak', 1);
       } else {
         // Missed — give the player audible + chat feedback so the pounce
         // doesn't feel like the input vanished. Throttle to once per second
@@ -203,7 +269,15 @@ function PlayerController({
         if (nowS - lastPounceMissAt.current > 1.0) {
           lastPounceMissAt.current = nowS;
           try { getAudioEngine().playStinger('miss'); } catch {}
-          useGameStore.getState().pushChat({
+          // Reset the no-miss streak by replacing each in-progress streak
+          // task — bumpTask with a -progress is awkward so we just nudge the
+          // task system to reset by setting progress to 0 via a fresh roll.
+          const cur = useGameStore.getState();
+          const reset = cur.tasks.map((t) =>
+            t.kind === 'pounce-streak' ? { ...t, progress: 0 } : t
+          );
+          (useGameStore as any).setState({ tasks: reset });
+          cur.pushChat({
             id: 'sys' + Date.now(),
             fromId: 'system',
             fromName: 'StarClan',
@@ -213,6 +287,24 @@ function PlayerController({
           });
         }
       }
+    }
+
+    // Update the highlight target every ~0.2s — the prey closest to the
+    // cat that is actually within a comfortable pounce range. Throttled so
+    // we don't spam re-renders of the prey list.
+    const tgtNow = performance.now();
+    if (tgtNow - (lastTargetAt.current ?? 0) > 200) {
+      lastTargetAt.current = tgtNow;
+      let bestId: string | null = null;
+      let bestD = Infinity;
+      const reach = c.crouch ? 3.4 : 3.0;
+      for (const p of preyList.current) {
+        if (!p.alive) continue;
+        const d = p.pos.distanceTo(pos.current);
+        if (d < reach && d < bestD) { bestD = d; bestId = p.id; }
+      }
+      const cur = useGameStore.getState().targetPreyId;
+      if (cur !== bestId) useGameStore.getState().setTargetPreyId(bestId);
     }
 
     // Cat body rotation: only follow the movement direction, NOT the camera.
@@ -317,6 +409,39 @@ function RemoteBubble({ text }: { text: string }) {
         {text}
       </div>
     </Html>
+  );
+}
+
+function PreyList({
+  preyList,
+  selfRef,
+  netSendCatch,
+}: {
+  preyList: React.MutableRefObject<PreyState[]>;
+  selfRef: React.MutableRefObject<THREE.Object3D | null>;
+  netSendCatch: (id: string, kind: string) => void;
+}) {
+  const targetId = useGameStore((s) => s.targetPreyId);
+  // We re-render rarely (only when target changes), so the cost is low and
+  // we get a clean reactive highlight without polling per frame in JSX.
+  return (
+    <>
+      {preyList.current.map((p) => (
+        <PreyMesh
+          key={p.id}
+          state={p}
+          threat={selfRef.current ? selfRef.current.position : null}
+          highlight={targetId === p.id}
+          onCaught={(id) => {
+            const found = preyList.current.find((x) => x.id === id);
+            if (found) netSendCatch(id, found.kind);
+            const cur = useGameStore.getState();
+            cur.setHud({ hunger: Math.min(100, cur.hud.hunger + 18) });
+            cur.pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: `You caught a ${found?.kind ?? 'prey'}.`, at: Date.now() });
+          }}
+        />
+      ))}
+    </>
   );
 }
 
@@ -487,20 +612,7 @@ export function Game({ room, net }: GameProps) {
 
         {/* prey */}
         <SilentErrorBoundary label="prey">
-          {preyList.current.map((p) => (
-            <PreyMesh
-              key={p.id}
-              state={p}
-              threat={selfRef.current ? selfRef.current.position : null}
-              onCaught={(id) => {
-                const found = preyList.current.find((x) => x.id === id);
-                if (found) net.sendCatch(id, found.kind);
-                const cur = useGameStore.getState();
-                cur.setHud({ hunger: Math.min(100, cur.hud.hunger + 18) });
-                cur.pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: `You caught a ${found?.kind ?? 'prey'}.`, at: Date.now() });
-              }}
-            />
-          ))}
+          <PreyList preyList={preyList} selfRef={selfRef} netSendCatch={net.sendCatch} />
         </SilentErrorBoundary>
 
         <CameraRig target={selfRef as any} yaw={yaw} pitch={pitch} mode={settings.cameraMode} />

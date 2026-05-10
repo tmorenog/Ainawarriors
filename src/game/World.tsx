@@ -400,6 +400,23 @@ function Camps() {
             </mesh>
           </group>
 
+          {/* Training post — pounce on it (or just hang around) to practice.
+              Stand within ~2.5 units to gain a stamina top-up. */}
+          <group position={[-3.5, 0, -3]}>
+            <mesh position={[0, 0.9, 0]}>
+              <cylinderGeometry args={[0.18, 0.22, 1.8, 8]} />
+              <meshStandardMaterial color={'#6a4a2a'} roughness={0.95} />
+            </mesh>
+            <mesh position={[0, 1.95, 0]}>
+              <sphereGeometry args={[0.32, 10, 8]} />
+              <meshStandardMaterial color={'#3f2a1a'} roughness={0.95} />
+            </mesh>
+            <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <ringGeometry args={[2.0, 2.4, 32]} />
+              <meshBasicMaterial color={'#cd9b3d'} transparent opacity={0.18} depthWrite={false} />
+            </mesh>
+          </group>
+
           {/* Fresh-kill pile — a small mound of caught prey at the centre.
               When a player drops prey, the pile visually grows by adding to
               the global hud "freshKill" tally; we still always render the

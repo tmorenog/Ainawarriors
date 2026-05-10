@@ -53,6 +53,12 @@ interface PreyMeshProps {
   state: PreyState;
   threat?: THREE.Vector3 | null;
   onCaught?: (id: string) => void;
+  // When the player is crouched the prey notice them less easily — sense
+  // ranges shrink and flee speed drops, so stalking actually pays off.
+  crouching?: boolean;
+  // Set true if this is the closest huntable prey within pounce range.
+  // Used to draw a subtle highlight ring so players see what they'll hit.
+  highlight?: boolean;
 }
 
 const COLORS: Record<PreyKind, string> = {
@@ -81,7 +87,7 @@ const SCALES: Record<PreyKind, number> = {
   blackbird: 0.65,
 };
 
-export const PreyMesh = forwardRef<THREE.Group, PreyMeshProps>(function PreyMesh({ state, threat, onCaught }, _ref) {
+export const PreyMesh = forwardRef<THREE.Group, PreyMeshProps>(function PreyMesh({ state, threat, onCaught, crouching, highlight }, _ref) {
   const ref = useRef<THREE.Group>(null);
   const t = useRef(Math.random() * 100);
 
@@ -91,11 +97,17 @@ export const PreyMesh = forwardRef<THREE.Group, PreyMeshProps>(function PreyMesh
     const desired = new THREE.Vector3();
     if (threat) {
       const d = state.pos.distanceTo(threat);
-      const sense = state.kind === 'rabbit' ? 16 : state.kind === 'bird' ? 22 : 12;
+      // Base sense range per species
+      const baseSense = state.kind === 'rabbit' ? 16 : state.kind === 'bird' ? 22 : 12;
+      // Crouching halves your noise — prey only notice you up close, which
+      // is the whole point of stalking.
+      const sense = crouching ? baseSense * 0.5 : baseSense;
       if (d < sense) {
-        // flee
+        // Flee — crouching also reduces the panic speed because the prey
+        // is less alarmed.
         const away = state.pos.clone().sub(threat).setY(0).normalize();
-        desired.copy(away).multiplyScalar(state.kind === 'rabbit' ? 9 : 6);
+        const fleeSpeed = (state.kind === 'rabbit' ? 9 : 6) * (crouching ? 0.65 : 1);
+        desired.copy(away).multiplyScalar(fleeSpeed);
         state.alarmed = true;
       } else {
         state.alarmed = false;
@@ -135,6 +147,12 @@ export const PreyMesh = forwardRef<THREE.Group, PreyMeshProps>(function PreyMesh
 
   return (
     <group ref={ref} position={state.pos.toArray() as [number, number, number]} scale={scale}>
+      {highlight && (
+        <mesh position={[0, -0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.35, 0.5, 24]} />
+          <meshBasicMaterial color={'#fff7c2'} transparent opacity={0.6} depthWrite={false} />
+        </mesh>
+      )}
       <mesh castShadow>
         <sphereGeometry args={[0.18, 10, 8]} />
         <meshStandardMaterial color={color} roughness={0.85} />
