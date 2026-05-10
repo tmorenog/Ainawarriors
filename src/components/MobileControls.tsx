@@ -28,6 +28,11 @@ export function MobileControls({ onMove, onLook, onSprint, onCrouch, onPounce, o
     <div className="absolute inset-0 pointer-events-none z-20">
       {coarse && <Joystick onChange={onMove} className="absolute left-3 bottom-24" />}
 
+      {/* Explicit D-pad — always visible alongside the joystick. Players who
+          can't get the joystick to register movement (or who prefer tap
+          controls) can use these buttons to walk in cardinal directions. */}
+      {coarse && <DPad onMove={onMove} />}
+
       {/* Look pad covers the right ~60% of the screen on mobile (drag anywhere to look). */}
       {coarse && <LookPad onChange={onLook} />}
 
@@ -65,6 +70,39 @@ function Btn({ label, onClick, hold = false, onPressChange, accent }: { label: s
       className={`w-16 h-16 rounded-full border border-white/20 text-bone text-xs font-display tracking-wide active:scale-95 transition select-none shadow-lg
         ${accent === 'thunder' ? 'bg-thunder/80 hover:bg-thunder' : 'bg-black/55 hover:bg-black/70'}`}
     >{label}</button>
+  );
+}
+
+// A simple tap-and-hold D-pad. Each button calls onMove with a fixed unit
+// vector while held and (0, 0) on release. We use small absolute positioning
+// instead of a flex grid so the buttons can sit comfortably above the
+// joystick without overlapping the action buttons on the right.
+function DPad({ onMove }: { onMove: (x: number, y: number) => void }) {
+  const held = useRef<{ x: number; y: number } | null>(null);
+  const press = (vx: number, vy: number) => (e: React.PointerEvent) => {
+    e.preventDefault();
+    held.current = { x: vx, y: vy };
+    onMove(vx, vy);
+  };
+  const release = (e: React.PointerEvent) => {
+    e.preventDefault();
+    if (held.current) {
+      held.current = null;
+      onMove(0, 0);
+    }
+  };
+  const cls = 'pointer-events-auto w-12 h-12 rounded-full bg-black/55 border border-white/20 text-bone text-xl grid place-items-center select-none active:scale-95 transition shadow';
+  return (
+    <div className="absolute left-44 bottom-28 w-[140px] h-[140px] pointer-events-none">
+      <button onPointerDown={press(0, 1)} onPointerUp={release} onPointerCancel={release} onPointerLeave={release}
+        className={`${cls} absolute left-1/2 -translate-x-1/2 top-0`}>↑</button>
+      <button onPointerDown={press(0, -1)} onPointerUp={release} onPointerCancel={release} onPointerLeave={release}
+        className={`${cls} absolute left-1/2 -translate-x-1/2 bottom-0`}>↓</button>
+      <button onPointerDown={press(-1, 0)} onPointerUp={release} onPointerCancel={release} onPointerLeave={release}
+        className={`${cls} absolute top-1/2 -translate-y-1/2 left-0`}>←</button>
+      <button onPointerDown={press(1, 0)} onPointerUp={release} onPointerCancel={release} onPointerLeave={release}
+        className={`${cls} absolute top-1/2 -translate-y-1/2 right-0`}>→</button>
+    </div>
   );
 }
 

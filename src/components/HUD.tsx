@@ -3,6 +3,7 @@
 import { useGameStore } from '@/game/useGameStore';
 import { CLANS } from '@/lib/clans';
 import { HERBS } from '@/lib/herbs';
+import { adjustCameraZoom } from '@/game/CameraRig';
 import { useState } from 'react';
 
 export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => void; onOpenLeader: () => void }) {
@@ -94,6 +95,18 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
 
       {/* bottom-right action buttons */}
       <div className="absolute right-3 bottom-3 flex flex-col gap-2 pointer-events-auto">
+        <div className="flex flex-col gap-1 items-stretch">
+          <button
+            onClick={() => adjustCameraZoom(-1.2)}
+            className="rounded-t-xl bg-black/55 hover:bg-black/75 px-3 py-2 text-base font-bold shadow border-b border-white/10"
+            title="Zoom in (or scroll up / pinch out)"
+          >+</button>
+          <button
+            onClick={() => adjustCameraZoom(1.2)}
+            className="rounded-b-xl bg-black/55 hover:bg-black/75 px-3 py-2 text-base font-bold shadow"
+            title="Zoom out (or scroll down / pinch in)"
+          >−</button>
+        </div>
         <button onClick={onOpenSettings} className="rounded-full bg-black/45 px-3 py-2 text-xs shadow">Settings</button>
       </div>
 

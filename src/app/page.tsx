@@ -154,8 +154,9 @@ function dispatchKeyTap(key: string) {
 function dispatchMove(x: number, y: number) {
   if (typeof window === 'undefined') return;
   // forward = y, strafe = x  -> simulate WASD pulses through controls layer
-  // We simulate by pressing the appropriate keys based on the dominant axis.
-  const threshold = 0.2;
+  // Lowered threshold so even a small joystick nudge starts walking, and
+  // the cat doesn't sit still while the player thinks they're pushing forward.
+  const threshold = 0.08;
   setHeld('w', y > threshold);
   setHeld('s', y < -threshold);
   setHeld('d', x > threshold);
