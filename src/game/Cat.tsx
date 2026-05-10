@@ -73,9 +73,9 @@ const Leg = forwardRef<THREE.Group, LegProps>(function Leg({ position, material,
       <mesh position={[0, -0.24, back ? 0.06 : 0]} rotation={[back ? -0.18 : 0, 0, 0]} material={material}>
         <cylinderGeometry args={[0.05, 0.046, 0.16, 12]} />
       </mesh>
-      {/* Paw — soft, slightly rounded */}
-      <mesh position={[0, -0.33, back ? 0.085 : 0.025]} material={material}>
-        <boxGeometry args={[0.1, 0.05, 0.13]} />
+      {/* Paw — soft, low pillow */}
+      <mesh position={[0, -0.33, back ? 0.085 : 0.025]} scale={[1.1, 0.45, 1.25]} material={material}>
+        <sphereGeometry args={[0.062, 14, 10]} />
       </mesh>
     </group>
   );
@@ -276,9 +276,9 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
         <mesh position={[bodyLen * 0.4, 0.02, 0]} material={bodyMaterial}>
           <sphereGeometry args={[bodyR * 1.06, 14, 12]} />
         </mesh>
-        {/* round haunches */}
-        <mesh position={[-bodyLen * 0.4, 0.04, 0]} material={bodyMaterial}>
-          <sphereGeometry args={[bodyR * 1.18, 14, 12]} />
+        {/* round haunches — slightly flattened along forward axis for a soft butt */}
+        <mesh position={[-bodyLen * 0.42, 0.02, 0]} scale={[0.78, 0.95, 1.08]} material={bodyMaterial}>
+          <sphereGeometry args={[bodyR * 1.2, 18, 14]} />
         </mesh>
         {/* fluffy belly */}
         <mesh position={[0, -bodyR * 0.45, 0]} rotation={[0, 0, Math.PI / 2]} scale={[1, 0.95, 0.78]} material={bellyMaterial}>
@@ -390,17 +390,27 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
             <coneGeometry args={[0.085, 0.20, 10]} />
           </mesh>
 
-          {/* whiskers */}
-          <group position={[0.22, -0.04, 0]}>
+          {/* whiskers — point sideways out from each cheek */}
+          <group position={[0.16, -0.05, 0]}>
+            {/* Left side: extend in +Z */}
             {[-1, 0, 1].map((i) => (
-              <mesh key={`wL${i}`} position={[0, i * 0.012, 0.07]} rotation={[0, 0.3 + i * 0.1, 0]}>
-                <boxGeometry args={[0.18, 0.0025, 0.0025]} />
+              <mesh
+                key={`wL${i}`}
+                position={[i * 0.006, i * 0.012, 0.255]}
+                rotation={[i * 0.18, Math.PI / 2 + i * 0.06, 0]}
+              >
+                <boxGeometry args={[0.13, 0.002, 0.002]} />
                 <meshBasicMaterial color={'#f5efe2'} />
               </mesh>
             ))}
+            {/* Right side: extend in -Z */}
             {[-1, 0, 1].map((i) => (
-              <mesh key={`wR${i}`} position={[0, i * 0.012, -0.07]} rotation={[0, -0.3 - i * 0.1, 0]}>
-                <boxGeometry args={[0.18, 0.0025, 0.0025]} />
+              <mesh
+                key={`wR${i}`}
+                position={[i * 0.006, i * 0.012, -0.255]}
+                rotation={[-i * 0.18, -Math.PI / 2 - i * 0.06, 0]}
+              >
+                <boxGeometry args={[0.13, 0.002, 0.002]} />
                 <meshBasicMaterial color={'#f5efe2'} />
               </mesh>
             ))}
