@@ -77,6 +77,23 @@ interface GameStore {
   gathering: boolean;
   setGathering: (v: boolean) => void;
 
+  // Firestar / Tigerstar storyline.
+  // mission: 'none' before talking to Firestar, 'accepted' after accepting,
+  // 'won' once Tigerstar is defeated.
+  mission: 'none' | 'accepted' | 'won';
+  setMission: (m: 'none' | 'accepted' | 'won') => void;
+  tigerstarHp: number;          // 0..100, decreases on each pounce
+  setTigerstarHp: (n: number) => void;
+  npcDialogId: string | null;   // currently open NPC dialog
+  setNpcDialogId: (id: string | null) => void;
+  battleActive: boolean;        // true while you're locked in combat with Tigerstar
+  setBattleActive: (v: boolean) => void;
+
+  // Fishing — like gathering, a short cutscene with a chance of failure,
+  // but only triggerable when the player is standing in the river.
+  fishing: boolean;
+  setFishing: (v: boolean) => void;
+
   // Rotating ambient task board — three quests at a time, auto-completing
   // as the player plays. Completed tasks are replaced with fresh ones.
   tasks: Task[];
@@ -158,6 +175,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   gathering: false,
   setGathering: (v) => set({ gathering: v }),
+
+  mission: 'none',
+  setMission: (m) => set({ mission: m }),
+  tigerstarHp: 100,
+  setTigerstarHp: (n) => set({ tigerstarHp: Math.max(0, Math.min(100, n)) }),
+  npcDialogId: null,
+  setNpcDialogId: (id) => set({ npcDialogId: id }),
+  battleActive: false,
+  setBattleActive: (v) => set({ battleActive: v }),
+
+  fishing: false,
+  setFishing: (v) => set({ fishing: v }),
 
   tasks: generateTaskBoard(3),
   reseedTasks: () => set({ tasks: generateTaskBoard(3) }),
