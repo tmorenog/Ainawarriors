@@ -26,6 +26,30 @@ const PATTERN_TINT: Record<string, number> = {
   spotted: 0.4,
 };
 
+// Flat ":3" cat-mouth curve, lying in the YZ plane (the cat faces +X).
+// One continuous path that dips twice — left lobe, joins at the top, then right lobe.
+const CAT_MOUTH_CURVE = (() => {
+  const pts: THREE.Vector3[] = [];
+  const N = 28;
+  const halfW = 0.030;   // total mouth half-width
+  const dip   = 0.014;   // how deep each lobe sags
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;             // 0 → 1
+    const z = -halfW + t * 2 * halfW;
+    let y: number;
+    if (t <= 0.5) {
+      const s = t * 2;            // 0 → 1 over the left lobe
+      y = -Math.sin(s * Math.PI) * dip;
+    } else {
+      const s = (t - 0.5) * 2;    // 0 → 1 over the right lobe
+      y = -Math.sin(s * Math.PI) * dip;
+    }
+    pts.push(new THREE.Vector3(0, y, z));
+  }
+  return new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
+})();
+const CAT_MOUTH_GEO = new THREE.TubeGeometry(CAT_MOUTH_CURVE, 40, 0.0024, 6, false);
+
 interface LegProps {
   position: [number, number, number];
   material: THREE.Material;
@@ -297,6 +321,11 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
           <mesh position={[0.255, -0.025, 0]}>
             <sphereGeometry args={[0.022, 12, 10]} />
             <meshStandardMaterial color={'#3a1f24'} roughness={0.6} />
+          </mesh>
+
+          {/* mouth — flat ":3" cat smile, two soft lobes joined at the middle */}
+          <mesh position={[0.224, -0.078, 0]} geometry={CAT_MOUTH_GEO}>
+            <meshBasicMaterial color={'#3a1f24'} />
           </mesh>
 
           {/* big round eyes (groups so we can scale Y to blink) */}
