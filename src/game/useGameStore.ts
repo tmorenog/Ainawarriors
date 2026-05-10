@@ -88,6 +88,16 @@ interface GameStore {
   setNpcDialogId: (id: string | null) => void;
   battleActive: boolean;        // true while you're locked in combat with Tigerstar
   setBattleActive: (v: boolean) => void;
+  // Cinematic phase of the Tigerstar fight:
+  //   'idle'     — no battle
+  //   'intro'    — opening cutscene banner ("BATTLE: TIGERSTAR"), 2s
+  //   'fighting' — full control, you can pounce (Q) or swipe (F)
+  //   'victory'  — closing cutscene banner ("VICTORY"), 2.5s
+  battlePhase: 'idle' | 'intro' | 'fighting' | 'victory';
+  setBattlePhase: (p: 'idle' | 'intro' | 'fighting' | 'victory') => void;
+  // Camera shake magnitude — decays each frame; set on every hit
+  cameraShake: number;
+  setCameraShake: (n: number) => void;
 
   // Fishing — like gathering, a short cutscene with a chance of failure,
   // but only triggerable when the player is standing in the river.
@@ -190,6 +200,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setNpcDialogId: (id) => set({ npcDialogId: id }),
   battleActive: false,
   setBattleActive: (v) => set({ battleActive: v }),
+  battlePhase: 'idle',
+  setBattlePhase: (p) => set({ battlePhase: p }),
+  cameraShake: 0,
+  setCameraShake: (n) => set({ cameraShake: n }),
 
   fishing: false,
   setFishing: (v) => set({ fishing: v }),

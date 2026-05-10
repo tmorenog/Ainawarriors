@@ -17,6 +17,7 @@ import { Tutorial } from '@/components/Tutorial';
 import { NpcDialog } from '@/components/NpcDialog';
 import { WaypointArrow } from '@/components/WaypointArrow';
 import { MapPanel } from '@/components/MapPanel';
+import { BattleOverlay } from '@/components/BattleOverlay';
 import { useGameStore } from '@/game/useGameStore';
 import { useMultiplayer } from '@/game/useMultiplayer';
 import { patchSave, loadSave } from '@/lib/persist';
@@ -124,6 +125,7 @@ export default function Page() {
             onCrouch={() => dispatchKeyTap('c')}
             onPounce={() => dispatchKeyTap('q')}
             onJump={() => dispatchKeyTap(' ')}
+            onSwipe={() => dispatchKeyTap('f')}
           />
           {showSettings && (
             <SettingsPanel onClose={() => setShowSettings(false)} onEditCat={() => { setShowSettings(false); setScreen('creator'); }} />
@@ -137,6 +139,7 @@ export default function Page() {
           <NpcDialog />
           <WaypointArrow />
           <MapPanel />
+          <BattleOverlay />
         </>
       )}
 

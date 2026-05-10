@@ -9,9 +9,10 @@ interface Props {
   onCrouch: () => void;
   onPounce: () => void;
   onJump: () => void;
+  onSwipe: () => void;
 }
 
-export function MobileControls({ onMove, onLook, onSprint, onCrouch, onPounce, onJump }: Props) {
+export function MobileControls({ onMove, onLook, onSprint, onCrouch, onPounce, onJump, onSwipe }: Props) {
   const [coarse, setCoarse] = useState(false);
   const [showHint, setShowHint] = useState(true);
 
@@ -47,6 +48,7 @@ export function MobileControls({ onMove, onLook, onSprint, onCrouch, onPounce, o
       <div className="absolute right-3 bottom-24 flex flex-col gap-2 pointer-events-auto">
         <Btn label="Jump" onClick={onJump} accent="thunder" />
         <Btn label="Pounce" onClick={onPounce} />
+        <Btn label="Swipe" onClick={onSwipe} />
         <Btn label="Crouch" onClick={onCrouch} />
         <Btn label="Run" onPressChange={onSprint} hold />
       </div>
