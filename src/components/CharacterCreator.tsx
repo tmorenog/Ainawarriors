@@ -98,6 +98,27 @@ export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
 
   const update = (patch: Partial<CatAppearance>) => setCat((c) => ({ ...c, ...patch }));
 
+  // Randomize the visual morph but keep the player's chosen name, clan, and role.
+  const randomizeMorph = () => {
+    setCat((c) => ({
+      ...c,
+      furBase: rand(FUR_BASES),
+      furBelly: rand(FUR_BELLY),
+      furPattern: rand(FUR_PATTERNS),
+      patternColor: rand(PATTERN_COLORS),
+      patternColor2: rand(PATTERN_COLORS),
+      patternColor3: rand(PATTERN_COLORS),
+      eyeColor: rand(EYE_COLORS),
+      earShape: rand(EARS),
+      tail: rand(TAILS),
+      fluffiness: 0.2 + Math.random() * 0.6,
+      size: rand(SIZES),
+      height: 0.9 + Math.random() * 0.3,
+      build: 0.85 + Math.random() * 0.3,
+      blush: Math.random() < 0.4,
+    }));
+  };
+
   // Validate the cat and return a normalized copy ready to persist, or null on bad name.
   const finalize = (): CatAppearance | null => {
     const safe = safeUsername(cat.name);
@@ -181,6 +202,12 @@ export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
         <div className="p-4 overflow-y-auto flex-1 min-h-0 space-y-4 text-sm">
           {tab === 'fur' && (
             <>
+              <button
+                onClick={randomizeMorph}
+                className="w-full rounded-xl border border-thunder/50 bg-thunder/15 hover:bg-thunder/25 active:scale-95 transition py-2 text-sm font-display"
+              >
+                ✨ Surprise me — randomize morph
+              </button>
               <Group title="Fur color">
                 <Swatches options={FUR_BASES} value={cat.furBase} onChange={(v) => update({ furBase: v })} />
               </Group>

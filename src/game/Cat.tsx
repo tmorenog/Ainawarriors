@@ -203,7 +203,12 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
     if (eyeRRef.current) eyeRRef.current.scale.y = lid;
 
     if (bodyRef.current) {
-      bodyRef.current.position.y = 0.5 + crouchY + bodyBob;
+      // Soft breathing motion when standing/sitting still
+      const isMoving = anim === 'walk' || anim === 'run' || anim === 'pounce' || anim === 'jump' || anim === 'limp';
+      const breath = isMoving ? 0 : Math.sin(time * 1.6) * 0.012;
+      bodyRef.current.position.y = 0.5 + crouchY + bodyBob + breath;
+      // Subtle chest expansion on inhale
+      bodyRef.current.scale.y = 1 + (isMoving ? 0 : Math.sin(time * 1.6) * 0.025);
     }
     if (groupRef.current) {
       groupRef.current.position.set(position[0], position[1] + pounceY + jumpY, position[2]);
@@ -320,6 +325,11 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
         <mesh position={[0, -bodyR * 0.45, 0]} rotation={[0, 0, Math.PI / 2]} scale={[1, 0.95, 0.78]} material={bellyMaterial}>
           <cylinderGeometry args={[bodyR * 0.78, bodyR * 0.78, bodyLen * 0.85, 14]} />
         </mesh>
+        {/* soft chest fluff just below where the neck meets the body */}
+        <mesh position={[bodyLen * 0.42, -0.05, 0]} scale={[0.85, 0.95, 1.0]} material={bellyMaterial}>
+          <sphereGeometry args={[bodyR * 0.78, 16, 14]} />
+        </mesh>
+
         {/* short, chubby neck */}
         <mesh position={[bodyLen * 0.55, 0.16, 0]} rotation={[0, 0, -0.55]} material={bodyMaterial}>
           <cylinderGeometry args={[bodyR * 0.78, bodyR * 0.92, 0.16, 14]} />
