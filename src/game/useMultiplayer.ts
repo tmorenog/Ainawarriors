@@ -12,6 +12,7 @@ export interface MultiplayerHandle {
   sendEmote: (emote: string) => void;
   sendCommand: (kind: string, payload?: any) => void;
   sendCatch: (preyId: string, kind: string) => void;
+  sendDisaster: (d: { kind: 'twoleg' | 'flood' | 'fire'; until: number; message: string }) => void;
 }
 
 const SOCKET_URL = (typeof window !== 'undefined'
@@ -37,7 +38,8 @@ type BcMessage =
   | { kind: 'leave'; id: string }
   | { kind: 'chat'; msg: ChatMessage }
   | { kind: 'who' }
-  | { kind: 'emote'; id: string; name: string; emote: string };
+  | { kind: 'emote'; id: string; name: string; emote: string }
+  | { kind: 'disaster'; disaster: { kind: 'twoleg' | 'flood' | 'fire'; until: number; message: string } };
 
 function makeBroadcastId(): string {
   // Persist the id across re-renders / hot reloads in this same tab so that
@@ -163,6 +165,9 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
 
     const bc = new BroadcastChannel(`wotc-${room}`);
     bcRef.current = bc;
+    // Expose on window so other modules (Game.tsx disaster effect) can
+    // broadcast directly without prop-drilling the mp handle.
+    try { (window as any).__WOTC_BC__ = bc; } catch {}
 
     const send = (m: BcMessage) => { try { bc.postMessage(m); } catch {} };
 
@@ -239,6 +244,25 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
           });
           break;
         }
+        case 'disaster': {
+          // Mirror the disaster into our local state so every tab sees
+          // the same fire / flood / twoleg event at the same time. We
+          // only replace our current disaster if there isn't one running
+          // or the broadcast is newer.
+          const s = useGameStore.getState();
+          if (!s.disaster || s.disaster.until < m.disaster.until) {
+            s.setDisaster(m.disaster);
+            s.pushChat({
+              id: 'sys' + Date.now(),
+              fromId: 'system',
+              fromName: 'StarClan',
+              scope: 'system',
+              text: m.disaster.message,
+              at: Date.now(),
+            });
+          }
+          break;
+        }
       }
     };
 
@@ -276,6 +300,7 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
         try { send({ kind: 'leave', id: myId }); } catch {}
         try { bc.close(); } catch {}
         bcRef.current = null;
+        try { delete (window as any).__WOTC_BC__; } catch {}
       }
       if (heartbeatRef.current != null) {
         clearInterval(heartbeatRef.current);
@@ -379,5 +404,20 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
     },
     sendCommand: (kind, payload) => socketRef.current?.emit('command', { kind, payload }),
     sendCatch: (preyId, kind) => socketRef.current?.emit('catch', { preyId, kind }),
+    sendDisaster: (d) => {
+      // Mirror the disaster locally so the originator sees it too, then
+      // broadcast so every other tab applies the same event.
+      const s = useGameStore.getState();
+      s.setDisaster(d);
+      s.pushChat({
+        id: 'sys' + Date.now(),
+        fromId: 'system',
+        fromName: 'StarClan',
+        scope: 'system',
+        text: d.message,
+        at: Date.now(),
+      });
+      try { bcRef.current?.postMessage({ kind: 'disaster', disaster: d } as BcMessage); } catch {}
+    },
   };
 }

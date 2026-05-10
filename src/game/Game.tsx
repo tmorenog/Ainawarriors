@@ -982,9 +982,16 @@ export function Game({ room, net }: GameProps) {
         flood:  'The river bursts its banks — a flood pours through RiverClan! Higher ground, now!',
         fire:   'Smoke on the wind — FIRE in the pines! Run for water!',
       };
-      s.setDisaster({ kind: pick, until: Date.now() + 45_000, message: messages[pick] });
+      const d = { kind: pick, until: Date.now() + 45_000, message: messages[pick] };
+      s.setDisaster(d);
       s.pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
         text: messages[pick], at: Date.now() });
+      // Mirror to every other tab so the disaster is shared across the
+      // BroadcastChannel multiplayer session.
+      try {
+        const w = window as any;
+        if (w.__WOTC_BC__) (w.__WOTC_BC__ as BroadcastChannel).postMessage({ kind: 'disaster', disaster: d });
+      } catch {}
     }, 60_000);
     return () => clearInterval(id);
   }, []);
