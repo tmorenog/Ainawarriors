@@ -5,6 +5,7 @@
 // Game samples it once per frame for the local cat.
 
 export function terrainHeightAt(x: number, z: number): number {
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return 0;
   // Big rolling hills (low frequency) + medium ridges + fine bumps
   let h =
     Math.sin(x * 0.012) * 1.4 +

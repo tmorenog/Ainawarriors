@@ -139,23 +139,29 @@ function GrassTufts({ count, season, dense }: { count: number; season: WorldProp
   const tipRef = useRef<THREE.InstancedMesh>(null);
   const rand = useMemo(() => seededRand(4242), []);
 
-  const color = useMemo(() => {
-    return new THREE.Color(
-      season === 'leaf-bare' ? '#7a6e4a' :
-      season === 'leaf-fall' ? '#9a7c3a' :
-      season === 'newleaf'   ? '#8fc05a' :
-                               '#6c9446'
-    );
-  }, [season]);
+  const tuftColor = useMemo(() => new THREE.Color(
+    season === 'leaf-bare' ? '#7a6e4a' :
+    season === 'leaf-fall' ? '#9a7c3a' :
+    season === 'newleaf'   ? '#8fc05a' :
+                             '#6c9446'
+  ), [season]);
 
-  const tipColor = useMemo(() => {
-    return new THREE.Color(
-      season === 'leaf-bare' ? '#a09478' :
-      season === 'leaf-fall' ? '#c8a14d' :
-      season === 'newleaf'   ? '#bedf86' :
-                               '#a3c477'
-    );
-  }, [season]);
+  const tipColor = useMemo(() => new THREE.Color(
+    season === 'leaf-bare' ? '#a09478' :
+    season === 'leaf-fall' ? '#c8a14d' :
+    season === 'newleaf'   ? '#bedf86' :
+                             '#a3c477'
+  ), [season]);
+
+  const segments = dense ? 6 : 5;
+  const tuftGeo = useMemo(() => new THREE.ConeGeometry(0.18, 0.34, segments), [segments]);
+  const tipGeo = useMemo(() => new THREE.ConeGeometry(0.10, 0.42, segments), [segments]);
+  const tuftMat = useMemo(() => new THREE.MeshStandardMaterial({ color: tuftColor, roughness: 0.95, flatShading: true }), [tuftColor]);
+  const tipMat = useMemo(() => new THREE.MeshStandardMaterial({ color: tipColor, roughness: 0.95, flatShading: true }), [tipColor]);
+
+  useEffect(() => () => {
+    tuftGeo.dispose(); tipGeo.dispose(); tuftMat.dispose(); tipMat.dispose();
+  }, [tuftGeo, tipGeo, tuftMat, tipMat]);
 
   useEffect(() => {
     const tufts = meshRef.current;
@@ -184,7 +190,6 @@ function GrassTufts({ count, season, dense }: { count: number; season: WorldProp
       m.compose(p, q, s);
       tufts.setMatrixAt(placed, m);
 
-      // Slightly taller, narrower "tips" mesh on top for the lighter highlight
       s.set(sc * 0.55, 0.9 + rand() * 0.6, sc * 0.55);
       p.set(x, y + 0.05, z);
       m.compose(p, q, s);
@@ -197,17 +202,11 @@ function GrassTufts({ count, season, dense }: { count: number; season: WorldProp
     tips.instanceMatrix.needsUpdate = true;
   }, [count, rand]);
 
-  const segments = dense ? 6 : 5;
+  if (count <= 0) return null;
   return (
     <group>
-      <instancedMesh ref={meshRef} args={[undefined as any, undefined as any, count]}>
-        <coneGeometry args={[0.18, 0.34, segments]} />
-        <meshStandardMaterial color={color} roughness={0.95} flatShading />
-      </instancedMesh>
-      <instancedMesh ref={tipRef} args={[undefined as any, undefined as any, count]}>
-        <coneGeometry args={[0.10, 0.42, segments]} />
-        <meshStandardMaterial color={tipColor} roughness={0.95} flatShading />
-      </instancedMesh>
+      <instancedMesh ref={meshRef} args={[tuftGeo, tuftMat, count]} />
+      <instancedMesh ref={tipRef} args={[tipGeo, tipMat, count]} />
     </group>
   );
 }
@@ -215,6 +214,9 @@ function GrassTufts({ count, season, dense }: { count: number; season: WorldProp
 function Rocks({ count }: { count: number }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const rand = useMemo(() => seededRand(9911), []);
+  const rockGeo = useMemo(() => new THREE.DodecahedronGeometry(0.6, 0), []);
+  const rockMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#7d7872', roughness: 1, flatShading: true }), []);
+  useEffect(() => () => { rockGeo.dispose(); rockMat.dispose(); }, [rockGeo, rockMat]);
 
   useEffect(() => {
     const rocks = meshRef.current;
@@ -247,12 +249,8 @@ function Rocks({ count }: { count: number }) {
     rocks.instanceMatrix.needsUpdate = true;
   }, [count, rand]);
 
-  return (
-    <instancedMesh ref={meshRef} args={[undefined as any, undefined as any, count]} receiveShadow>
-      <dodecahedronGeometry args={[0.6, 0]} />
-      <meshStandardMaterial color={'#7d7872'} roughness={1} flatShading />
-    </instancedMesh>
-  );
+  if (count <= 0) return null;
+  return <instancedMesh ref={meshRef} args={[rockGeo, rockMat, count]} receiveShadow />;
 }
 
 function Clouds({ count, isNight }: { count: number; isNight: boolean }) {
@@ -267,13 +265,19 @@ function Clouds({ count, isNight }: { count: number; isNight: boolean }) {
   }, [count, rand]);
 
   useFrame((_, dt) => {
-    if (!groupRef.current) return;
-    groupRef.current.children.forEach((c, i) => {
-      c.position.x += list[i].drift * dt;
-      if (c.position.x > 280) c.position.x = -280;
-    });
+    const group = groupRef.current;
+    if (!group) return;
+    const kids = group.children;
+    const n = Math.min(kids.length, list.length);
+    for (let i = 0; i < n; i++) {
+      const k = kids[i];
+      if (!k) continue;
+      k.position.x += list[i].drift * dt;
+      if (k.position.x > 280) k.position.x = -280;
+    }
   });
 
+  if (count <= 0) return null;
   const color = isNight ? '#3a4666' : '#f5f7fa';
   return (
     <group ref={groupRef}>
