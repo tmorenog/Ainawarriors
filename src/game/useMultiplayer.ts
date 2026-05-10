@@ -40,7 +40,16 @@ type BcMessage =
   | { kind: 'emote'; id: string; name: string; emote: string };
 
 function makeBroadcastId(): string {
-  return 'tab_' + Math.random().toString(36).slice(2, 10);
+  // Persist the id across re-renders / hot reloads in this same tab so that
+  // when the multiplayer effect tears down and re-runs (because cat or muted
+  // changed) we don't appear to other tabs as a different cat with a fresh
+  // id every time.
+  if (typeof window === 'undefined') return 'tab_ssr';
+  const w = window as any;
+  if (typeof w.__WOTC_TAB_ID__ === 'string') return w.__WOTC_TAB_ID__;
+  const id = 'tab_' + Math.random().toString(36).slice(2, 10);
+  w.__WOTC_TAB_ID__ = id;
+  return id;
 }
 
 export function useMultiplayer(cat: CatAppearance | null, room: string, enabled: boolean): MultiplayerHandle {
@@ -143,9 +152,13 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
 
     const send = (m: BcMessage) => { try { bc.postMessage(m); } catch {} };
 
-    // Announce ourselves and ask everyone else to announce themselves
+    // Announce ourselves and ask everyone else to announce themselves.
+    // Send a few times in case the receiver tab's BC handler attached just
+    // after we sent.
     send({ kind: 'hello', player: me });
     send({ kind: 'who' });
+    setTimeout(() => { try { send({ kind: 'who' }); } catch {} }, 800);
+    setTimeout(() => { try { send({ kind: 'who' }); } catch {} }, 2500);
 
     pushChat({
       id: 's0',
@@ -241,13 +254,20 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
 
     return () => {
       _refs -= 1;
-      onUnload();
+      // Only fully tear down when the LAST consumer unmounts (e.g. on real
+      // page unload). React strict-mode and dep-driven re-runs would
+      // otherwise broadcast a fake "leave" and yank our cat out of every
+      // other tab's view.
+      if (_refs <= 0) {
+        try { send({ kind: 'leave', id: myId }); } catch {}
+        try { bc.close(); } catch {}
+        bcRef.current = null;
+      }
       if (heartbeatRef.current != null) {
         clearInterval(heartbeatRef.current);
         heartbeatRef.current = null;
       }
       window.removeEventListener('beforeunload', onUnload);
-      bcRef.current = null;
     };
   }, [enabled, cat, room, setSelfId, upsertPlayer, removePlayer, setPlayers, setRoom, pushChat, muted]);
 
