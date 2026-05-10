@@ -1,9 +1,10 @@
 'use client';
 
 import { useFrame } from '@react-three/fiber';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CLAN_LIST } from '@/lib/clans';
+import { terrainHeightAt } from './terrain';
 
 interface WorldProps {
   timeOfDay: number; // 0..1
@@ -26,31 +27,29 @@ function makeTerrain(size = 600, seg = 96, season: WorldProps['season']) {
   const pos = geo.attributes.position;
   const colors: number[] = [];
   const grass = new THREE.Color(season === 'leaf-bare' ? '#c5b58a' : season === 'leaf-fall' ? '#a78b48' : season === 'newleaf' ? '#6b9a4d' : '#4f7a45');
+  const grassDark = new THREE.Color(season === 'leaf-bare' ? '#9a8b66' : season === 'leaf-fall' ? '#7a5e2a' : season === 'newleaf' ? '#4d7a36' : '#365a2a');
   const dirt = new THREE.Color('#5a4a32');
   const rock = new THREE.Color('#8a8276');
   const snow = new THREE.Color('#eef4f7');
+  const sand = new THREE.Color('#bfa977');
 
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const z = pos.getZ(i);
-    const r = Math.sqrt(x * x + z * z);
-    let h =
-      Math.sin(x * 0.012) * 1.4 +
-      Math.cos(z * 0.013) * 1.4 +
-      Math.sin((x + z) * 0.005) * 2.4 +
-      Math.cos((x - z) * 0.008) * 1.0;
-    // riverbed channel near +X
-    const river = Math.exp(-Math.pow((x - 180) / 30, 2));
-    h -= river * 3.2;
-    // moor (windclan) lower flat
-    if (x < -120) h *= 0.4;
+    const h = terrainHeightAt(x, z);
     pos.setY(i, h);
 
-    let c = grass.clone();
+    // Mix two grass shades using a low-freq mask so the ground doesn't look flat-painted
+    const mossMask = (Math.sin(x * 0.05) * Math.cos(z * 0.04) + 1) * 0.5;
+    let c = grass.clone().lerp(grassDark, 0.35 + mossMask * 0.45);
+
     if (h < -1.5) c = dirt.clone();
-    if (h > 4) c.lerp(rock, 0.6);
+    if (h > 4) c.lerp(rock, Math.min(1, (h - 4) * 0.4));
     if (season === 'leaf-bare' && h > 1.8) c.lerp(snow, 0.7);
-    if (Math.abs(x - 180) < 28) c.set('#3a78a8'); // river
+    // Sandy banks alongside the river
+    if (Math.abs(x - 180) < 32 && Math.abs(x - 180) > 22) c.lerp(sand, 0.55);
+    // River water itself
+    if (Math.abs(x - 180) < 22) c.set('#3a78a8');
     colors.push(c.r, c.g, c.b);
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -71,7 +70,9 @@ function Trees({ count, season }: { count: number; season: WorldProps['season'] 
       if (moor && rand() > 0.15) continue;
       const shadow = z > 90 && x < 30;
       const kind: 'oak' | 'pine' | 'birch' = shadow ? 'pine' : moor ? 'birch' : (rand() < 0.6 ? 'oak' : 'birch');
-      arr.push({ p: [x, 0, z], s: 0.7 + rand() * 1.6, kind });
+      // Plant the tree at its actual terrain height so trunks aren't floating
+      const y = terrainHeightAt(x, z);
+      arr.push({ p: [x, y, z], s: 0.7 + rand() * 1.6, kind });
     }
     return arr;
   }, [count, rand]);
@@ -133,11 +134,167 @@ function Trees({ count, season }: { count: number; season: WorldProps['season'] 
   );
 }
 
+function GrassTufts({ count, season, dense }: { count: number; season: WorldProps['season']; dense: boolean }) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const tipRef = useRef<THREE.InstancedMesh>(null);
+  const rand = useMemo(() => seededRand(4242), []);
+
+  const color = useMemo(() => {
+    return new THREE.Color(
+      season === 'leaf-bare' ? '#7a6e4a' :
+      season === 'leaf-fall' ? '#9a7c3a' :
+      season === 'newleaf'   ? '#8fc05a' :
+                               '#6c9446'
+    );
+  }, [season]);
+
+  const tipColor = useMemo(() => {
+    return new THREE.Color(
+      season === 'leaf-bare' ? '#a09478' :
+      season === 'leaf-fall' ? '#c8a14d' :
+      season === 'newleaf'   ? '#bedf86' :
+                               '#a3c477'
+    );
+  }, [season]);
+
+  useEffect(() => {
+    const tufts = meshRef.current;
+    const tips = tipRef.current;
+    if (!tufts || !tips) return;
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const s = new THREE.Vector3();
+    const p = new THREE.Vector3();
+    let placed = 0;
+    let attempts = 0;
+    const max = count;
+    while (placed < max && attempts < max * 4) {
+      attempts++;
+      const x = (rand() - 0.5) * 520;
+      const z = (rand() - 0.5) * 520;
+      if (Math.abs(x - 180) < 32) continue; // skip river
+      const y = terrainHeightAt(x, z);
+      if (y < -1.4) continue; // dirt patches stay bare
+      if (y > 4.5) continue;  // rocky peaks stay bare
+      const yaw = rand() * Math.PI * 2;
+      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+      const sc = 0.7 + rand() * 0.9;
+      s.set(sc, 0.55 + rand() * 0.7, sc);
+      p.set(x, y, z);
+      m.compose(p, q, s);
+      tufts.setMatrixAt(placed, m);
+
+      // Slightly taller, narrower "tips" mesh on top for the lighter highlight
+      s.set(sc * 0.55, 0.9 + rand() * 0.6, sc * 0.55);
+      p.set(x, y + 0.05, z);
+      m.compose(p, q, s);
+      tips.setMatrixAt(placed, m);
+      placed++;
+    }
+    tufts.count = placed;
+    tips.count = placed;
+    tufts.instanceMatrix.needsUpdate = true;
+    tips.instanceMatrix.needsUpdate = true;
+  }, [count, rand]);
+
+  const segments = dense ? 6 : 5;
+  return (
+    <group>
+      <instancedMesh ref={meshRef} args={[undefined as any, undefined as any, count]}>
+        <coneGeometry args={[0.18, 0.34, segments]} />
+        <meshStandardMaterial color={color} roughness={0.95} flatShading />
+      </instancedMesh>
+      <instancedMesh ref={tipRef} args={[undefined as any, undefined as any, count]}>
+        <coneGeometry args={[0.10, 0.42, segments]} />
+        <meshStandardMaterial color={tipColor} roughness={0.95} flatShading />
+      </instancedMesh>
+    </group>
+  );
+}
+
+function Rocks({ count }: { count: number }) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const rand = useMemo(() => seededRand(9911), []);
+
+  useEffect(() => {
+    const rocks = meshRef.current;
+    if (!rocks) return;
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const s = new THREE.Vector3();
+    const p = new THREE.Vector3();
+    let placed = 0;
+    let attempts = 0;
+    while (placed < count && attempts < count * 6) {
+      attempts++;
+      const x = (rand() - 0.5) * 520;
+      const z = (rand() - 0.5) * 520;
+      if (Math.abs(x - 180) < 28) continue;
+      const y = terrainHeightAt(x, z);
+      const yaw = rand() * Math.PI * 2;
+      const tilt = (rand() - 0.5) * 0.4;
+      q.setFromEuler(new THREE.Euler(tilt, yaw, tilt * 0.5));
+      const sx = 0.5 + rand() * 1.6;
+      const sy = 0.35 + rand() * 0.9;
+      const sz = 0.5 + rand() * 1.6;
+      s.set(sx, sy, sz);
+      p.set(x, y + sy * 0.35, z);
+      m.compose(p, q, s);
+      rocks.setMatrixAt(placed, m);
+      placed++;
+    }
+    rocks.count = placed;
+    rocks.instanceMatrix.needsUpdate = true;
+  }, [count, rand]);
+
+  return (
+    <instancedMesh ref={meshRef} args={[undefined as any, undefined as any, count]} receiveShadow>
+      <dodecahedronGeometry args={[0.6, 0]} />
+      <meshStandardMaterial color={'#7d7872'} roughness={1} flatShading />
+    </instancedMesh>
+  );
+}
+
+function Clouds({ count, isNight }: { count: number; isNight: boolean }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const rand = useMemo(() => seededRand(55), []);
+  const list = useMemo(() => {
+    return Array.from({ length: count }).map(() => ({
+      p: [(rand() - 0.5) * 500, 40 + rand() * 18, (rand() - 0.5) * 500] as [number, number, number],
+      s: 6 + rand() * 14,
+      drift: 0.4 + rand() * 0.8,
+    }));
+  }, [count, rand]);
+
+  useFrame((_, dt) => {
+    if (!groupRef.current) return;
+    groupRef.current.children.forEach((c, i) => {
+      c.position.x += list[i].drift * dt;
+      if (c.position.x > 280) c.position.x = -280;
+    });
+  });
+
+  const color = isNight ? '#3a4666' : '#f5f7fa';
+  return (
+    <group ref={groupRef}>
+      {list.map((c, i) => (
+        <mesh key={i} position={c.p}>
+          <sphereGeometry args={[c.s, 8, 6]} />
+          <meshBasicMaterial color={color} transparent opacity={isNight ? 0.45 : 0.7} depthWrite={false} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 function Camps() {
   return (
     <group>
       {CLAN_LIST.map((c) => (
-        <group key={c.id} position={c.campCenter}>
+        <group
+          key={c.id}
+          position={[c.campCenter[0], terrainHeightAt(c.campCenter[0], c.campCenter[2]), c.campCenter[2]]}
+        >
           {/* clearing */}
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
             <circleGeometry args={[12, 24]} />
@@ -234,6 +391,9 @@ function Snow({ intensity = 400, hidden }: { intensity?: number; hidden?: boolea
 
 export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
   const treeCount = graphics === 'low' ? 50 : graphics === 'medium' ? 120 : 240;
+  const grassCount = graphics === 'low' ? 0 : graphics === 'medium' ? 220 : 480;
+  const rockCount = graphics === 'low' ? 14 : graphics === 'medium' ? 32 : 60;
+  const cloudCount = graphics === 'low' ? 4 : graphics === 'medium' ? 8 : 14;
   const terrainGeo = useMemo(() => makeTerrain(600, graphics === 'low' ? 48 : graphics === 'medium' ? 72 : 96, season), [season, graphics]);
 
   // sun/moon angle from timeOfDay (0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset)
@@ -275,10 +435,13 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
       </mesh>
 
       <Trees count={treeCount} season={season} />
+      {grassCount > 0 && <GrassTufts count={grassCount} season={season} dense={graphics === 'high'} />}
+      <Rocks count={rockCount} />
+      <Clouds count={cloudCount} isNight={isNight} />
       <Camps />
 
       {/* twoleg place: simple boxy buildings */}
-      <group position={[260, 0, 240]}>
+      <group position={[260, terrainHeightAt(260, 240), 240]}>
         {[0, 1, 2, 3].map((i) => (
           <mesh key={i} position={[i * 6 - 9, 1.5, (i % 2) * 5]}>
             <boxGeometry args={[4, 3, 4]} />
@@ -288,7 +451,7 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
       </group>
 
       {/* moonpool stone ring */}
-      <group position={[-220, 0, -220]}>
+      <group position={[-220, terrainHeightAt(-220, -220), -220]}>
         {Array.from({ length: 8 }).map((_, i) => {
           const a = (i / 8) * Math.PI * 2;
           return (

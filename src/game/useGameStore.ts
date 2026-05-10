@@ -46,6 +46,19 @@ interface GameStore {
   questText: string;
   setQuest: (q: string) => void;
 
+  // Book Mode — narrative campaign loosely tracking the Warriors books.
+  bookMode: boolean;
+  setBookMode: (v: boolean) => void;
+  chapterIndex: number;
+  setChapterIndex: (n: number) => void;
+  chapterProgress: number;
+  bumpChapterProgress: (n?: number) => void;
+
+  // Sleep cutscene — when true the world dims and a soft pad plays for a
+  // few seconds before fading back in (also doubles as a Book objective).
+  sleeping: boolean;
+  setSleeping: (v: boolean) => void;
+
   muted: Set<string>;
   toggleMute: (id: string) => void;
 
@@ -100,6 +113,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   questText: 'Find your bearings in your new clan.',
   setQuest: (q) => set({ questText: q }),
+
+  bookMode: false,
+  setBookMode: (v) => set({ bookMode: v }),
+  chapterIndex: 0,
+  setChapterIndex: (n) => set({ chapterIndex: n, chapterProgress: 0 }),
+  chapterProgress: 0,
+  bumpChapterProgress: (n = 1) =>
+    set((st) => ({ chapterProgress: st.chapterProgress + n })),
+
+  sleeping: false,
+  setSleeping: (v) => set({ sleeping: v }),
 
   muted: new Set<string>(),
   toggleMute: (id) =>

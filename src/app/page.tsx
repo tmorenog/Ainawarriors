@@ -10,6 +10,7 @@ import { SettingsPanel } from '@/components/Settings';
 import { LeaderPanel } from '@/components/LeaderPanel';
 import { MobileControls } from '@/components/MobileControls';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { BookPanel } from '@/components/BookPanel';
 import { useGameStore } from '@/game/useGameStore';
 import { useMultiplayer } from '@/game/useMultiplayer';
 import { patchSave, loadSave } from '@/lib/persist';
@@ -90,6 +91,7 @@ export default function Page() {
 
       {screen === 'game' && cat && (
         <>
+          <SleepOverlay />
           <ErrorBoundary label="game" onReset={() => setScreen('title')}>
             {/* No WebGLGuard here on purpose — the editor already created a Canvas
                 successfully, so we trust WebGL works. If the game Canvas does fail
@@ -118,6 +120,7 @@ export default function Page() {
           {showLeader && (
             <LeaderPanel onClose={() => setShowLeader(false)} onCommand={(k, p) => mp.sendCommand(k, p)} />
           )}
+          <BookPanel />
         </>
       )}
 
@@ -161,4 +164,27 @@ function setHeld(key: string, down: boolean) {
 function dispatchLook(dx: number, dy: number) {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent('wotc-look', { detail: { dx, dy } }));
+}
+
+// Soft fade-to-black overlay used by the Book Mode sleep objective and
+// triggered when the player rests. The audio engine's "sleep" mode plays
+// through this — see audio.ts.
+function SleepOverlay() {
+  const sleeping = useGameStore((s) => s.sleeping);
+  return (
+    <div
+      className="absolute inset-0 z-40 pointer-events-none transition-opacity duration-700"
+      style={{
+        opacity: sleeping ? 1 : 0,
+        background: 'radial-gradient(ellipse at center, rgba(8,12,30,0.85), rgba(0,0,0,0.98))',
+      }}
+    >
+      <div className="h-full grid place-items-center text-bone">
+        <div className="text-center">
+          <div className="font-display text-3xl mb-2 animate-pulse-soft">A warrior&rsquo;s rest…</div>
+          <div className="text-sm opacity-70">StarClan watches over your dreams.</div>
+        </div>
+      </div>
+    </div>
+  );
 }
