@@ -21,20 +21,23 @@ interface CatProps {
 // Five control points trace a real "3" lying on its side:
 //   left corner — left dip — middle PEAK (the back of the 3) — right dip — right corner.
 const CAT_MOUTH_CURVE = (() => {
-  const halfW   = 0.034;   // mouth half-width
-  const dip     = 0.013;   // how far each lobe sags
-  const midPeak = 0.010;   // how high the middle joint rises (this makes it a "3")
+  const halfW   = 0.046;   // mouth half-width — bigger so it reads as a 3
+  const dip     = 0.020;   // how far each lobe sags
+  const midPeak = 0.024;   // the middle peak — must be clearly higher than the corners
   const pts = [
     new THREE.Vector3(0,        0,        -halfW),           // left corner
-    new THREE.Vector3(0,    -dip * 0.95,  -halfW * 0.55),    // left lobe bottom
-    new THREE.Vector3(0,     midPeak,      0),               // middle peak — back of the 3
-    new THREE.Vector3(0,    -dip * 0.95,   halfW * 0.55),    // right lobe bottom
+    new THREE.Vector3(0,    -dip * 0.4,   -halfW * 0.78),    // pull-in toward dip
+    new THREE.Vector3(0,    -dip,         -halfW * 0.45),    // left lobe bottom
+    new THREE.Vector3(0,    -dip * 0.5,   -halfW * 0.18),    // climb toward peak
+    new THREE.Vector3(0,     midPeak,      0),               // middle PEAK — back of the 3
+    new THREE.Vector3(0,    -dip * 0.5,    halfW * 0.18),
+    new THREE.Vector3(0,    -dip,          halfW * 0.45),    // right lobe bottom
+    new THREE.Vector3(0,    -dip * 0.4,    halfW * 0.78),
     new THREE.Vector3(0,        0,         halfW),           // right corner
   ];
-  // Lower tension so the corners stay sharp-ish and the dips read clearly
-  return new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.35);
+  return new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.25);
 })();
-const CAT_MOUTH_GEO = new THREE.TubeGeometry(CAT_MOUTH_CURVE, 48, 0.003, 6, false);
+const CAT_MOUTH_GEO = new THREE.TubeGeometry(CAT_MOUTH_CURVE, 64, 0.0038, 6, false);
 
 interface LegProps {
   position: [number, number, number];
@@ -189,16 +192,19 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
     }
   });
 
-  // Procedural fur texture for non-solid coats (spotted / tabby / tortoiseshell / calico / point / bicolor)
+  // Procedural fur texture for non-solid coats. Up to three pattern colors give
+  // tortoiseshells / calicos / spotted coats real multi-color depth.
   const furTexture = useMemo(
     () => buildFurTexture({
       pattern: cat.furPattern,
       base: cat.furBase,
       patternColor: cat.patternColor,
+      patternColor2: cat.patternColor2,
+      patternColor3: cat.patternColor3,
       belly: cat.furBelly,
       seed: hashId(cat.id || cat.name),
     }),
-    [cat.furPattern, cat.furBase, cat.patternColor, cat.furBelly, cat.id, cat.name]
+    [cat.furPattern, cat.furBase, cat.patternColor, cat.patternColor2, cat.patternColor3, cat.furBelly, cat.id, cat.name]
   );
   useEffect(() => () => { furTexture?.dispose(); }, [furTexture]);
 
@@ -235,6 +241,9 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
     const map: Record<string, number> = {
       amber: 0xe2a23a, green: 0x6abf6a, blue: 0x6cc4e0, yellow: 0xf3d23a,
       copper: 0xc36a32, hazel: 0xa78540, odd: 0x6cc4e0,
+      emerald: 0x2fb37b, sky: 0x9bd3f5, violet: 0xa48cd6,
+      rose: 0xe389b3, silver: 0xd6e0e8, gold: 0xfad34b,
+      jade: 0x88d4b3, sunset: 0xf08560,
     };
     return map[cat.eyeColor] ?? 0xe2a23a;
   }, [cat.eyeColor]);
@@ -320,9 +329,19 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
             <meshStandardMaterial color={'#3a1f24'} roughness={0.6} />
           </mesh>
 
-          {/* mouth — flat ":3" cat smile, two soft lobes joined at the middle */}
-          <mesh position={[0.224, -0.078, 0]} geometry={CAT_MOUTH_GEO}>
-            <meshBasicMaterial color={'#3a1f24'} />
+          {/* mouth — flat "3" sitting on the muzzle just below the nose */}
+          <mesh position={[0.272, -0.082, 0]} geometry={CAT_MOUTH_GEO} renderOrder={2}>
+            <meshBasicMaterial color={'#3a1f24'} depthTest={true} />
+          </mesh>
+
+          {/* soft pink blush spots on the cheeks for extra cuteness */}
+          <mesh position={[0.20, -0.03, 0.16]} rotation={[0, 0.3, 0]}>
+            <circleGeometry args={[0.038, 18]} />
+            <meshBasicMaterial color={'#f7a8b4'} transparent opacity={0.55} />
+          </mesh>
+          <mesh position={[0.20, -0.03, -0.16]} rotation={[0, -0.3, 0]}>
+            <circleGeometry args={[0.038, 18]} />
+            <meshBasicMaterial color={'#f7a8b4'} transparent opacity={0.55} />
           </mesh>
 
           {/* big round eyes (groups so we can scale Y to blink) */}

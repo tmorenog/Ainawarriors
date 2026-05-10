@@ -5,7 +5,10 @@ import type {
 const FUR_BASES = ['#3a2618', '#5b3a25', '#7a5a3a', '#9c8268', '#c9b59b'];
 const SIZES: SizeTier[] = ['tiny','small','medium','large','massive'];
 const PATTERNS: FurPattern[] = ['solid','tabby','tortoiseshell','calico','point','bicolor','spotted'];
-const EYES: EyeColor[] = ['amber','green','blue','yellow','copper','hazel','odd'];
+const EYES: EyeColor[] = [
+  'amber','green','blue','yellow','copper','hazel','odd',
+  'emerald','sky','violet','rose','silver','gold','jade','sunset',
+];
 const EARS: EarShape[] = ['standard','tufted','rounded','curl'];
 const TAILS: TailType[] = ['long','short','fluffy','kink'];
 const BUBBLES: CatAppearance['bubbleStyle'][] = ['classic','cloud','leaf','stone'];
@@ -35,6 +38,8 @@ export function normalizeCat(input: any): CatAppearance {
     furBelly: color(safe.furBelly, '#f4f1ea'),
     furPattern: pick(safe.furPattern, PATTERNS, 'tabby'),
     patternColor: color(safe.patternColor, '#3a2618'),
+    patternColor2: color(safe.patternColor2, '#888888'),
+    patternColor3: color(safe.patternColor3, '#5b3a25'),
     eyeColor: pick(safe.eyeColor, EYES, 'amber'),
     earShape: pick(safe.earShape, EARS, 'standard'),
     tail: pick(safe.tail, TAILS, 'long'),

@@ -24,6 +24,8 @@ export interface FurInputs {
   pattern: FurPattern;
   base: string;
   patternColor: string;
+  patternColor2?: string;
+  patternColor3?: string;
   belly: string;
   seed: number;
 }
@@ -48,6 +50,9 @@ export function buildFurTexture(input: FurInputs): THREE.CanvasTexture | null {
 
   const rand = seeded(input.seed);
   const { base, patternColor, belly, pattern } = input;
+  const c2 = input.patternColor2 || patternColor;
+  const c3 = input.patternColor3 || c2;
+  const palette = [patternColor, c2, c3];
 
   // Base coat
   ctx.fillStyle = base;
@@ -55,7 +60,7 @@ export function buildFurTexture(input: FurInputs): THREE.CanvasTexture | null {
 
   switch (pattern) {
     case 'tabby': {
-      // Vertical-ish curving mackerel stripes
+      // Primary mackerel stripes in patternColor
       ctx.strokeStyle = patternColor;
       ctx.lineWidth = 5;
       ctx.lineCap = 'round';
@@ -70,9 +75,22 @@ export function buildFurTexture(input: FurInputs): THREE.CanvasTexture | null {
         }
         ctx.stroke();
       }
-      // Soft darker spine band along the top
+      // Secondary thinner accent stripes in patternColor2 between primaries
+      ctx.strokeStyle = c2;
+      ctx.lineWidth = 2.2;
+      for (let i = 0; i < stripes; i++) {
+        const baseX = (i / stripes) * W + W / (stripes * 2);
+        ctx.beginPath();
+        for (let y = -8; y <= H + 8; y += 6) {
+          const x = baseX + Math.sin(y * 0.06 + i * 1.1) * 7;
+          if (y === -8) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      // Spine band uses patternColor3 as the deepest shade if provided
       const spine = ctx.createLinearGradient(0, 0, 0, H);
-      spine.addColorStop(0, patternColor);
+      spine.addColorStop(0, c3);
       spine.addColorStop(0.4, 'rgba(0,0,0,0)');
       ctx.fillStyle = spine;
       ctx.globalAlpha = 0.35;
@@ -82,10 +100,10 @@ export function buildFurTexture(input: FurInputs): THREE.CanvasTexture | null {
     }
 
     case 'spotted': {
-      // Scattered round spots — clearly visible, varied sizes
-      ctx.fillStyle = patternColor;
-      const count = 90;
+      // Mix of spot colors from the palette so each "spot" can be a different shade
+      const count = 100;
       for (let i = 0; i < count; i++) {
+        ctx.fillStyle = palette[Math.floor(rand() * palette.length)];
         const x = rand() * W;
         const y = rand() * H;
         const r = 4 + rand() * 9;
@@ -97,9 +115,9 @@ export function buildFurTexture(input: FurInputs): THREE.CanvasTexture | null {
     }
 
     case 'tortoiseshell': {
-      // Mottled patches of patternColor over base, then lighter highlights
-      ctx.fillStyle = patternColor;
-      for (let i = 0; i < 14; i++) {
+      // Alternating patches of every pattern color → classic tortie marbling
+      for (let i = 0; i < 18; i++) {
+        ctx.fillStyle = palette[i % palette.length];
         const x = rand() * W;
         const y = rand() * H;
         const r = 22 + rand() * 36;
@@ -107,10 +125,10 @@ export function buildFurTexture(input: FurInputs): THREE.CanvasTexture | null {
         ctx.ellipse(x, y, r, r * (0.55 + rand() * 0.7), rand() * Math.PI, 0, Math.PI * 2);
         ctx.fill();
       }
-      // A few lighter speckles for depth
+      // A few lighter base-color speckles for depth
       ctx.fillStyle = base;
-      ctx.globalAlpha = 0.45;
-      for (let i = 0; i < 30; i++) {
+      ctx.globalAlpha = 0.4;
+      for (let i = 0; i < 32; i++) {
         const x = rand() * W;
         const y = rand() * H;
         const r = 5 + rand() * 12;
@@ -123,24 +141,18 @@ export function buildFurTexture(input: FurInputs): THREE.CanvasTexture | null {
     }
 
     case 'calico': {
-      // Big white patches + big patternColor patches
-      ctx.fillStyle = belly || '#f5efe2';
-      for (let i = 0; i < 7; i++) {
-        const x = rand() * W;
-        const y = rand() * H;
-        const r = 24 + rand() * 30;
-        ctx.beginPath();
-        ctx.ellipse(x, y, r, r * (0.55 + rand() * 0.7), rand() * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.fillStyle = patternColor;
-      for (let i = 0; i < 7; i++) {
-        const x = rand() * W;
-        const y = rand() * H;
-        const r = 20 + rand() * 28;
-        ctx.beginPath();
-        ctx.ellipse(x, y, r, r * (0.55 + rand() * 0.7), rand() * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
+      // White / belly + each pattern color gets its own patches
+      const layers = [belly || '#f5efe2', patternColor, c2, c3];
+      for (const fill of layers) {
+        ctx.fillStyle = fill;
+        for (let i = 0; i < 6; i++) {
+          const x = rand() * W;
+          const y = rand() * H;
+          const r = 22 + rand() * 28;
+          ctx.beginPath();
+          ctx.ellipse(x, y, r, r * (0.55 + rand() * 0.7), rand() * Math.PI, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       break;
     }

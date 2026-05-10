@@ -16,9 +16,27 @@ import { safeUsername } from '@/lib/chatFilter';
 import { normalizeCat } from '@/lib/normalizeCat';
 import { WebGLGuard } from '@/components/WebGLGuard';
 
-const FUR_BASES = ['#3a2618','#5b3a25','#7a5a3a','#9c8268','#c9b59b','#e3d5b8','#1d1d1d','#444','#888','#bdbdbd','#f4f1ea','#9c4a22','#c46a32','#e2a456','#5a4a2a'];
-const FUR_BELLY = ['#f4f1ea','#e3d5b8','#c9b59b','#9c8268','#444'];
-const PATTERN_COLORS = ['#3a2618','#1d1d1d','#5b3a25','#9c4a22','#7a5a3a','#888','#444','#222'];
+const FUR_BASES = [
+  // browns
+  '#1d1206','#2c1a0e','#3a2618','#4a3018','#5b3a25','#6e4a2c','#7a5a3a','#8b6b46','#9c8268','#b89876','#c9b59b','#d8c5a8','#e3d5b8',
+  // creams / whites
+  '#f4f1ea','#fbf6ec','#fff8e8','#efe6cf','#dccfae',
+  // greys / blacks
+  '#0d0d0d','#1d1d1d','#2c2c2c','#3a3a3a','#525252','#6c6c6c','#888888','#a8a8a8','#c0c0c0','#d8d8d8',
+  // gingers / oranges
+  '#7a3010','#9c4a22','#c46a32','#d97a35','#e2a456','#f0c585',
+  // unusual
+  '#5a4a2a','#3d4a36','#4a3848','#604055','#3a2a3a',
+];
+const FUR_BELLY = [
+  '#f4f1ea','#fff8e8','#fbf6ec','#e3d5b8','#dccfae','#c9b59b','#9c8268','#a89886','#444444','#1d1d1d','#222222',
+];
+const PATTERN_COLORS = [
+  '#1d1d1d','#2c1a0e','#3a2618','#4a3018','#5b3a25','#7a5a3a',
+  '#9c4a22','#c46a32','#d97a35','#e2a456',
+  '#444444','#666666','#888888','#a0a0a0','#bdbdbd','#dddddd','#ffffff',
+  '#0d0d0d','#222222','#3d4a36','#4a3848','#604055',
+];
 const FUR_PATTERNS: FurPattern[] = ['solid','tabby','tortoiseshell','calico','point','bicolor','spotted'];
 const EYE_COLORS: EyeColor[] = ['amber','green','blue','yellow','copper','hazel','odd'];
 const EARS: EarShape[] = ['standard','tufted','rounded','curl'];
@@ -46,6 +64,8 @@ function makeDefault(): CatAppearance {
     furBelly: rand(FUR_BELLY),
     furPattern: rand(FUR_PATTERNS),
     patternColor: rand(PATTERN_COLORS),
+    patternColor2: rand(PATTERN_COLORS),
+    patternColor3: rand(PATTERN_COLORS),
     eyeColor: rand(EYE_COLORS),
     earShape: 'standard',
     tail: 'long',
@@ -101,9 +121,9 @@ export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
   };
 
   return (
-    <div className="absolute inset-0 grid grid-rows-[auto_1fr_auto] md:grid-cols-[1fr_420px] md:grid-rows-1 bg-forest-900 text-bone">
+    <div className="absolute inset-0 flex flex-col md:grid md:grid-cols-[1fr_420px] md:grid-rows-1 bg-forest-900 text-bone overflow-hidden">
       {/* Preview */}
-      <div className="relative md:col-start-1 row-start-2 md:row-start-1 min-h-[40vh] bg-gradient-to-b from-forest-700 to-forest-900">
+      <div className="relative md:col-start-1 h-[38vh] md:h-auto md:min-h-0 shrink-0 bg-gradient-to-b from-forest-700 to-forest-900">
         <WebGLGuard>
           <Canvas
             camera={{ position: [2.6, 1.4, 2.6], fov: 38 }}
@@ -138,8 +158,8 @@ export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="md:col-start-2 row-start-3 md:row-start-1 flex flex-col bg-forest-900 border-l border-white/10 max-h-screen md:max-h-none overflow-hidden">
+      {/* Controls — flex-1 fills remaining height; footer is always visible at the bottom */}
+      <div className="md:col-start-2 flex-1 min-h-0 flex flex-col bg-forest-900 border-t md:border-t-0 md:border-l border-white/10 overflow-hidden">
         <header className="p-4 border-b border-white/10">
           <div className="font-display text-2xl">Create your Warrior</div>
           <div className="text-xs opacity-70">All choices save locally and persist between sessions.</div>
@@ -157,7 +177,7 @@ export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
           ))}
         </nav>
 
-        <div className="p-4 overflow-y-auto flex-1 space-y-4 text-sm">
+        <div className="p-4 overflow-y-auto flex-1 min-h-0 space-y-4 text-sm">
           {tab === 'fur' && (
             <>
               <Group title="Fur color">
@@ -173,9 +193,19 @@ export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
                   ))}
                 </div>
               </Group>
-              <Group title="Pattern color">
+              <Group title="Pattern color (primary)">
                 <Swatches options={PATTERN_COLORS} value={cat.patternColor} onChange={(v) => update({ patternColor: v })} />
               </Group>
+              {cat.furPattern !== 'solid' && cat.furPattern !== 'bicolor' && cat.furPattern !== 'point' && (
+                <>
+                  <Group title="Pattern color 2 (accent)">
+                    <Swatches options={PATTERN_COLORS} value={cat.patternColor2 ?? '#888888'} onChange={(v) => update({ patternColor2: v })} />
+                  </Group>
+                  <Group title="Pattern color 3 (deep)">
+                    <Swatches options={PATTERN_COLORS} value={cat.patternColor3 ?? '#5b3a25'} onChange={(v) => update({ patternColor3: v })} />
+                  </Group>
+                </>
+              )}
               <Group title="Eye color">
                 <div className="flex flex-wrap gap-2">
                   {EYE_COLORS.map((e) => (
@@ -312,32 +342,32 @@ export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
           )}
         </div>
 
-        <footer className="p-3 border-t border-white/10 space-y-2">
+        <footer className="shrink-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-white/15 bg-forest-900/95 backdrop-blur space-y-2">
           {savedToast && (
-            <div className="rounded-lg bg-forest-500/30 border border-forest-300/40 text-forest-50 text-xs text-center py-1.5 animate-fade-in">
-              Morph saved. Keep tweaking, or press Play to enter the forest.
+            <div className="rounded-lg bg-forest-500/40 border border-forest-300/50 text-forest-50 text-xs text-center py-1.5 animate-fade-in">
+              ✓ Morph saved. Keep tweaking, or press Play to enter the forest.
             </div>
           )}
           <div className="grid grid-cols-3 gap-2">
             <button
               onClick={onCancel}
-              className="rounded-xl border border-white/15 hover:bg-white/5 py-2.5 text-sm"
+              className="rounded-xl border-2 border-white/25 bg-black/30 hover:bg-black/50 active:scale-95 transition py-3 text-sm text-bone"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 font-display text-base py-2.5"
-              title="Save your morph and stay on the editor"
+              className="rounded-xl bg-forest-500 hover:bg-forest-500/90 active:scale-95 transition border-2 border-forest-300/60 text-white font-display text-base py-3 shadow-lg"
+              title="Save your morph and keep editing"
             >
-              Save
+              💾 Save
             </button>
             <button
               onClick={handlePlay}
-              className="rounded-xl bg-thunder hover:bg-thunder/90 font-display text-base py-2.5 shadow"
+              className="rounded-xl bg-thunder hover:bg-thunder/90 active:scale-95 transition border-2 border-thunder/80 text-white font-display text-base py-3 shadow-lg"
               title="Save and enter the forest"
             >
-              Play ▶
+              ▶ Play
             </button>
           </div>
         </footer>

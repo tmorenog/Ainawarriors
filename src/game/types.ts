@@ -5,7 +5,9 @@ export type SizeTier = 'tiny' | 'small' | 'medium' | 'large' | 'massive';
 export type FurPattern = 'solid' | 'tabby' | 'tortoiseshell' | 'calico' | 'point' | 'bicolor' | 'spotted';
 export type EarShape = 'standard' | 'tufted' | 'rounded' | 'curl';
 export type TailType = 'long' | 'short' | 'fluffy' | 'kink';
-export type EyeColor = 'amber' | 'green' | 'blue' | 'yellow' | 'copper' | 'hazel' | 'odd';
+export type EyeColor =
+  | 'amber' | 'green' | 'blue' | 'yellow' | 'copper' | 'hazel' | 'odd'
+  | 'emerald' | 'sky' | 'violet' | 'rose' | 'silver' | 'gold' | 'jade' | 'sunset';
 
 export interface CatAppearance {
   id: string;
@@ -16,6 +18,8 @@ export interface CatAppearance {
   furBelly: string;
   furPattern: FurPattern;
   patternColor: string;
+  patternColor2?: string;     // second pattern accent (tabby tertiary stripes, calico patches, tortie depth)
+  patternColor3?: string;     // third pattern accent
   eyeColor: EyeColor;
   earShape: EarShape;
   tail: TailType;
