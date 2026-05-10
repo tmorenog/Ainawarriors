@@ -12,7 +12,7 @@ interface CatProps {
   cat: CatAppearance;
   position?: [number, number, number];
   rotation?: number;
-  anim?: 'idle' | 'walk' | 'run' | 'sit' | 'sleep' | 'crouch' | 'pounce' | 'limp' | 'jump';
+  anim?: 'idle' | 'walk' | 'run' | 'sit' | 'sleep' | 'doze' | 'crouch' | 'pounce' | 'limp' | 'jump';
   injured?: boolean;
   carrying?: string | null;
 }
@@ -141,6 +141,7 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
       pounceY = Math.max(0, Math.sin(time * 6) * 0.5);
       stride = 0.6; speed = 10;
     } else if (anim === 'sit') { crouchY = -0.05; }
+    else if (anim === 'doze') { crouchY = -0.18; }
     else if (anim === 'sleep') { crouchY = -0.32; }
     else if (anim === 'limp' || injured) { stride = 0.6; speed = 4.5; }
     else if (anim === 'jump') { jumpY = 0.4; stride = 0.4; }
@@ -167,10 +168,14 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
       headRef.current.rotation.x = (anim === 'crouch' || anim === 'pounce' ? -0.15 : Math.sin(time * 0.5) * 0.04);
     }
 
-    // Blink animation — generous, eased, occasionally a slow loving blink
+    // Blink animation — generous, eased, occasionally a slow loving blink.
+    // 'sleep' fully closes the eyes; 'doze' droops them halfway shut so the
+    // sleep cutscene can show the cat actually nodding off.
     let lid = 1;
     if (anim === 'sleep') {
-      lid = 0.04;
+      lid = 0.0;
+    } else if (anim === 'doze') {
+      lid = 0.25;
     } else {
       const bs = blinkRef.current;
       if (bs.startedAt < 0 && time >= bs.nextAt) {

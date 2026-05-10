@@ -246,7 +246,7 @@ function triggerSleep(setSleeping: (v: boolean) => void) {
   const endTod = 0.27;
   const sweep = (() => { let d = endTod - startTod; if (d <= 0) d += 1; return d; })();
   const startReal = performance.now();
-  const sweepDuration = 7000;
+  const sweepDuration = 14000;
   const sweepInt = window.setInterval(() => {
     const k = Math.min(1, (performance.now() - startReal) / sweepDuration);
     const cur = useGameStore.getState();
@@ -255,18 +255,18 @@ function triggerSleep(setSleeping: (v: boolean) => void) {
     if (k >= 1) clearInterval(sweepInt);
   }, 90);
 
-  setTimeout(() => useGameStore.getState().setSleepStage('curl'), 1500);
-  setTimeout(() => useGameStore.getState().setSleepStage('deep'), 3000);
+  setTimeout(() => useGameStore.getState().setSleepStage('curl'), 2500);
+  setTimeout(() => useGameStore.getState().setSleepStage('deep'), 5000);
   setTimeout(() => {
     const s = useGameStore.getState();
     s.setSleepStage('waking');
     if (s.room) s.setRoom({ ...s.room, timeOfDay: endTod });
-  }, 7000);
+  }, 13000);
   setTimeout(() => {
     const s = useGameStore.getState();
     s.setSleepStage('idle');
     setSleeping(false);
-  }, 7800);
+  }, 14500);
 }
 
 function describeObjective(kind: string, target: string | undefined, count: number | undefined, progress: number) {
