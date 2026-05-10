@@ -140,10 +140,17 @@ function NpcInstance({
               fromId: 'system',
               fromName: 'Firestar',
               scope: 'system',
-              text: 'Together we did it. ThunderClan owes you everything.',
+              text: "Well done, young warrior! As a prize for doing this, I'll give you some fresh-kill.",
               at: Date.now(),
             });
-            store.setHud({ hp: 100, stamina: 100, reputation: Math.min(100, store.hud.reputation + 25) });
+            // Drop a fresh-kill prize into the player's slot if free
+            if (!store.carrying) store.setCarrying('rabbit');
+            store.setHud({
+              hp: 100,
+              stamina: 100,
+              hunger: Math.min(100, store.hud.hunger + 35),
+              reputation: Math.min(100, store.hud.reputation + 25),
+            });
           } else {
             store.pushChat({
               id: 'fs' + Date.now(),
