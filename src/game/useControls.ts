@@ -47,7 +47,7 @@ export function useKeyboardControls(controlsRef: React.MutableRefObject<Controls
       keys[k] = true;
       if (k === 'v') controlsRef.current.toggleCamera = true;
       if (k === 'e') controlsRef.current.interact = true;
-      if (k === 'f') controlsRef.current.attack = true;
+      if (k === 'f' || k === 'b') controlsRef.current.attack = true;
       if (k === 'q') controlsRef.current.pounce = true;
       if (k === 'p' || k === 'escape') {
         try {
