@@ -233,8 +233,8 @@ function Snow({ intensity = 400, hidden }: { intensity?: number; hidden?: boolea
 }
 
 export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
-  const treeCount = graphics === 'low' ? 80 : graphics === 'medium' ? 180 : 320;
-  const terrainGeo = useMemo(() => makeTerrain(600, graphics === 'low' ? 64 : 96, season), [season, graphics]);
+  const treeCount = graphics === 'low' ? 50 : graphics === 'medium' ? 120 : 240;
+  const terrainGeo = useMemo(() => makeTerrain(600, graphics === 'low' ? 48 : graphics === 'medium' ? 72 : 96, season), [season, graphics]);
 
   // sun/moon angle from timeOfDay (0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset)
   const sunAngle = (timeOfDay - 0.25) * Math.PI * 2;
@@ -255,14 +255,14 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
       {/* sky color comes from the scene background (above) — no sphere mesh
           needed, which avoids any back-face rendering quirks across browsers */}
 
-      {/* sun / moon */}
+      {/* sun / moon — shadows only on 'high' to avoid framebuffer alloc crashes */}
       <directionalLight
         position={[sunX * 100, Math.max(0.1, sunY) * 100 + 10, 50]}
         intensity={isNight ? 0.18 : 1.0}
         color={isNight ? '#a5b8e8' : sunY < 0.2 ? '#ffc89a' : '#fff7e8'}
-        castShadow={graphics !== 'low'}
-        shadow-mapSize-width={graphics === 'high' ? 2048 : 1024}
-        shadow-mapSize-height={graphics === 'high' ? 2048 : 1024}
+        castShadow={graphics === 'high'}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
       />
       {/* Ambient + hemisphere fill so the scene is well lit even if the
           directional light fails to compute on a constrained device */}

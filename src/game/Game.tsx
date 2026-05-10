@@ -229,8 +229,11 @@ export function Game({ room, net }: GameProps) {
     );
   }
 
-  const dpr: [number, number] = settings.graphics === 'low' ? [1, 1] : settings.graphics === 'medium' ? [1, 1.5] : [1, 2];
-  const shadows = settings.graphics !== 'low';
+  const dpr: [number, number] = settings.graphics === 'low' ? [1, 1] : settings.graphics === 'medium' ? [1, 1.25] : [1, 1.75];
+  // Shadows only on the highest graphics setting. On medium/low (and on iPad
+  // Safari especially) requesting shadow framebuffers can crash WebGL context
+  // creation, leaving an empty black canvas.
+  const shadows = settings.graphics === 'high';
 
   return (
     <Canvas
