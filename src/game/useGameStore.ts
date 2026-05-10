@@ -94,6 +94,12 @@ interface GameStore {
   fishing: boolean;
   setFishing: (v: boolean) => void;
 
+  // Custom waypoint set by tapping the map. The on-screen arrow points
+  // here if it's set, otherwise falls back to Tigerstar during the
+  // mission. Cleared when the player gets within ~6 units of it.
+  waypoint: { x: number; z: number; label: string } | null;
+  setWaypoint: (w: { x: number; z: number; label: string } | null) => void;
+
   // Rotating ambient task board — three quests at a time, auto-completing
   // as the player plays. Completed tasks are replaced with fresh ones.
   tasks: Task[];
@@ -187,6 +193,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   fishing: false,
   setFishing: (v) => set({ fishing: v }),
+
+  waypoint: null,
+  setWaypoint: (w) => set({ waypoint: w }),
 
   tasks: generateTaskBoard(3),
   reseedTasks: () => set({ tasks: generateTaskBoard(3) }),
