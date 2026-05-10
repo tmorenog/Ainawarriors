@@ -94,7 +94,10 @@ export const NPCS: Record<NpcId, NpcDef> = {
   tigerstar: {
     id: 'tigerstar',
     cat: TIGERSTAR_CAT,
-    pos: [-57, 0, 181],
+    // Moved well forward of ShadowClan camp toward the ThunderClan border
+    // so the player doesn't have to slog across the whole map for the
+    // mission. ~55 forest-units north-east of ThunderClan camp at (0,0,0).
+    pos: [-20, 0, 50],
     greeting:
       'You smell of ThunderClan blood. Run home, kit, before I tear out your throat. Or stay — and I will make you part of the forest floor.',
     options: [
