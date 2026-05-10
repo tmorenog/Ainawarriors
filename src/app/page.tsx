@@ -15,6 +15,7 @@ import { BookPanel } from '@/components/BookPanel';
 import { TasksPanel } from '@/components/TasksPanel';
 import { Tutorial } from '@/components/Tutorial';
 import { NpcDialog } from '@/components/NpcDialog';
+import { WaypointArrow } from '@/components/WaypointArrow';
 import { useGameStore } from '@/game/useGameStore';
 import { useMultiplayer } from '@/game/useMultiplayer';
 import { patchSave, loadSave } from '@/lib/persist';
@@ -133,6 +134,7 @@ export default function Page() {
           <TasksPanel />
           <Tutorial />
           <NpcDialog />
+          <WaypointArrow />
         </>
       )}
 
