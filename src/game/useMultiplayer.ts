@@ -22,8 +22,34 @@ const SOCKET_URL = (typeof window !== 'undefined'
 let _socket: Socket | null = null;
 let _refs = 0;
 
+// ---------------------------------------------------------------------------
+// BroadcastChannel-based multiplayer fallback.
+// When no Socket.io URL is configured we still want the game to be
+// "automatically multiplayer" — any other browser tab/window the player has
+// open joins the same forest and sees each other walk around. This works
+// across tabs on the same browser; for cross-device multiplayer the user can
+// still set NEXT_PUBLIC_SOCKET_URL.
+// ---------------------------------------------------------------------------
+
+type BcMessage =
+  | { kind: 'hello'; player: PlayerState }
+  | { kind: 'state'; player: PlayerState }
+  | { kind: 'leave'; id: string }
+  | { kind: 'chat'; msg: ChatMessage }
+  | { kind: 'who' }
+  | { kind: 'emote'; id: string; name: string; emote: string };
+
+function makeBroadcastId(): string {
+  return 'tab_' + Math.random().toString(36).slice(2, 10);
+}
+
 export function useMultiplayer(cat: CatAppearance | null, room: string, enabled: boolean): MultiplayerHandle {
   const socketRef = useRef<Socket | null>(null);
+  const bcRef = useRef<BroadcastChannel | null>(null);
+  const bcIdRef = useRef<string>('');
+  const heartbeatRef = useRef<number | null>(null);
+  const lastSeenRef = useRef<Record<string, number>>({});
+
   const upsertPlayer = useGameStore((s) => s.upsertPlayer);
   const removePlayer = useGameStore((s) => s.removePlayer);
   const setPlayers = useGameStore((s) => s.setPlayers);
@@ -35,112 +61,249 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
   useEffect(() => {
     if (!enabled || !cat) return;
     _refs += 1;
-    // No URL? Run offline (single player) — leader is set locally.
-    if (!SOCKET_URL) {
-      // Stable id so editing the cat (e.g. changing role/fur) updates the
-      // same player record instead of leaving an old "clone" of the previous
-      // self in the players map.
-      const localId = 'local_self';
-      setSelfId(localId);
-      const me: PlayerState = {
-        socketId: localId,
-        cat,
-        pos: [0, 0, 0],
-        rot: 0,
-        anim: 'idle',
-        hp: 100, hunger: 60, stamina: 100, reputation: 50,
-        isLeader: true, isDeputy: false,
+
+    // ----- Socket.io path -----
+    if (SOCKET_URL) {
+      if (!_socket) {
+        _socket = io(SOCKET_URL, { transports: ['websocket'], query: { room } });
+      }
+      const s = _socket;
+      socketRef.current = s;
+
+      const onConnect = () => {
+        setSelfId(s.id || '');
+        s.emit('join', { room, cat });
       };
-      // Wipe any stale records (in case a different id lingered from a
-      // previous session before this fix shipped).
-      setPlayers({ [localId]: me });
-      setRoom({
-        roomId: 'offline',
-        leaderId: localId,
-        leaderByClan: { [cat.clan]: localId } as any,
-        deputyByClan: {} as any,
-        weather: 'clear', season: 'greenleaf', timeOfDay: 0.4, preyAlive: 24, events: [],
-      });
-      pushChat({ id: 's0', fromId: 'system', fromName: 'StarClan', scope: 'system', text: 'You are alone in the territory. (No multiplayer server configured — set NEXT_PUBLIC_SOCKET_URL to connect)', at: Date.now() });
+      const onRoomState = (rs: any) => setRoom(rs);
+      const onPlayersAll = (ps: Record<string, PlayerState>) => setPlayers(ps);
+      const onUpsert = (p: PlayerState) => { if (!muted.has(p.socketId)) upsertPlayer(p); };
+      const onLeave = (id: string) => removePlayer(id);
+      const onChat = (m: ChatMessage) => { if (!muted.has(m.fromId)) pushChat(m); };
+      const onSystem = (text: string) => pushChat({ id: 's' + Date.now(), fromId: 'system', fromName: 'System', scope: 'system', text, at: Date.now() });
+
+      s.on('connect', onConnect);
+      s.on('room:state', onRoomState);
+      s.on('players:all', onPlayersAll);
+      s.on('player:upsert', onUpsert);
+      s.on('player:leave', onLeave);
+      s.on('chat', onChat);
+      s.on('system', onSystem);
+
+      if (s.connected) onConnect();
+
+      return () => {
+        s.off('connect', onConnect);
+        s.off('room:state', onRoomState);
+        s.off('players:all', onPlayersAll);
+        s.off('player:upsert', onUpsert);
+        s.off('player:leave', onLeave);
+        s.off('chat', onChat);
+        s.off('system', onSystem);
+        _refs -= 1;
+        if (_refs <= 0 && _socket) {
+          _socket.disconnect();
+          _socket = null;
+          socketRef.current = null;
+        }
+      };
+    }
+
+    // ----- BroadcastChannel path (zero-config local multiplayer) -----
+    const bcSupported = typeof window !== 'undefined' && 'BroadcastChannel' in window;
+    const myId = makeBroadcastId();
+    bcIdRef.current = myId;
+    setSelfId(myId);
+
+    const me: PlayerState = {
+      socketId: myId,
+      cat,
+      pos: [0, 0, 0],
+      rot: 0,
+      anim: 'idle',
+      hp: 100, hunger: 60, stamina: 100, reputation: 50,
+      isLeader: false, isDeputy: false,
+    };
+
+    setPlayers({ [myId]: me });
+    setRoom({
+      roomId: bcSupported ? `local-${room}` : 'offline',
+      leaderId: myId,
+      leaderByClan: { [cat.clan]: myId } as any,
+      deputyByClan: {} as any,
+      weather: 'clear', season: 'greenleaf', timeOfDay: 0.4, preyAlive: 24, events: [],
+    });
+
+    if (!bcSupported) {
+      pushChat({ id: 's0', fromId: 'system', fromName: 'StarClan', scope: 'system', text: 'You are alone — your browser does not support cross-tab multiplayer.', at: Date.now() });
       return () => { _refs -= 1; };
     }
 
-    if (!_socket) {
-      _socket = io(SOCKET_URL, { transports: ['websocket'], query: { room } });
-    }
-    const s = _socket;
-    socketRef.current = s;
+    const bc = new BroadcastChannel(`wotc-${room}`);
+    bcRef.current = bc;
 
-    const onConnect = () => {
-      setSelfId(s.id || '');
-      s.emit('join', { room, cat });
+    const send = (m: BcMessage) => { try { bc.postMessage(m); } catch {} };
+
+    // Announce ourselves and ask everyone else to announce themselves
+    send({ kind: 'hello', player: me });
+    send({ kind: 'who' });
+
+    pushChat({
+      id: 's0',
+      fromId: 'system',
+      fromName: 'StarClan',
+      scope: 'system',
+      text: 'You step into the forest. Open the game in another browser tab to see another warrior here with you.',
+      at: Date.now(),
+    });
+
+    bc.onmessage = (ev) => {
+      const m = ev.data as BcMessage;
+      if (!m || typeof m !== 'object') return;
+      switch (m.kind) {
+        case 'hello':
+        case 'state': {
+          if (m.player.socketId === myId) return;
+          if (muted.has(m.player.socketId)) return;
+          lastSeenRef.current[m.player.socketId] = Date.now();
+          upsertPlayer(m.player);
+          if (m.kind === 'hello') {
+            // Greet the new tab back so it sees us immediately
+            const cur = useGameStore.getState().players[myId];
+            if (cur) send({ kind: 'state', player: cur });
+            pushChat({
+              id: 'sj' + Date.now(),
+              fromId: 'system',
+              fromName: 'StarClan',
+              scope: 'system',
+              text: `${m.player.cat.name} of ${m.player.cat.clan} steps into the territory.`,
+              at: Date.now(),
+            });
+          }
+          break;
+        }
+        case 'who': {
+          const cur = useGameStore.getState().players[myId];
+          if (cur) send({ kind: 'state', player: cur });
+          break;
+        }
+        case 'leave': {
+          if (m.id === myId) return;
+          removePlayer(m.id);
+          delete lastSeenRef.current[m.id];
+          break;
+        }
+        case 'chat': {
+          if (m.msg.fromId === myId) return;
+          if (muted.has(m.msg.fromId)) return;
+          pushChat(m.msg);
+          break;
+        }
+        case 'emote': {
+          if (m.id === myId) return;
+          if (muted.has(m.id)) return;
+          pushChat({
+            id: 'em' + Date.now(),
+            fromId: m.id,
+            fromName: m.name,
+            scope: 'nearby',
+            text: `*${m.emote.replace('-', ' ')}s*`,
+            at: Date.now(),
+            emote: m.emote,
+          });
+          break;
+        }
+      }
     };
-    const onRoomState = (rs: any) => setRoom(rs);
-    const onPlayersAll = (ps: Record<string, PlayerState>) => setPlayers(ps);
-    const onUpsert = (p: PlayerState) => { if (!muted.has(p.socketId)) upsertPlayer(p); };
-    const onLeave = (id: string) => removePlayer(id);
-    const onChat = (m: ChatMessage) => { if (!muted.has(m.fromId)) pushChat(m); };
-    const onSystem = (text: string) => pushChat({ id: 's' + Date.now(), fromId: 'system', fromName: 'System', scope: 'system', text, at: Date.now() });
 
-    s.on('connect', onConnect);
-    s.on('room:state', onRoomState);
-    s.on('players:all', onPlayersAll);
-    s.on('player:upsert', onUpsert);
-    s.on('player:leave', onLeave);
-    s.on('chat', onChat);
-    s.on('system', onSystem);
+    // Heartbeat: re-announce our state, and prune neighbours we haven't heard
+    // from in 7s (other tab probably closed).
+    heartbeatRef.current = window.setInterval(() => {
+      const cur = useGameStore.getState().players[myId];
+      if (cur) send({ kind: 'state', player: cur });
 
-    if (s.connected) onConnect();
+      const now = Date.now();
+      const players = useGameStore.getState().players;
+      for (const id of Object.keys(players)) {
+        if (id === myId) continue;
+        const seen = lastSeenRef.current[id];
+        if (!seen || now - seen > 7000) {
+          removePlayer(id);
+          delete lastSeenRef.current[id];
+        }
+      }
+    }, 2000) as unknown as number;
+
+    const onUnload = () => {
+      try { send({ kind: 'leave', id: myId }); } catch {}
+      try { bc.close(); } catch {}
+    };
+    window.addEventListener('beforeunload', onUnload);
 
     return () => {
-      s.off('connect', onConnect);
-      s.off('room:state', onRoomState);
-      s.off('players:all', onPlayersAll);
-      s.off('player:upsert', onUpsert);
-      s.off('player:leave', onLeave);
-      s.off('chat', onChat);
-      s.off('system', onSystem);
       _refs -= 1;
-      if (_refs <= 0 && _socket) {
-        _socket.disconnect();
-        _socket = null;
-        socketRef.current = null;
+      onUnload();
+      if (heartbeatRef.current != null) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
       }
+      window.removeEventListener('beforeunload', onUnload);
+      bcRef.current = null;
     };
   }, [enabled, cat, room, setSelfId, upsertPlayer, removePlayer, setPlayers, setRoom, pushChat, muted]);
 
   return {
     socket: socketRef.current,
     sendMove: (pos, rot, anim) => {
-      socketRef.current?.emit('move', { pos, rot, anim });
+      if (socketRef.current) {
+        socketRef.current.emit('move', { pos, rot, anim });
+        return;
+      }
+      // BroadcastChannel: keep our own player record fresh and let the
+      // heartbeat propagate it. We also send an immediate state so other tabs
+      // see us moving smoothly instead of in 2s steps.
+      const myId = bcIdRef.current;
+      if (!myId) return;
+      const cur = useGameStore.getState().players[myId];
+      if (!cur) return;
+      const next: PlayerState = { ...cur, pos, rot, anim };
+      useGameStore.getState().upsertPlayer(next);
+      try { bcRef.current?.postMessage({ kind: 'state', player: next } as BcMessage); } catch {}
     },
     sendChat: (text, scope) => {
-      if (socketRef.current) socketRef.current.emit('chat', { text, scope });
-      else if (cat) {
-        // offline echo
-        useGameStore.getState().pushChat({
-          id: 'me' + Date.now(),
-          fromId: useGameStore.getState().selfId,
-          fromName: cat.name,
-          scope, text, at: Date.now(),
-        });
+      if (socketRef.current) {
+        socketRef.current.emit('chat', { text, scope });
+        return;
       }
+      if (!cat) return;
+      const myId = bcIdRef.current || useGameStore.getState().selfId;
+      const msg: ChatMessage = {
+        id: 'me' + Date.now(),
+        fromId: myId,
+        fromName: cat.name,
+        scope,
+        text,
+        at: Date.now(),
+      };
+      useGameStore.getState().pushChat(msg);
+      try { bcRef.current?.postMessage({ kind: 'chat', msg } as BcMessage); } catch {}
     },
     sendEmote: (emote) => {
       if (socketRef.current) {
         socketRef.current.emit('emote', { emote });
-      } else if (cat) {
-        // Offline: echo the emote into the chat feed so the player sees it.
-        useGameStore.getState().pushChat({
-          id: 'em' + Date.now(),
-          fromId: useGameStore.getState().selfId,
-          fromName: cat.name,
-          scope: 'nearby',
-          text: `*${emote.replace('-', ' ')}s*`,
-          at: Date.now(),
-          emote,
-        });
+        return;
       }
+      if (!cat) return;
+      const myId = bcIdRef.current || useGameStore.getState().selfId;
+      useGameStore.getState().pushChat({
+        id: 'em' + Date.now(),
+        fromId: myId,
+        fromName: cat.name,
+        scope: 'nearby',
+        text: `*${emote.replace('-', ' ')}s*`,
+        at: Date.now(),
+        emote,
+      });
+      try { bcRef.current?.postMessage({ kind: 'emote', id: myId, name: cat.name, emote } as BcMessage); } catch {}
     },
     sendCommand: (kind, payload) => socketRef.current?.emit('command', { kind, payload }),
     sendCatch: (preyId, kind) => socketRef.current?.emit('catch', { preyId, kind }),
