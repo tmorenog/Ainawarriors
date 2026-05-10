@@ -279,6 +279,27 @@ export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
                   ))}
                 </div>
               </Group>
+              <Group title="Pupil size">
+                <Slider value={cat.pupilSize ?? 0.5} min={0} max={1} step={0.01} onChange={(v) => update({ pupilSize: v })} />
+                <div className="text-[11px] opacity-60 mt-1">Pinprick to wide-blown — affects how alert your cat looks.</div>
+              </Group>
+              <Group title="Vision">
+                <div className="flex flex-wrap gap-2">
+                  {(['normal','half-blind','blind'] as const).map((v) => (
+                    <Pill key={v} active={(cat.vision ?? 'normal') === v} onClick={() => update({ vision: v })}>{v}</Pill>
+                  ))}
+                </div>
+                <div className="text-[11px] opacity-60 mt-1">Half-blind dims one side of the screen. Blind cats see only soft shapes.</div>
+              </Group>
+              <Group title="Night vision">
+                <button
+                  onClick={() => update({ nightVision: !cat.nightVision })}
+                  className={`px-3 py-1.5 rounded border text-xs ${cat.nightVision ? 'border-thunder bg-thunder/20' : 'border-white/10 hover:bg-white/5'}`}
+                >
+                  {cat.nightVision ? '✓ Night vision' : 'No night vision'}
+                </button>
+                <div className="text-[11px] opacity-60 mt-1">Brightens the world after dusk.</div>
+              </Group>
             </>
           )}
 

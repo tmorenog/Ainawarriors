@@ -33,6 +33,10 @@ export interface CatAppearance {
   role: RoleId;
   bubbleStyle: 'classic' | 'cloud' | 'leaf' | 'stone';
   voicePitch: number; // 0.5..1.5
+  // Eye / vision options
+  pupilSize?: number;         // 0..1 — relative pupil radius (0=pinprick, 1=full eye)
+  vision?: 'normal' | 'half-blind' | 'blind';  // applies a visual handicap in-game
+  nightVision?: boolean;      // grants brighter sight at night
 }
 
 export const SIZE_STATS: Record<SizeTier, { speed: number; strength: number; stamina: number; hunting: number; scale: number }> = {

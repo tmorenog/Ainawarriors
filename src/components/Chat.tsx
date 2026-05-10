@@ -27,8 +27,34 @@ export function Chat({ onSend, onEmote }: Props) {
 
   const submit = (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!text.trim()) return;
-    const f = filterChat(text);
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    // Emote shortcuts — typing one of these on its own (or with a leading slash)
+    // fires the matching emote instead of a chat message.
+    const lower = trimmed.toLowerCase().replace(/^\/+/, '');
+    const emoteMap: Record<string, string> = {
+      'purr': 'purr',
+      'hiss': 'hiss',
+      'meow': 'mew',
+      'mew': 'mew',
+      'ear flick': 'ear-twitch',
+      'ear-flick': 'ear-twitch',
+      'earflick': 'ear-twitch',
+      'tail flick': 'tail-flick',
+      'tail-flick': 'tail-flick',
+      'tailflick': 'tail-flick',
+      'groom': 'groom',
+      'pounce': 'pounce',
+      'headbutt': 'headbutt',
+    };
+    if (emoteMap[lower]) {
+      onEmote(emoteMap[lower]);
+      setText('');
+      return;
+    }
+
+    const f = filterChat(trimmed);
     onSend(f.clean, scope);
     setText('');
   };

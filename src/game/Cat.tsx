@@ -388,51 +388,60 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
           )}
 
           {/* big round eyes (groups so we can scale Y to blink) */}
-          <group ref={eyeLRef} position={[0.18, 0.06, 0.10]}>
-            <mesh rotation={[0, 0.35, 0]}>
-              <sphereGeometry args={[0.052, 16, 14]} />
-              <meshStandardMaterial color={eyeColor} emissive={eyeColor} emissiveIntensity={0.18} roughness={0.3} />
-            </mesh>
-            {/* pupil — round (not slit) for cuteness */}
-            <mesh position={[0.022, 0, 0.012]}>
-              <sphereGeometry args={[0.026, 12, 12]} />
-              <meshBasicMaterial color={'#0a0a0a'} />
-            </mesh>
-            {/* white highlight */}
-            <mesh position={[0.034, 0.014, 0.020]}>
-              <sphereGeometry args={[0.012, 8, 8]} />
-              <meshBasicMaterial color={'#ffffff'} />
-            </mesh>
-            {/* tiny secondary sparkle */}
-            <mesh position={[0.030, -0.012, 0.018]}>
-              <sphereGeometry args={[0.005, 6, 6]} />
-              <meshBasicMaterial color={'#ffffff'} />
-            </mesh>
-          </group>
+          {(() => {
+            // Pupil size: 0..1 → 0.012..0.040 radius. The "blind" cat gets a
+            // pale blue cataract overlay instead of a coloured iris.
+            const pupilR = 0.012 + (cat.pupilSize ?? 0.5) * 0.028;
+            const isBlind = cat.vision === 'blind';
+            const irisColor = isBlind ? 0xc6d8ec : eyeColor;
+            const irisColorR = isBlind ? 0xc6d8ec : (cat.eyeColor === 'odd' ? 0xe2a23a : eyeColor);
+            return (
+              <>
+                <group ref={eyeLRef} position={[0.18, 0.06, 0.10]}>
+                  <mesh rotation={[0, 0.35, 0]}>
+                    <sphereGeometry args={[0.052, 16, 14]} />
+                    <meshStandardMaterial color={irisColor} emissive={irisColor} emissiveIntensity={isBlind ? 0.05 : 0.18} roughness={0.3} />
+                  </mesh>
+                  <mesh position={[0.022, 0, 0.012]}>
+                    <sphereGeometry args={[pupilR, 12, 12]} />
+                    <meshBasicMaterial color={'#0a0a0a'} />
+                  </mesh>
+                  <mesh position={[0.034, 0.014, 0.020]}>
+                    <sphereGeometry args={[0.012, 8, 8]} />
+                    <meshBasicMaterial color={'#ffffff'} />
+                  </mesh>
+                  <mesh position={[0.030, -0.012, 0.018]}>
+                    <sphereGeometry args={[0.005, 6, 6]} />
+                    <meshBasicMaterial color={'#ffffff'} />
+                  </mesh>
+                </group>
 
-          <group ref={eyeRRef} position={[0.18, 0.06, -0.10]}>
-            <mesh rotation={[0, -0.35, 0]}>
-              <sphereGeometry args={[0.052, 16, 14]} />
-              <meshStandardMaterial
-                color={cat.eyeColor === 'odd' ? 0xe2a23a : eyeColor}
-                emissive={cat.eyeColor === 'odd' ? 0xe2a23a : eyeColor}
-                emissiveIntensity={0.18}
-                roughness={0.3}
-              />
-            </mesh>
-            <mesh position={[0.022, 0, -0.012]}>
-              <sphereGeometry args={[0.026, 12, 12]} />
-              <meshBasicMaterial color={'#0a0a0a'} />
-            </mesh>
-            <mesh position={[0.034, 0.014, -0.020]}>
-              <sphereGeometry args={[0.012, 8, 8]} />
-              <meshBasicMaterial color={'#ffffff'} />
-            </mesh>
-            <mesh position={[0.030, -0.012, -0.018]}>
-              <sphereGeometry args={[0.005, 6, 6]} />
-              <meshBasicMaterial color={'#ffffff'} />
-            </mesh>
-          </group>
+                <group ref={eyeRRef} position={[0.18, 0.06, -0.10]}>
+                  <mesh rotation={[0, -0.35, 0]}>
+                    <sphereGeometry args={[0.052, 16, 14]} />
+                    <meshStandardMaterial
+                      color={irisColorR}
+                      emissive={irisColorR}
+                      emissiveIntensity={isBlind ? 0.05 : 0.18}
+                      roughness={0.3}
+                    />
+                  </mesh>
+                  <mesh position={[0.022, 0, -0.012]}>
+                    <sphereGeometry args={[pupilR, 12, 12]} />
+                    <meshBasicMaterial color={'#0a0a0a'} />
+                  </mesh>
+                  <mesh position={[0.034, 0.014, -0.020]}>
+                    <sphereGeometry args={[0.012, 8, 8]} />
+                    <meshBasicMaterial color={'#ffffff'} />
+                  </mesh>
+                  <mesh position={[0.030, -0.012, -0.018]}>
+                    <sphereGeometry args={[0.005, 6, 6]} />
+                    <meshBasicMaterial color={'#ffffff'} />
+                  </mesh>
+                </group>
+              </>
+            );
+          })()}
 
           {/* ears (outer) — set higher on the bigger head */}
           <mesh ref={earL} position={[-0.03, 0.22, 0.135]} rotation={[0, 0, 0.18]} material={bodyMaterial}>

@@ -134,12 +134,37 @@ function PlayerController({
 
     if (hud.hp < 30 && (fwd !== 0 || sd !== 0) && grounded.current) anim = 'limp';
 
-    // stamina/hunger drain
+    // stamina / hunger / HP attrition
     const draining = anim === 'run';
+    const starving = hud.hunger <= 0;
+    // When hunger hits zero, you slowly take damage. HP regenerates slowly
+    // when you're well-fed and not running.
+    const hpRegen = !starving && !draining && hud.hunger > 30 ? 1.0 : 0;
+    const hpDrain = starving ? 1.5 : 0;
     setHud({
       stamina: Math.max(0, Math.min(100, hud.stamina + (draining ? -20 : 8) * dt)),
       hunger: Math.max(0, hud.hunger - 0.4 * dt),
+      hp: Math.max(0, Math.min(100, hud.hp + (hpRegen - hpDrain) * dt)),
     });
+
+    // Death — HP hit zero. Respawn back at the camp with a system message,
+    // partial hunger restored. A real game would gate this behind StarClan
+    // narration, but for now a quick respawn keeps the loop playable.
+    if (hud.hp <= 0) {
+      const [cx, , cz] = CLANS[cat.clan].campCenter as [number, number, number];
+      pos.current.set(cx, terrainHeightAt(cx, cz), cz);
+      vy.current = 0;
+      grounded.current = true;
+      setHud({ hp: 60, hunger: 50, stamina: 60 });
+      useGameStore.getState().pushChat({
+        id: 'sys' + Date.now(),
+        fromId: 'system',
+        fromName: 'StarClan',
+        scope: 'system',
+        text: `${cat.name}'s spirit walks among the stars... but you are returned to your clan.`,
+        at: Date.now(),
+      });
+    }
 
     // attempt to catch nearest prey when pouncing
     if (anim === 'pounce') {
@@ -221,7 +246,7 @@ export function Game({ room, net }: GameProps) {
   const pitch = useRef(0);
   const catYaw = useRef(0); // cat body facing — independent of the camera yaw
   const [anim, setAnim] = useState<string>('idle');
-  const preyList = useRef<PreyState[]>(spawnPrey(28));
+  const preyList = useRef<PreyState[]>(spawnPrey(60));
 
   // Wait ~400ms after mount before creating the Canvas so the editor's
   // previous WebGL context has time to be torn down by the browser. iPad

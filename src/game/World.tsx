@@ -26,8 +26,8 @@ function makeTerrain(size = 600, seg = 96, season: WorldProps['season']) {
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
   const colors: number[] = [];
-  const grass = new THREE.Color(season === 'leaf-bare' ? '#c5b58a' : season === 'leaf-fall' ? '#a78b48' : season === 'newleaf' ? '#6b9a4d' : '#4f7a45');
-  const grassDark = new THREE.Color(season === 'leaf-bare' ? '#9a8b66' : season === 'leaf-fall' ? '#7a5e2a' : season === 'newleaf' ? '#4d7a36' : '#365a2a');
+  const grass = new THREE.Color(season === 'leaf-bare' ? '#d8c89a' : season === 'leaf-fall' ? '#bfa05a' : season === 'newleaf' ? '#86bf5e' : '#6c9a4f');
+  const grassDark = new THREE.Color(season === 'leaf-bare' ? '#a89878' : season === 'leaf-fall' ? '#8c6d36' : season === 'newleaf' ? '#5e8d3d' : '#4d7838');
   const dirt = new THREE.Color('#5a4a32');
   const rock = new THREE.Color('#8a8276');
   const snow = new THREE.Color('#eef4f7');
@@ -140,17 +140,17 @@ function GrassTufts({ count, season, dense }: { count: number; season: WorldProp
   const rand = useMemo(() => seededRand(4242), []);
 
   const tuftColor = useMemo(() => new THREE.Color(
-    season === 'leaf-bare' ? '#7a6e4a' :
-    season === 'leaf-fall' ? '#9a7c3a' :
-    season === 'newleaf'   ? '#8fc05a' :
-                             '#6c9446'
+    season === 'leaf-bare' ? '#8a8064' :
+    season === 'leaf-fall' ? '#b4924a' :
+    season === 'newleaf'   ? '#a3d572' :
+                             '#83b95c'
   ), [season]);
 
   const tipColor = useMemo(() => new THREE.Color(
-    season === 'leaf-bare' ? '#a09478' :
-    season === 'leaf-fall' ? '#c8a14d' :
-    season === 'newleaf'   ? '#bedf86' :
-                             '#a3c477'
+    season === 'leaf-bare' ? '#b4a888' :
+    season === 'leaf-fall' ? '#dcb862' :
+    season === 'newleaf'   ? '#cdec97' :
+                             '#bcd986'
   ), [season]);
 
   const segments = dense ? 6 : 5;
@@ -253,6 +253,42 @@ function Rocks({ count }: { count: number }) {
   return <instancedMesh ref={meshRef} args={[rockGeo, rockMat, count]} receiveShadow />;
 }
 
+function Stars({ visible, count = 320 }: { visible: boolean; count?: number }) {
+  // A dome of point sprites high above the world. Only mounted on the night
+  // side of the day/night cycle, with a gentle twinkle via material opacity.
+  const ref = useRef<THREE.Points>(null);
+  const positions = useMemo(() => {
+    const a = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      // Spherical distribution — only the upper hemisphere
+      const u = Math.random();
+      const v = Math.random() * 0.5; // 0..0.5 → upper hemisphere
+      const theta = u * Math.PI * 2;
+      const phi = Math.acos(1 - 2 * v);
+      const r = 240;
+      a[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
+      a[i * 3 + 1] = r * Math.cos(phi) + 80; // lift the dome
+      a[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+    }
+    return a;
+  }, [count]);
+  useFrame((_, dt) => {
+    if (!ref.current) return;
+    const mat = ref.current.material as THREE.PointsMaterial;
+    const t = performance.now() * 0.0006;
+    mat.opacity = visible ? 0.65 + Math.sin(t) * 0.18 : 0;
+  });
+  if (!visible) return null;
+  return (
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} count={count} />
+      </bufferGeometry>
+      <pointsMaterial color={'#ffffff'} size={1.4} sizeAttenuation transparent opacity={0.8} depthWrite={false} />
+    </points>
+  );
+}
+
 function Clouds({ count, isNight }: { count: number; isNight: boolean }) {
   const groupRef = useRef<THREE.Group>(null);
   const rand = useMemo(() => seededRand(55), []);
@@ -304,11 +340,90 @@ function Camps() {
             <circleGeometry args={[12, 24]} />
             <meshStandardMaterial color={'#7a6a4a'} roughness={1} />
           </mesh>
-          {/* leader rock / highrock */}
-          <mesh position={[0, 1.0, -6]}>
-            <boxGeometry args={[3, 1.6, 2]} />
-            <meshStandardMaterial color={'#8a8276'} roughness={1} />
-          </mesh>
+
+          {/* High Rock — a layered crag the leader stands on to address the
+              clan. Built from stacked boxes plus a sloped "step path" so cats
+              can visually walk up to the top. */}
+          <group position={[0, 0, -7]}>
+            <mesh position={[0, 1.1, 0]}>
+              <boxGeometry args={[4.2, 2.2, 2.6]} />
+              <meshStandardMaterial color={'#8a8276'} roughness={1} flatShading />
+            </mesh>
+            <mesh position={[0, 2.35, -0.2]}>
+              <boxGeometry args={[3.2, 0.5, 2.2]} />
+              <meshStandardMaterial color={'#9a948a'} roughness={1} flatShading />
+            </mesh>
+            <mesh position={[1.7, 0.45, 1.2]} rotation={[0, 0, -0.18]}>
+              <boxGeometry args={[1.6, 0.3, 1.0]} />
+              <meshStandardMaterial color={'#7a7268'} roughness={1} flatShading />
+            </mesh>
+            {/* Clan banner stone glowing on top */}
+            <mesh position={[0, 2.85, -0.2]}>
+              <sphereGeometry args={[0.28, 12, 12]} />
+              <meshStandardMaterial color={c.color} emissive={c.color} emissiveIntensity={0.55} />
+            </mesh>
+          </group>
+
+          {/* Leader's den — small cave-like hollow at the base of the high rock */}
+          <group position={[3.2, 0, -6]}>
+            <mesh position={[0, 0.7, 0]}>
+              <sphereGeometry args={[1.2, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
+              <meshStandardMaterial color={'#5a544a'} roughness={1} />
+            </mesh>
+            <mesh position={[0, 0.45, 0.4]}>
+              <boxGeometry args={[0.9, 0.7, 0.1]} />
+              <meshStandardMaterial color={'#1c1814'} />
+            </mesh>
+          </group>
+
+          {/* Warriors' den — bramble dome on the right side of the camp */}
+          <group position={[5.5, 0, 4]}>
+            <mesh position={[0, 0.9, 0]}>
+              <sphereGeometry args={[1.8, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
+              <meshStandardMaterial color={'#3a4a26'} roughness={0.95} flatShading />
+            </mesh>
+            <mesh position={[0, 0.55, 1.5]}>
+              <boxGeometry args={[1.2, 0.9, 0.1]} />
+              <meshStandardMaterial color={'#1c1814'} />
+            </mesh>
+          </group>
+
+          {/* Apprentices' / nursery den — left side */}
+          <group position={[-5.5, 0, 4]}>
+            <mesh position={[0, 0.7, 0]}>
+              <sphereGeometry args={[1.4, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
+              <meshStandardMaterial color={'#4a5a30'} roughness={0.95} flatShading />
+            </mesh>
+            <mesh position={[0, 0.45, 1.15]}>
+              <boxGeometry args={[1.0, 0.7, 0.1]} />
+              <meshStandardMaterial color={'#1c1814'} />
+            </mesh>
+          </group>
+
+          {/* Fresh-kill pile — a small mound of caught prey at the centre.
+              When a player drops prey, the pile visually grows by adding to
+              the global hud "freshKill" tally; we still always render the
+              base mound so the camp never looks empty. */}
+          <group position={[0, 0, 2]}>
+            <mesh position={[0, 0.18, 0]} scale={[1.3, 0.5, 1.3]}>
+              <sphereGeometry args={[0.5, 12, 8]} />
+              <meshStandardMaterial color={'#7a4a2a'} roughness={0.9} />
+            </mesh>
+            <mesh position={[0.18, 0.32, 0.05]} scale={[0.7, 0.55, 0.45]}>
+              <sphereGeometry args={[0.4, 10, 8]} />
+              <meshStandardMaterial color={'#a86a3a'} roughness={0.9} />
+            </mesh>
+            <mesh position={[-0.22, 0.28, -0.1]} scale={[0.55, 0.5, 0.45]}>
+              <sphereGeometry args={[0.35, 10, 8]} />
+              <meshStandardMaterial color={'#6a3e22'} roughness={0.9} />
+            </mesh>
+            {/* small label sphere — clan-coloured pebble marking the pile */}
+            <mesh position={[0, 0.02, 0.65]}>
+              <sphereGeometry args={[0.12, 10, 8]} />
+              <meshStandardMaterial color={c.color} emissive={c.color} emissiveIntensity={0.3} />
+            </mesh>
+          </group>
+
           {/* bramble walls (ring of bushes) */}
           {Array.from({ length: 18 }).map((_, i) => {
             const a = (i / 18) * Math.PI * 2;
@@ -319,11 +434,6 @@ function Camps() {
               </mesh>
             );
           })}
-          {/* clan banner color stone */}
-          <mesh position={[0, 1.95, -6]}>
-            <sphereGeometry args={[0.25, 12, 12]} />
-            <meshStandardMaterial color={c.color} emissive={c.color} emissiveIntensity={0.4} />
-          </mesh>
         </group>
       ))}
     </group>
@@ -442,6 +552,7 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
       {grassCount > 0 && <GrassTufts count={grassCount} season={season} dense={graphics === 'high'} />}
       <Rocks count={rockCount} />
       <Clouds count={cloudCount} isNight={isNight} />
+      <Stars visible={isNight} count={graphics === 'low' ? 140 : graphics === 'medium' ? 240 : 380} />
       <Camps />
 
       {/* twoleg place: simple boxy buildings */}
