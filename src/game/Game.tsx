@@ -53,6 +53,8 @@ function PlayerController({
   const room = useGameStore((s) => s.room);
 
   const pos = useRef(new THREE.Vector3(0, 0, 0));
+  const vy = useRef(0);
+  const grounded = useRef(true);
   const lastSent = useRef(0);
   const lastAnim = useRef('idle');
 
@@ -87,14 +89,29 @@ function PlayerController({
     if (dir.lengthSq() > 0) dir.normalize();
     pos.current.addScaledVector(dir, speed * dt);
 
+    // Jump physics
+    if (c.jump && grounded.current) {
+      vy.current = 6.5;
+      grounded.current = false;
+      c.jump = false;
+    }
+    vy.current -= 18 * dt; // gravity
+    pos.current.y += vy.current * dt;
+    if (pos.current.y <= 0) {
+      pos.current.y = 0;
+      vy.current = 0;
+      grounded.current = true;
+    }
+
     let anim = 'idle';
-    if (c.pounce) { anim = 'pounce'; c.pounce = false; }
+    if (!grounded.current) anim = 'jump';
+    else if (c.pounce) { anim = 'pounce'; c.pounce = false; }
     else if (c.crouch && (fwd !== 0 || sd !== 0)) anim = 'crouch';
     else if (c.crouch) anim = 'sit';
     else if (c.sprint && (fwd !== 0 || sd !== 0)) anim = 'run';
     else if (fwd !== 0 || sd !== 0) anim = 'walk';
 
-    if (hud.hp < 30 && (fwd !== 0 || sd !== 0)) anim = 'limp';
+    if (hud.hp < 30 && (fwd !== 0 || sd !== 0) && grounded.current) anim = 'limp';
 
     // stamina/hunger drain
     const draining = anim === 'run';

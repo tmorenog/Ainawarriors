@@ -10,7 +10,7 @@ interface CatProps {
   cat: CatAppearance;
   position?: [number, number, number];
   rotation?: number;
-  anim?: 'idle' | 'walk' | 'run' | 'sit' | 'sleep' | 'crouch' | 'pounce' | 'limp';
+  anim?: 'idle' | 'walk' | 'run' | 'sit' | 'sleep' | 'crouch' | 'pounce' | 'limp' | 'jump';
   injured?: boolean;
   carrying?: string | null;
 }
@@ -24,6 +24,37 @@ const PATTERN_TINT: Record<string, number> = {
   bicolor: 0.55,
   spotted: 0.4,
 };
+
+interface LegProps {
+  position: [number, number, number];
+  material: THREE.Material;
+  // 0 = front leg, 1 = back leg (back legs bend more)
+  back?: boolean;
+}
+
+const Leg = forwardRef<THREE.Group, LegProps>(function Leg({ position, material, back = false }, ref) {
+  // Two-segment leg: upper (thigh/shoulder) → lower (shin) → paw
+  return (
+    <group ref={ref} position={position}>
+      {/* Upper segment */}
+      <mesh position={[0, -0.14, 0]} material={material}>
+        <cylinderGeometry args={[0.055, 0.045, 0.28, 10]} />
+      </mesh>
+      {/* Knee/elbow joint */}
+      <mesh position={[0, -0.28, back ? 0.04 : 0]} material={material}>
+        <sphereGeometry args={[0.055, 10, 8]} />
+      </mesh>
+      {/* Lower segment */}
+      <mesh position={[0, -0.42, back ? 0.06 : 0]} rotation={[back ? -0.15 : 0, 0, 0]} material={material}>
+        <cylinderGeometry args={[0.045, 0.04, 0.28, 10]} />
+      </mesh>
+      {/* Paw */}
+      <mesh position={[0, -0.56, back ? 0.08 : 0.02]} material={material}>
+        <boxGeometry args={[0.09, 0.05, 0.13]} />
+      </mesh>
+    </group>
+  );
+});
 
 export function Cat({ cat, position = [0, 0, 0], rotation = 0, anim = 'idle', injured = false, carrying = null }: CatProps) {
   const groupRef = useRef<THREE.Group>(null);
@@ -56,6 +87,7 @@ export function Cat({ cat, position = [0, 0, 0], rotation = 0, anim = 'idle', in
     let bodyBob = 0;
     let crouchY = 0;
     let pounceY = 0;
+    let jumpY = 0;
 
     if (anim === 'walk') { stride = 1.0; speed = 6; }
     else if (anim === 'run') { stride = 1.6; speed = 12; }
@@ -66,6 +98,7 @@ export function Cat({ cat, position = [0, 0, 0], rotation = 0, anim = 'idle', in
     } else if (anim === 'sit') { crouchY = -0.05; }
     else if (anim === 'sleep') { crouchY = -0.32; }
     else if (anim === 'limp' || injured) { stride = 0.6; speed = 4.5; }
+    else if (anim === 'jump') { jumpY = 0.4; stride = 0.4; }
 
     const limpFactor = anim === 'limp' || injured ? 0.4 : 1;
     if (fLegL.current && fLegR.current && bLegL.current && bLegR.current) {
@@ -78,12 +111,12 @@ export function Cat({ cat, position = [0, 0, 0], rotation = 0, anim = 'idle', in
       bodyBob = Math.abs(Math.sin(time * speed)) * 0.04 * stride;
     }
 
-    // tail wave
+    // tail wave — flowing along the length
     tailRefs.current.forEach((seg, i) => {
       if (!seg) return;
       const phase = time * (anim === 'run' ? 5 : 2.2) - i * 0.5;
       seg.rotation.y = Math.sin(phase) * (0.18 + i * 0.06);
-      seg.rotation.x = Math.sin(phase * 0.8) * 0.05 + (anim === 'pounce' ? -0.2 : 0);
+      seg.rotation.x = Math.sin(phase * 0.8) * 0.05 + (anim === 'pounce' ? -0.2 : 0) + (anim === 'jump' ? 0.3 : 0);
     });
 
     // ear twitch
@@ -98,15 +131,15 @@ export function Cat({ cat, position = [0, 0, 0], rotation = 0, anim = 'idle', in
     }
 
     if (bodyRef.current) {
-      bodyRef.current.position.y = 0.32 + crouchY + bodyBob;
+      bodyRef.current.position.y = 0.6 + crouchY + bodyBob;
     }
     if (groupRef.current) {
-      groupRef.current.position.set(position[0], position[1] + pounceY, position[2]);
+      groupRef.current.position.set(position[0], position[1] + pounceY + jumpY, position[2]);
       groupRef.current.rotation.y = rotation;
     }
   });
 
-  // mix base + pattern by simple emissive trick on body parts
+  // body material with pattern tint
   const bodyMaterial = useMemo(() => {
     const c = furBase.clone().lerp(patternColor, patternStrength * 0.35);
     return new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, metalness: 0 });
@@ -118,8 +151,13 @@ export function Cat({ cat, position = [0, 0, 0], rotation = 0, anim = 'idle', in
   );
 
   const stripesMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: patternColor, roughness: 0.85, metalness: 0, transparent: true, opacity: patternStrength }),
+    () => new THREE.MeshStandardMaterial({ color: patternColor, roughness: 0.85, metalness: 0, transparent: true, opacity: patternStrength * 0.85 }),
     [patternColor, patternStrength]
+  );
+
+  const earInnerMat = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: '#f4b8c4', roughness: 0.9 }),
+    []
   );
 
   const eyeColor = useMemo(() => {
@@ -130,92 +168,138 @@ export function Cat({ cat, position = [0, 0, 0], rotation = 0, anim = 'idle', in
     return map[cat.eyeColor] ?? 0xe2a23a;
   }, [cat.eyeColor]);
 
+  // Ear geometry
   const earGeo = (() => {
     switch (cat.earShape) {
-      case 'tufted':  return <coneGeometry args={[0.13, 0.32, 8]} />;
-      case 'rounded': return <sphereGeometry args={[0.14, 12, 12, 0, Math.PI]} />;
-      case 'curl':    return <coneGeometry args={[0.11, 0.22, 8]} />;
-      default:        return <coneGeometry args={[0.12, 0.25, 8]} />;
+      case 'tufted':  return <coneGeometry args={[0.085, 0.28, 8]} />;
+      case 'rounded': return <sphereGeometry args={[0.1, 12, 12, 0, Math.PI]} />;
+      case 'curl':    return <coneGeometry args={[0.075, 0.18, 8]} />;
+      default:        return <coneGeometry args={[0.085, 0.22, 8]} />;
     }
   })();
 
-  const tailLen = cat.tail === 'short' ? 4 : cat.tail === 'long' ? 9 : cat.tail === 'fluffy' ? 7 : 6;
-  const tailFluff = cat.tail === 'fluffy' ? 1.5 : 1;
-  const fluff = 1 + cat.fluffiness * 0.45;
+  const tailLen = cat.tail === 'short' ? 5 : cat.tail === 'long' ? 11 : cat.tail === 'fluffy' ? 8 : 7;
+  const tailFluff = cat.tail === 'fluffy' ? 1.6 : 1;
+  const fluff = 1 + cat.fluffiness * 0.35;
+
+  // Body length and proportions
+  const bodyLen = 0.95 * buildScale;
+  const bodyR = 0.18 * fluff * buildScale;
 
   return (
     <group ref={groupRef} scale={scale}>
       {/* shadow */}
-      <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.55 * buildScale, 16]} />
-        <meshBasicMaterial color={'#000'} transparent opacity={0.25} />
+      <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[bodyLen * 0.7, bodyR * 1.6, 1]}>
+        <circleGeometry args={[1, 24]} />
+        <meshBasicMaterial color={'#000'} transparent opacity={0.28} />
       </mesh>
 
-      <group ref={bodyRef} position={[0, 0.32, 0]}>
-        {/* body */}
-        <mesh castShadow scale={[1.0 * buildScale * fluff, 0.6 * fluff, 0.55 * fluff]} material={bodyMaterial}>
-          <sphereGeometry args={[0.5, 18, 14]} />
+      <group ref={bodyRef} position={[0, 0.6, 0]}>
+        {/* main body — long capsule along X (forward axis) */}
+        <mesh castShadow rotation={[0, 0, Math.PI / 2]} material={bodyMaterial}>
+          <capsuleGeometry args={[bodyR, bodyLen, 8, 16]} />
         </mesh>
-        {/* belly highlight */}
-        <mesh position={[0, -0.12, 0]} scale={[0.85 * buildScale, 0.45, 0.45]} material={bellyMaterial}>
-          <sphereGeometry args={[0.5, 16, 12]} />
+        {/* shoulders bulk */}
+        <mesh position={[bodyLen * 0.42, 0.02, 0]} material={bodyMaterial}>
+          <sphereGeometry args={[bodyR * 1.05, 14, 12]} />
         </mesh>
-        {/* tabby stripes overlay */}
+        {/* haunches (back hips) bulk */}
+        <mesh position={[-bodyLen * 0.42, 0.04, 0]} material={bodyMaterial}>
+          <sphereGeometry args={[bodyR * 1.15, 14, 12]} />
+        </mesh>
+        {/* belly */}
+        <mesh position={[0, -bodyR * 0.55, 0]} rotation={[0, 0, Math.PI / 2]} scale={[1, 0.85, 0.7]} material={bellyMaterial}>
+          <capsuleGeometry args={[bodyR * 0.7, bodyLen * 0.85, 6, 12]} />
+        </mesh>
+        {/* tabby/spotted overlay */}
         {patternStrength > 0 && (
-          <mesh scale={[1.02 * buildScale * fluff, 0.62 * fluff, 0.57 * fluff]} material={stripesMaterial}>
-            <sphereGeometry args={[0.5, 18, 14]} />
+          <mesh rotation={[0, 0, Math.PI / 2]} scale={[1.01, 1.01, 1.01]} material={stripesMaterial}>
+            <capsuleGeometry args={[bodyR * 1.005, bodyLen, 8, 16]} />
           </mesh>
         )}
 
+        {/* neck */}
+        <mesh position={[bodyLen * 0.55, 0.18, 0]} rotation={[0, 0, -0.6]} material={bodyMaterial}>
+          <cylinderGeometry args={[bodyR * 0.7, bodyR * 0.85, 0.22, 12]} />
+        </mesh>
+
         {/* head */}
-        <group ref={headRef} position={[0.55 * buildScale, 0.18, 0]}>
-          <mesh castShadow scale={[0.9, 0.85, 0.9]} material={bodyMaterial}>
-            <sphereGeometry args={[0.22, 16, 14]} />
+        <group ref={headRef} position={[bodyLen * 0.65, 0.36, 0]}>
+          {/* skull */}
+          <mesh castShadow scale={[1.0, 0.95, 1.0]} material={bodyMaterial}>
+            <sphereGeometry args={[0.18, 16, 14]} />
+          </mesh>
+          {/* cheeks/jowls */}
+          <mesh position={[0.05, -0.06, 0.09]} material={bodyMaterial}>
+            <sphereGeometry args={[0.07, 10, 10]} />
+          </mesh>
+          <mesh position={[0.05, -0.06, -0.09]} material={bodyMaterial}>
+            <sphereGeometry args={[0.07, 10, 10]} />
           </mesh>
           {/* muzzle */}
-          <mesh position={[0.18, -0.06, 0]} scale={[0.9, 0.7, 0.8]} material={bellyMaterial}>
-            <sphereGeometry args={[0.11, 12, 10]} />
+          <mesh position={[0.16, -0.05, 0]} scale={[1, 0.8, 0.9]} material={bellyMaterial}>
+            <sphereGeometry args={[0.085, 12, 10]} />
+          </mesh>
+          {/* chin */}
+          <mesh position={[0.18, -0.1, 0]} scale={[0.8, 0.6, 0.7]} material={bellyMaterial}>
+            <sphereGeometry args={[0.07, 10, 8]} />
           </mesh>
           {/* nose */}
-          <mesh position={[0.27, -0.04, 0]}>
-            <sphereGeometry args={[0.025, 8, 8]} />
+          <mesh position={[0.235, -0.035, 0]}>
+            <sphereGeometry args={[0.022, 10, 10]} />
             <meshStandardMaterial color={'#3a1f24'} roughness={0.6} />
           </mesh>
           {/* eyes */}
-          <mesh position={[0.18, 0.05, 0.1]}>
-            <sphereGeometry args={[0.035, 10, 10]} />
-            <meshStandardMaterial color={eyeColor} emissive={eyeColor} emissiveIntensity={0.15} />
+          <mesh position={[0.155, 0.04, 0.075]} rotation={[0, 0.4, 0]}>
+            <sphereGeometry args={[0.032, 12, 10]} />
+            <meshStandardMaterial color={eyeColor} emissive={eyeColor} emissiveIntensity={0.2} />
           </mesh>
-          <mesh position={[0.18, 0.05, -0.1]}>
-            <sphereGeometry args={[0.035, 10, 10]} />
-            <meshStandardMaterial color={cat.eyeColor === 'odd' ? 0xe2a23a : eyeColor} emissive={cat.eyeColor === 'odd' ? 0xe2a23a : eyeColor} emissiveIntensity={0.15} />
+          <mesh position={[0.155, 0.04, -0.075]} rotation={[0, -0.4, 0]}>
+            <sphereGeometry args={[0.032, 12, 10]} />
+            <meshStandardMaterial color={cat.eyeColor === 'odd' ? 0xe2a23a : eyeColor} emissive={cat.eyeColor === 'odd' ? 0xe2a23a : eyeColor} emissiveIntensity={0.2} />
           </mesh>
-          {/* ears */}
-          <mesh ref={earL} position={[-0.02, 0.21, 0.13]} rotation={[0, 0, 0.15]} material={bodyMaterial}>
+          {/* pupils (slit) */}
+          <mesh position={[0.171, 0.04, 0.075]}>
+            <boxGeometry args={[0.005, 0.024, 0.005]} />
+            <meshBasicMaterial color={'#0a0a0a'} />
+          </mesh>
+          <mesh position={[0.171, 0.04, -0.075]}>
+            <boxGeometry args={[0.005, 0.024, 0.005]} />
+            <meshBasicMaterial color={'#0a0a0a'} />
+          </mesh>
+          {/* ears (outer) */}
+          <mesh ref={earL} position={[-0.04, 0.18, 0.105]} rotation={[0, 0, 0.15]} material={bodyMaterial}>
             {earGeo}
           </mesh>
-          <mesh ref={earR} position={[-0.02, 0.21, -0.13]} rotation={[0, 0, -0.15]} material={bodyMaterial}>
+          <mesh ref={earR} position={[-0.04, 0.18, -0.105]} rotation={[0, 0, -0.15]} material={bodyMaterial}>
             {earGeo}
           </mesh>
-          {/* whiskers (lines) */}
-          <group position={[0.23, -0.05, 0]}>
+          {/* ear inner pink */}
+          <mesh position={[-0.035, 0.17, 0.108]} rotation={[0, 0, 0.15]} scale={0.7} material={earInnerMat}>
+            <coneGeometry args={[0.07, 0.18, 8]} />
+          </mesh>
+          <mesh position={[-0.035, 0.17, -0.108]} rotation={[0, 0, -0.15]} scale={0.7} material={earInnerMat}>
+            <coneGeometry args={[0.07, 0.18, 8]} />
+          </mesh>
+          {/* whiskers */}
+          <group position={[0.21, -0.05, 0]}>
             {[-1, 0, 1].map((i) => (
-              <mesh key={`wL${i}`} position={[0, i * 0.015, 0.05]} rotation={[0, 0.3, 0]}>
-                <boxGeometry args={[0.18, 0.003, 0.003]} />
+              <mesh key={`wL${i}`} position={[0, i * 0.012, 0.06]} rotation={[0, 0.3 + i * 0.1, 0]}>
+                <boxGeometry args={[0.18, 0.0025, 0.0025]} />
                 <meshBasicMaterial color={'#f5efe2'} />
               </mesh>
             ))}
             {[-1, 0, 1].map((i) => (
-              <mesh key={`wR${i}`} position={[0, i * 0.015, -0.05]} rotation={[0, -0.3, 0]}>
-                <boxGeometry args={[0.18, 0.003, 0.003]} />
+              <mesh key={`wR${i}`} position={[0, i * 0.012, -0.06]} rotation={[0, -0.3 - i * 0.1, 0]}>
+                <boxGeometry args={[0.18, 0.0025, 0.0025]} />
                 <meshBasicMaterial color={'#f5efe2'} />
               </mesh>
             ))}
           </group>
 
-          {/* carrying prey in mouth */}
+          {/* carrying prey */}
           {carrying && (
-            <mesh position={[0.36, -0.12, 0]} rotation={[0, 0, 0.2]}>
+            <mesh position={[0.3, -0.12, 0]} rotation={[0, 0, 0.2]}>
               <sphereGeometry args={[0.08, 10, 8]} />
               <meshStandardMaterial color={'#7a4a2a'} roughness={0.9} />
             </mesh>
@@ -223,63 +307,57 @@ export function Cat({ cat, position = [0, 0, 0], rotation = 0, anim = 'idle', in
 
           {/* scars */}
           {cat.scars.includes('left-ear-nick') && (
-            <mesh position={[-0.02, 0.31, 0.13]} rotation={[0, 0, 0.5]}>
+            <mesh position={[-0.04, 0.28, 0.105]} rotation={[0, 0, 0.5]}>
               <boxGeometry args={[0.04, 0.06, 0.005]} />
               <meshBasicMaterial color={'#3a2618'} />
             </mesh>
           )}
           {cat.scars.includes('left-eye') && (
-            <mesh position={[0.18, 0.05, 0.1]} rotation={[0, 0, 0.6]}>
-              <boxGeometry args={[0.12, 0.012, 0.005]} />
+            <mesh position={[0.155, 0.04, 0.075]} rotation={[0, 0, 0.6]}>
+              <boxGeometry args={[0.1, 0.012, 0.005]} />
               <meshBasicMaterial color={'#3a2618'} />
             </mesh>
           )}
           {cat.scars.includes('muzzle') && (
-            <mesh position={[0.21, -0.02, 0.04]} rotation={[0, 0.4, 0.5]}>
-              <boxGeometry args={[0.1, 0.01, 0.005]} />
+            <mesh position={[0.18, -0.02, 0.04]} rotation={[0, 0.4, 0.5]}>
+              <boxGeometry args={[0.08, 0.01, 0.005]} />
               <meshBasicMaterial color={'#3a2618'} />
             </mesh>
           )}
         </group>
 
-        {/* legs */}
-        <Leg ref={fLegL} position={[0.32 * buildScale, -0.32, 0.18]} material={bodyMaterial} />
-        <Leg ref={fLegR} position={[0.32 * buildScale, -0.32, -0.18]} material={bodyMaterial} />
-        <Leg ref={bLegL} position={[-0.32 * buildScale, -0.32, 0.18]} material={bodyMaterial} />
-        <Leg ref={bLegR} position={[-0.32 * buildScale, -0.32, -0.18]} material={bodyMaterial} />
+        {/* legs - placed at proper anatomical points */}
+        {/* Front legs near shoulders */}
+        <Leg ref={fLegL} position={[bodyLen * 0.4, -bodyR * 0.6, 0.12]} material={bodyMaterial} />
+        <Leg ref={fLegR} position={[bodyLen * 0.4, -bodyR * 0.6, -0.12]} material={bodyMaterial} />
+        {/* Back legs near haunches */}
+        <Leg ref={bLegL} position={[-bodyLen * 0.4, -bodyR * 0.55, 0.12]} material={bodyMaterial} back />
+        <Leg ref={bLegR} position={[-bodyLen * 0.4, -bodyR * 0.55, -0.12]} material={bodyMaterial} back />
 
-        {/* tail */}
-        <group position={[-0.5 * buildScale, 0.08, 0]}>
-          {Array.from({ length: tailLen }).map((_, i) => (
-            <mesh
-              key={i}
-              ref={(el) => { if (el) tailRefs.current[i] = el; }}
-              position={[-i * 0.11, i * 0.012 + (cat.tail === 'kink' && i === 3 ? 0.08 : 0), 0]}
-              material={bodyMaterial}
-            >
-              <sphereGeometry args={[(0.08 + (tailLen - i) * 0.005) * tailFluff * (1 + cat.fluffiness * 0.3), 8, 8]} />
-            </mesh>
-          ))}
+        {/* tail — long, tapered, segmented for natural curve */}
+        <group position={[-bodyLen * 0.55, 0.1, 0]}>
+          {Array.from({ length: tailLen }).map((_, i) => {
+            const ratio = i / tailLen;
+            const segR = (bodyR * 0.55) * (1 - ratio * 0.7) * tailFluff * (1 + cat.fluffiness * 0.25);
+            // Curve the tail upward like the reference image
+            const baseRise = Math.sin((i / tailLen) * Math.PI * 0.6) * 0.18;
+            return (
+              <mesh
+                key={i}
+                ref={(el) => { if (el) tailRefs.current[i] = el; }}
+                position={[
+                  -i * 0.095,
+                  baseRise + (cat.tail === 'kink' && i === 4 ? 0.08 : 0),
+                  0,
+                ]}
+                material={bodyMaterial}
+              >
+                <sphereGeometry args={[segR, 10, 8]} />
+              </mesh>
+            );
+          })}
         </group>
       </group>
     </group>
   );
 }
-
-interface LegProps {
-  position: [number, number, number];
-  material: THREE.Material;
-}
-
-const Leg = forwardRef<THREE.Group, LegProps>(function Leg({ position, material }, ref) {
-  return (
-    <group ref={ref} position={position}>
-      <mesh position={[0, -0.08, 0]} material={material}>
-        <cylinderGeometry args={[0.06, 0.05, 0.18, 8]} />
-      </mesh>
-      <mesh position={[0, -0.2, 0]} material={material}>
-        <sphereGeometry args={[0.07, 10, 8]} />
-      </mesh>
-    </group>
-  );
-});
