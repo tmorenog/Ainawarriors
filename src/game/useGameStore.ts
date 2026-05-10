@@ -58,6 +58,8 @@ interface GameStore {
   // few seconds before fading back in (also doubles as a Book objective).
   sleeping: boolean;
   setSleeping: (v: boolean) => void;
+  dreamText: string;
+  setDreamText: (s: string) => void;
 
   muted: Set<string>;
   toggleMute: (id: string) => void;
@@ -124,6 +126,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   sleeping: false,
   setSleeping: (v) => set({ sleeping: v }),
+  dreamText: '',
+  setDreamText: (s) => set({ dreamText: s }),
 
   muted: new Set<string>(),
   toggleMute: (id) =>

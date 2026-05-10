@@ -1,10 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '@/game/useGameStore';
 import { BOOK_CHAPTERS } from '@/lib/book';
 import { CLANS } from '@/lib/clans';
 import { getAudioEngine } from '@/game/audio';
+
+// Web Speech API helper. Returns a stop function. We pause any in-flight
+// speech before starting a new one so chapter changes don't stack voices.
+function speak(text: string, onEnd?: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const synth = (window as any).speechSynthesis as SpeechSynthesis | undefined;
+  if (!synth) return () => {};
+  try { synth.cancel(); } catch {}
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.rate = 0.92;
+  utter.pitch = 1.0;
+  utter.volume = 1.0;
+  if (onEnd) utter.onend = onEnd;
+  try { synth.speak(utter); } catch {}
+  return () => { try { synth.cancel(); } catch {} };
+}
 
 export function BookPanel() {
   const bookMode = useGameStore((s) => s.bookMode);
@@ -23,6 +39,19 @@ export function BookPanel() {
   const pushChat = useGameStore((s) => s.pushChat);
 
   const [open, setOpen] = useState(false);
+  const [readMode, setReadMode] = useState<'self' | 'aloud'>('self');
+  const [reading, setReading] = useState(false);
+  const stopReadRef = useRef<() => void>(() => {});
+
+  // Stop any in-flight narration when the chapter changes, the panel closes,
+  // or Book Mode is turned off.
+  useEffect(() => {
+    return () => { stopReadRef.current(); };
+  }, []);
+  useEffect(() => {
+    stopReadRef.current();
+    setReading(false);
+  }, [chapterIndex, bookMode, open]);
 
   // When the player toggles Book Mode on, snap the quest tracker to the
   // current chapter so they can see what to do next.
@@ -127,6 +156,39 @@ export function BookPanel() {
             <div className="text-[10px] opacity-60">{chapterIndex + 1}/{BOOK_CHAPTERS.length}</div>
           </div>
           <p className="leading-snug opacity-90">{ch.text}</p>
+
+          {/* Read-it-yourself / read-to-you toggle */}
+          <div className="mt-3 flex gap-1 text-[10px]">
+            <button
+              className={`px-2 py-1 rounded ${readMode === 'self' ? 'bg-thunder/30 border border-thunder' : 'bg-white/5 hover:bg-white/10'}`}
+              onClick={() => { setReadMode('self'); stopReadRef.current(); setReading(false); }}
+            >
+              Read it myself
+            </button>
+            <button
+              className={`px-2 py-1 rounded ${readMode === 'aloud' ? 'bg-thunder/30 border border-thunder' : 'bg-white/5 hover:bg-white/10'}`}
+              onClick={() => setReadMode('aloud')}
+            >
+              Read it to me
+            </button>
+            {readMode === 'aloud' && (
+              <button
+                className="ml-auto px-2 py-1 rounded bg-river/30 border border-river"
+                onClick={() => {
+                  if (reading) {
+                    stopReadRef.current();
+                    setReading(false);
+                  } else {
+                    setReading(true);
+                    stopReadRef.current = speak(`${ch.title}. ${ch.text}`, () => setReading(false));
+                  }
+                }}
+              >
+                {reading ? '⏸ pause' : '▶ play'}
+              </button>
+            )}
+          </div>
+
           <div className="mt-3 text-[11px] opacity-80">
             <span className="opacity-60">Objective:</span>{' '}
             {describeObjective(ch.objective.kind, ch.objective.target, ch.objective.count, chapterProgress)}

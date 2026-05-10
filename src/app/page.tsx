@@ -12,6 +12,7 @@ import { MobileControls } from '@/components/MobileControls';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { WebGLGuard } from '@/components/WebGLGuard';
 import { BookPanel } from '@/components/BookPanel';
+import { Tutorial } from '@/components/Tutorial';
 import { useGameStore } from '@/game/useGameStore';
 import { useMultiplayer } from '@/game/useMultiplayer';
 import { patchSave, loadSave } from '@/lib/persist';
@@ -92,6 +93,7 @@ export default function Page() {
 
       {screen === 'game' && cat && (
         <>
+          <VisionOverlay />
           <SleepOverlay />
           <ErrorBoundary label="game" onReset={() => setScreen('title')}>
             {/* WebGLGuard probes for a usable WebGL context BEFORE we mount the
@@ -124,6 +126,7 @@ export default function Page() {
             <LeaderPanel onClose={() => setShowLeader(false)} onCommand={(k, p) => mp.sendCommand(k, p)} />
           )}
           <BookPanel />
+          <Tutorial />
         </>
       )}
 
@@ -169,11 +172,84 @@ function dispatchLook(dx: number, dy: number) {
   window.dispatchEvent(new CustomEvent('wotc-look', { detail: { dx, dy } }));
 }
 
+// Renders the cat's vision impairments / night vision boost as DOM overlays
+// over the WebGL canvas. Cheaper than a postprocess pass and works on iPad.
+function VisionOverlay() {
+  const cat = useGameStore((s) => s.cat);
+  const room = useGameStore((s) => s.room);
+  if (!cat) return null;
+  const tod = room?.timeOfDay ?? 0.5;
+  const isNight = tod < 0.22 || tod > 0.78;
+  const layers: React.ReactNode[] = [];
+  if (cat.vision === 'half-blind') {
+    // Dim the right half of the view with a soft gradient (the "blind side")
+    layers.push(
+      <div
+        key="halfblind"
+        className="absolute inset-0 z-30 pointer-events-none"
+        style={{
+          background: 'linear-gradient(90deg, rgba(0,0,0,0) 50%, rgba(0,0,0,0.55) 100%)',
+        }}
+      />
+    );
+  }
+  if (cat.vision === 'blind') {
+    // Heavy blur + low contrast — you can still tell shapes apart but only just
+    layers.push(
+      <div
+        key="blind"
+        className="absolute inset-0 z-30 pointer-events-none"
+        style={{
+          backdropFilter: 'blur(6px) brightness(0.85) saturate(0.5)',
+          WebkitBackdropFilter: 'blur(6px) brightness(0.85) saturate(0.5)',
+          background: 'rgba(180,200,220,0.18)',
+        }}
+      />
+    );
+  }
+  // Night-vision boost lifts shadows when it's actually night
+  if (cat.nightVision && isNight) {
+    layers.push(
+      <div
+        key="nv"
+        className="absolute inset-0 z-30 pointer-events-none mix-blend-screen"
+        style={{ background: 'rgba(150,200,160,0.18)' }}
+      />
+    );
+  }
+  return <>{layers}</>;
+}
+
+// StarClan dream pool — rotated through during the sleep cutscene. Original
+// short paraphrasings, never copies of book prose.
+const STARCLAN_DREAMS = [
+  'A silver tabby walks beside you. "There will be three," she whispers. "Kin of your kin..."',
+  'The wind smells of pine and old battles. Listen, little warrior — your clan needs your eyes open at dawn.',
+  'A river runs red, then clear again. Trust the apprentice you have not yet trusted.',
+  'You see your own paw-prints leading away from camp. They stop at the edge of a cliff. You must turn back.',
+  'A starry tom touches noses with you. "Even kittypets can be warriors. Walk with us."',
+  'A voice you have never heard says your true name, three times. You feel it click into place.',
+  'The Moonpool is full of stars tonight. One of them is closer than the rest.',
+  'A vole flees through tall grass. "Catch it, and you will not go hungry tomorrow."',
+];
+
 // Soft fade-to-black overlay used by the Book Mode sleep objective and
 // triggered when the player rests. The audio engine's "sleep" mode plays
 // through this — see audio.ts.
 function SleepOverlay() {
   const sleeping = useGameStore((s) => s.sleeping);
+  const dreamText = useGameStore((s) => s.dreamText);
+  const setDreamText = useGameStore((s) => s.setDreamText);
+
+  useEffect(() => {
+    if (!sleeping) { setDreamText(''); return; }
+    // Show a fresh dream every 2.5s while the cat is asleep
+    const pick = () => setDreamText(STARCLAN_DREAMS[Math.floor(Math.random() * STARCLAN_DREAMS.length)]);
+    pick();
+    const id = setInterval(pick, 2500);
+    return () => clearInterval(id);
+  }, [sleeping, setDreamText]);
+
   return (
     <div
       className="absolute inset-0 z-40 pointer-events-none transition-opacity duration-700"
@@ -182,10 +258,15 @@ function SleepOverlay() {
         background: 'radial-gradient(ellipse at center, rgba(8,12,30,0.85), rgba(0,0,0,0.98))',
       }}
     >
-      <div className="h-full grid place-items-center text-bone">
-        <div className="text-center">
-          <div className="font-display text-3xl mb-2 animate-pulse-soft">A warrior&rsquo;s rest…</div>
-          <div className="text-sm opacity-70">StarClan watches over your dreams.</div>
+      <div className="h-full grid place-items-center text-bone p-6">
+        <div className="text-center max-w-md">
+          <div className="font-display text-3xl mb-3 animate-pulse-soft">A warrior&rsquo;s rest&hellip;</div>
+          <div className="text-xs uppercase tracking-[0.4em] opacity-60 mb-3">StarClan whispers</div>
+          {dreamText && (
+            <p key={dreamText} className="italic text-sm opacity-90 animate-fade-in leading-relaxed">
+              {dreamText}
+            </p>
+          )}
         </div>
       </div>
     </div>

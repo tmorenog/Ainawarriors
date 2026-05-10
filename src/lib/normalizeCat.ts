@@ -53,5 +53,8 @@ export function normalizeCat(input: any): CatAppearance {
     role: str(safe.role, 'Warrior') as CatAppearance['role'],
     bubbleStyle: pick(safe.bubbleStyle, BUBBLES, 'classic'),
     voicePitch: num(safe.voicePitch, 1.0, 0.5, 1.5),
+    pupilSize: num(safe.pupilSize, 0.5, 0, 1),
+    vision: pick(safe.vision, ['normal', 'half-blind', 'blind'] as const, 'normal'),
+    nightVision: typeof safe.nightVision === 'boolean' ? safe.nightVision : false,
   };
 }

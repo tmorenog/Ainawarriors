@@ -126,7 +126,22 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
         });
       }
     },
-    sendEmote: (emote) => socketRef.current?.emit('emote', { emote }),
+    sendEmote: (emote) => {
+      if (socketRef.current) {
+        socketRef.current.emit('emote', { emote });
+      } else if (cat) {
+        // Offline: echo the emote into the chat feed so the player sees it.
+        useGameStore.getState().pushChat({
+          id: 'em' + Date.now(),
+          fromId: useGameStore.getState().selfId,
+          fromName: cat.name,
+          scope: 'nearby',
+          text: `*${emote.replace('-', ' ')}s*`,
+          at: Date.now(),
+          emote,
+        });
+      }
+    },
     sendCommand: (kind, payload) => socketRef.current?.emit('command', { kind, payload }),
     sendCatch: (preyId, kind) => socketRef.current?.emit('catch', { preyId, kind }),
   };
