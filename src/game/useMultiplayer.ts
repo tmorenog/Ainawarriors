@@ -178,7 +178,27 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
     // broadcast directly without prop-drilling the mp handle.
     try { (window as any).__WOTC_BC__ = bc; } catch {}
 
-    const send = (m: BcMessage) => { try { bc.postMessage(m); } catch {} };
+    // Belt-and-braces: every BC message also rides on a localStorage
+    // event. Browsers that don't support BroadcastChannel still raise
+    // 'storage' events across same-origin tabs, so this guarantees the
+    // other tab gets at least the latest state.
+    const LS_KEY = `wotc-bc-${room}`;
+    const send = (m: BcMessage) => {
+      try { bc.postMessage(m); } catch {}
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(LS_KEY, JSON.stringify({ ts: Date.now(), m }));
+        }
+      } catch {}
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== LS_KEY || !e.newValue) return;
+      try {
+        const { m } = JSON.parse(e.newValue) as { ts: number; m: BcMessage };
+        if (m && typeof m === 'object' && 'kind' in m) bc.dispatchEvent(new MessageEvent('message', { data: m }));
+      } catch {}
+    };
+    if (typeof window !== 'undefined') window.addEventListener('storage', onStorage);
 
     // Announce ourselves and ask everyone else to announce themselves.
     // Send a few times in case the receiver tab's BC handler attached just
@@ -316,6 +336,7 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
         heartbeatRef.current = null;
       }
       window.removeEventListener('beforeunload', onUnload);
+      try { window.removeEventListener('storage', onStorage); } catch {}
     };
   }, [enabled, cat, room, setSelfId, upsertPlayer, removePlayer, setPlayers, setRoom, pushChat, muted]);
 
