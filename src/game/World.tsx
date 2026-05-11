@@ -50,6 +50,16 @@ function makeTerrain(size = 600, seg = 96, season: WorldProps['season']) {
     if (Math.abs(x - 180) < 32 && Math.abs(x - 180) > 22) c.lerp(sand, 0.55);
     // River water itself
     if (Math.abs(x - 180) < 22) c.set('#3a78a8');
+    // Tributary 1 — winding east-west stream around z = -120
+    const t1Center = -120 + Math.sin(x * 0.02) * 25;
+    const dt1 = Math.abs(z - t1Center);
+    if (dt1 < 12 && dt1 > 7) c.lerp(sand, 0.45);
+    if (dt1 < 7) c.set('#4886b2');
+    // Tributary 2 — winding north-south stream around x = -50
+    const t2Center = -50 + Math.sin(z * 0.025) * 20;
+    const dt2 = Math.abs(x - t2Center);
+    if (dt2 < 11 && dt2 > 6) c.lerp(sand, 0.45);
+    if (dt2 < 6) c.set('#4886b2');
     colors.push(c.r, c.g, c.b);
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -64,8 +74,18 @@ function Trees({ count, season }: { count: number; season: WorldProps['season'] 
     for (let i = 0; i < count; i++) {
       const x = (rand() - 0.5) * 540;
       const z = (rand() - 0.5) * 540;
-      // keep clear of river
+      // keep clear of river + tributaries
       if (Math.abs(x - 180) < 28) continue;
+      const t1c = -120 + Math.sin(x * 0.02) * 25;
+      if (Math.abs(z - t1c) < 11) continue;
+      const t2c = -50 + Math.sin(z * 0.025) * 20;
+      if (Math.abs(x - t2c) < 10) continue;
+      // keep clear of twoleg village, barns, moonstone, snakerocks, thunderpath
+      if (Math.abs(x - 260) < 40 && Math.abs(z - 240) < 40) continue;
+      if (Math.abs(x - 240) < 32 && Math.abs(z + 180) < 32) continue;
+      if (Math.abs(x + 280) < 12 && Math.abs(z + 260) < 12) continue;
+      if (Math.abs(x - 60) < 10 && Math.abs(z - 70) < 10) continue;
+      if (x > -185 && x < 85 && Math.abs(z - 95 - Math.sin(x * 0.015) * 6) < 5) continue;
       const moor = x < -120;
       if (moor && rand() > 0.15) continue; // pine forest is thinner on the moor
       const y = terrainHeightAt(x, z);
@@ -197,6 +217,10 @@ function GrassTufts({ count, season, dense }: { count: number; season: WorldProp
       const x = (rand() - 0.5) * 520;
       const z = (rand() - 0.5) * 520;
       if (Math.abs(x - 180) < 32) continue; // skip river
+      const t1cg = -120 + Math.sin(x * 0.02) * 25;
+      if (Math.abs(z - t1cg) < 12) continue;
+      const t2cg = -50 + Math.sin(z * 0.025) * 20;
+      if (Math.abs(x - t2cg) < 11) continue;
       const y = terrainHeightAt(x, z);
       if (y < -1.4) continue; // dirt patches stay bare
       if (y > 4.5) continue;  // rocky peaks stay bare
@@ -262,6 +286,10 @@ function Rocks({ count }: { count: number }) {
       const x = (rand() - 0.5) * 520;
       const z = (rand() - 0.5) * 520;
       if (Math.abs(x - 180) < 28) continue;
+      const t1cr = -120 + Math.sin(x * 0.02) * 25;
+      if (Math.abs(z - t1cr) < 11) continue;
+      const t2cr = -50 + Math.sin(z * 0.025) * 20;
+      if (Math.abs(x - t2cr) < 10) continue;
       const y = terrainHeightAt(x, z);
       const yaw = rand() * Math.PI * 2;
       const tilt = (rand() - 0.5) * 0.4;
@@ -943,6 +971,258 @@ function TwolegPlace({ isNight }: { isNight: boolean }) {
   );
 }
 
+// Horseplace barns — three small wooden barns east of RiverClan with a
+// rough wooden fence ringing a paddock. Lore: Barley and Ravenpaw live
+// near here. Set on the far east side, past the river.
+function Barns() {
+  const anchorX = 240, anchorZ = -180;
+  const barns = useMemo(() => {
+    const rand = seededRand(4242);
+    const list: Array<{ x: number; z: number; w: number; d: number; h: number; rotY: number; wall: string; roof: string }> = [];
+    const palettes = [
+      { wall: '#8a4a2a', roof: '#3a1c10' },
+      { wall: '#a86838', roof: '#4a2418' },
+      { wall: '#6a3818', roof: '#2a1408' },
+    ];
+    for (let i = 0; i < 3; i++) {
+      const p = palettes[i];
+      list.push({
+        x: (i - 1) * 14 + (rand() - 0.5) * 3,
+        z: (rand() - 0.5) * 6,
+        w: 4.5 + rand() * 1.0,
+        d: 3.2 + rand() * 0.8,
+        h: 2.6 + rand() * 0.5,
+        rotY: (rand() - 0.5) * 0.25,
+        wall: p.wall,
+        roof: p.roof,
+      });
+    }
+    return list;
+  }, []);
+
+  return (
+    <group position={[anchorX, terrainHeightAt(anchorX, anchorZ), anchorZ]}>
+      {barns.map((b, i) => (
+        <group key={i} position={[b.x, 0, b.z]} rotation={[0, b.rotY, 0]}>
+          {/* walls */}
+          <mesh position={[0, b.h / 2, 0]} castShadow receiveShadow>
+            <boxGeometry args={[b.w, b.h, b.d]} />
+            <meshStandardMaterial color={b.wall} roughness={1} flatShading />
+          </mesh>
+          {/* pitched roof — two slanted boxes */}
+          <mesh position={[0, b.h + 0.4, -b.d * 0.25]} rotation={[-0.5, 0, 0]}>
+            <boxGeometry args={[b.w + 0.4, 0.12, b.d * 0.6]} />
+            <meshStandardMaterial color={b.roof} roughness={1} flatShading />
+          </mesh>
+          <mesh position={[0, b.h + 0.4, b.d * 0.25]} rotation={[0.5, 0, 0]}>
+            <boxGeometry args={[b.w + 0.4, 0.12, b.d * 0.6]} />
+            <meshStandardMaterial color={b.roof} roughness={1} flatShading />
+          </mesh>
+          {/* big barn door */}
+          <mesh position={[0, b.h * 0.45, b.d / 2 + 0.01]}>
+            <boxGeometry args={[b.w * 0.45, b.h * 0.8, 0.05]} />
+            <meshStandardMaterial color={'#3a2418'} roughness={1} />
+          </mesh>
+          {/* X-brace plank on door */}
+          <mesh position={[0, b.h * 0.45, b.d / 2 + 0.04]} rotation={[0, 0, 0.6]}>
+            <boxGeometry args={[b.w * 0.55, 0.08, 0.02]} />
+            <meshStandardMaterial color={'#5a3a20'} roughness={1} />
+          </mesh>
+          <mesh position={[0, b.h * 0.45, b.d / 2 + 0.04]} rotation={[0, 0, -0.6]}>
+            <boxGeometry args={[b.w * 0.55, 0.08, 0.02]} />
+            <meshStandardMaterial color={'#5a3a20'} roughness={1} />
+          </mesh>
+          {/* haystack beside the barn */}
+          <mesh position={[b.w * 0.65, 0.5, b.d * 0.4]}>
+            <cylinderGeometry args={[0.7, 0.85, 1.0, 12]} />
+            <meshStandardMaterial color={'#d8b85a'} roughness={1} flatShading />
+          </mesh>
+        </group>
+      ))}
+      {/* Paddock fence ring */}
+      {Array.from({ length: 28 }).map((_, i) => {
+        const a = (i / 28) * Math.PI * 2;
+        const r = 26;
+        return (
+          <mesh key={`p${i}`} position={[Math.cos(a) * r, 0.45, Math.sin(a) * r]} rotation={[0, a, 0]}>
+            <boxGeometry args={[0.08, 0.9, 0.08]} />
+            <meshStandardMaterial color={'#7a5a3a'} roughness={1} />
+          </mesh>
+        );
+      })}
+      {/* a couple of horse-feeding troughs */}
+      <mesh position={[6, 0.2, -10]}>
+        <boxGeometry args={[2, 0.4, 0.6]} />
+        <meshStandardMaterial color={'#5a3a20'} roughness={1} />
+      </mesh>
+      <mesh position={[-8, 0.2, 8]}>
+        <boxGeometry args={[2, 0.4, 0.6]} />
+        <meshStandardMaterial color={'#5a3a20'} roughness={1} />
+      </mesh>
+    </group>
+  );
+}
+
+// Moonstone — sacred cave in the Highstones beyond WindClan. A stone
+// mound with a dark entrance and a glowing crystal pillar shimmering
+// inside. Brighter and more visible at night.
+function Moonstone({ isNight }: { isNight: boolean }) {
+  const ax = -280, az = -260;
+  const y = terrainHeightAt(ax, az);
+  return (
+    <group position={[ax, y, az]}>
+      {/* outer rocky mound — irregular stack of boulders */}
+      {[
+        { p: [0, 1.6, 0] as [number, number, number], s: [10, 3.2, 8] as [number, number, number], c: '#6a6258' },
+        { p: [-3.5, 1.2, 2] as [number, number, number], s: [5, 2.4, 4] as [number, number, number], c: '#7a7268' },
+        { p: [3.2, 1.0, -1.5] as [number, number, number], s: [4.5, 2.0, 3.8] as [number, number, number], c: '#5a5248' },
+        { p: [0.5, 3.2, -2] as [number, number, number], s: [4, 1.8, 3] as [number, number, number], c: '#8a8278' },
+        { p: [-1.5, 4.4, -0.5] as [number, number, number], s: [2.6, 1.4, 2.2] as [number, number, number], c: '#6a6258' },
+      ].map((b, i) => (
+        <mesh key={i} position={b.p} rotation={[0, i * 0.7, i * 0.15]} castShadow receiveShadow>
+          <boxGeometry args={b.s} />
+          <meshStandardMaterial color={b.c} roughness={1} flatShading />
+        </mesh>
+      ))}
+      {/* Mothermouth — dark cave entrance arch */}
+      <mesh position={[0, 1.3, 4]}>
+        <boxGeometry args={[2.4, 2.4, 0.4]} />
+        <meshStandardMaterial color={'#08060a'} roughness={1} />
+      </mesh>
+      {/* Glowing crystal pillar visible just inside the cave mouth */}
+      <mesh position={[0, 1.4, 4.45]}>
+        <coneGeometry args={[0.5, 2.6, 6]} />
+        <meshStandardMaterial
+          color={isNight ? '#cfe4ff' : '#a0c4ff'}
+          emissive={'#7aa8ff'}
+          emissiveIntensity={isNight ? 1.4 : 0.4}
+          roughness={0.2}
+          metalness={0.15}
+          flatShading
+        />
+      </mesh>
+      {/* Soft point light at night so it lifts off the cliff */}
+      {isNight && (
+        <pointLight position={[0, 2.5, 5]} intensity={1.2} distance={18} color={'#8ab4ff'} />
+      )}
+      {/* Smaller crystal shards on the ground */}
+      <mesh position={[2, 0.4, 5]} rotation={[0, 0.6, 0.3]}>
+        <coneGeometry args={[0.25, 0.8, 5]} />
+        <meshStandardMaterial color={'#a0c4ff'} emissive={'#5a82c0'} emissiveIntensity={isNight ? 0.6 : 0.15} roughness={0.3} />
+      </mesh>
+      <mesh position={[-1.8, 0.35, 5.3]} rotation={[0, -0.4, -0.2]}>
+        <coneGeometry args={[0.22, 0.7, 5]} />
+        <meshStandardMaterial color={'#a0c4ff'} emissive={'#5a82c0'} emissiveIntensity={isNight ? 0.6 : 0.15} roughness={0.3} />
+      </mesh>
+    </group>
+  );
+}
+
+// Snakerocks — a jagged pile of fallen stones in ThunderClan territory
+// where adders sun themselves. A scattered cluster of tilted, sharp slabs.
+function Snakerocks() {
+  const ax = 60, az = 70;
+  const slabs = useMemo(() => {
+    const rand = seededRand(3131);
+    const arr: Array<{ p: [number, number, number]; s: [number, number, number]; rot: [number, number, number]; c: string }> = [];
+    const palette = ['#7d7872', '#8a8278', '#6a6058', '#a09682', '#5e5448', '#8e8478'];
+    for (let i = 0; i < 14; i++) {
+      const a = rand() * Math.PI * 2;
+      const r = rand() * 6;
+      const sx = 0.8 + rand() * 2.2;
+      const sy = 1.0 + rand() * 2.4;
+      const sz = 0.8 + rand() * 2.2;
+      arr.push({
+        p: [Math.cos(a) * r, sy * 0.45, Math.sin(a) * r],
+        s: [sx, sy, sz],
+        rot: [(rand() - 0.5) * 0.6, rand() * Math.PI * 2, (rand() - 0.5) * 0.5],
+        c: palette[Math.floor(rand() * palette.length)],
+      });
+    }
+    return arr;
+  }, []);
+  // A few resting snakes — small dark coiled cylinders.
+  const snakes = useMemo(() => {
+    const rand = seededRand(8181);
+    const arr: Array<{ p: [number, number, number]; rotY: number; c: string }> = [];
+    const cols = ['#3a2818', '#5a3818', '#2a2010'];
+    for (let i = 0; i < 3; i++) {
+      const a = rand() * Math.PI * 2;
+      const r = 1.5 + rand() * 4;
+      arr.push({ p: [Math.cos(a) * r, 0.18, Math.sin(a) * r], rotY: rand() * Math.PI * 2, c: cols[i % cols.length] });
+    }
+    return arr;
+  }, []);
+
+  return (
+    <group position={[ax, terrainHeightAt(ax, az), az]}>
+      {slabs.map((s, i) => (
+        <mesh key={i} position={s.p} rotation={s.rot} castShadow receiveShadow>
+          <boxGeometry args={s.s} />
+          <meshStandardMaterial color={s.c} roughness={1} flatShading />
+        </mesh>
+      ))}
+      {snakes.map((s, i) => (
+        <mesh key={`sn${i}`} position={s.p} rotation={[Math.PI / 2, 0, s.rotY]}>
+          <torusGeometry args={[0.35, 0.09, 6, 12]} />
+          <meshStandardMaterial color={s.c} roughness={0.7} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+// Thunderpath — the long gray monster-road that splits ThunderClan from
+// ShadowClan. East–west segments stitched together so the path follows
+// the rolling terrain rather than floating above it. White dashed lane
+// markings down the middle.
+function Thunderpath() {
+  const z0 = 95; // band between ThunderClan (z=0) and ShadowClan (z=180)
+  const xMin = -180, xMax = 80;
+  const segLen = 8;
+  const segments = useMemo(() => {
+    const arr: Array<{ x: number; y: number }> = [];
+    for (let x = xMin + segLen / 2; x < xMax; x += segLen) {
+      // Slight wind to z so the road meanders gently rather than ruler-straight
+      const zCenter = z0 + Math.sin(x * 0.015) * 6;
+      arr.push({ x, y: terrainHeightAt(x, zCenter) + 0.08 });
+    }
+    return arr;
+  }, []);
+  // Dashed white lane markings — every other segment.
+  return (
+    <group>
+      {segments.map((s, i) => {
+        const zCenter = z0 + Math.sin(s.x * 0.015) * 6;
+        return (
+          <group key={i} position={[s.x, s.y, zCenter]}>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+              <planeGeometry args={[segLen + 0.2, 6]} />
+              <meshStandardMaterial color={'#2a2826'} roughness={0.85} />
+            </mesh>
+            {/* dashed center line — only on alternate segments */}
+            {i % 2 === 0 && (
+              <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[segLen * 0.55, 0.22]} />
+                <meshStandardMaterial color={'#d8d2b8'} roughness={0.9} />
+              </mesh>
+            )}
+            {/* gravel shoulders — a thin sandy strip along each edge */}
+            <mesh position={[0, 0.005, -3.2]} rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[segLen + 0.2, 0.8]} />
+              <meshStandardMaterial color={'#8a7a5a'} roughness={1} />
+            </mesh>
+            <mesh position={[0, 0.005, 3.2]} rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[segLen + 0.2, 0.8]} />
+              <meshStandardMaterial color={'#8a7a5a'} roughness={1} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
 export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
   const treeCount = graphics === 'low' ? 50 : graphics === 'medium' ? 120 : 240;
   const grassCount = graphics === 'low' ? 0 : graphics === 'medium' ? 220 : 480;
@@ -996,6 +1276,10 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
       <Camps />
 
       <TwolegPlace isNight={isNight} />
+      <Barns />
+      <Moonstone isNight={isNight} />
+      <Snakerocks />
+      <Thunderpath />
 
       {/* moonpool — uneven stone ring surrounding a glowing silver pool */}
       <group position={[-220, terrainHeightAt(-220, -220), -220]}>
