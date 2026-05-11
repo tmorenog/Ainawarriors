@@ -33,16 +33,37 @@ function platformHeightAt(x: number, z: number): number {
 }
 
 function naturalTerrain(x: number, z: number): number {
+  // Base rolling hills (low-frequency)
   let h =
     Math.sin(x * 0.012) * 1.4 +
     Math.cos(z * 0.013) * 1.4 +
     Math.sin((x + z) * 0.005) * 2.4 +
     Math.cos((x - z) * 0.008) * 1.0 +
-    Math.sin(x * 0.04 + z * 0.03) * 0.35 +
-    Math.cos(x * 0.06 - z * 0.05) * 0.25;
+    // New "lots of hills" octave — bigger ridges and crests.
+    Math.sin(x * 0.018 + z * 0.022) * 2.8 +
+    Math.cos(x * 0.025 - z * 0.015) * 2.0 +
+    // Mid-frequency bumps
+    Math.sin(x * 0.04 + z * 0.03) * 0.50 +
+    Math.cos(x * 0.06 - z * 0.05) * 0.40;
+
+  // Main river channel along +X (carves a smooth valley)
   const river = Math.exp(-Math.pow((x - 180) / 30, 2));
   h -= river * 3.2;
-  if (x < -120) h *= 0.4;
+
+  // Tributary 1 — winding east-west stream around z = -120, branching
+  // off the moor toward the main river.
+  const t1Center = -120 + Math.sin(x * 0.02) * 25;
+  const trib1 = Math.exp(-Math.pow((z - t1Center) / 10, 2));
+  h -= trib1 * 2.2;
+
+  // Tributary 2 — winding north-south stream around x = -50, snaking
+  // through ThunderClan territory.
+  const t2Center = -50 + Math.sin(z * 0.025) * 20;
+  const trib2 = Math.exp(-Math.pow((x - t2Center) / 9, 2));
+  h -= trib2 * 2.0;
+
+  // WindClan moor — flatter but still has rolling hills (was 0.4 → 0.55).
+  if (x < -120) h *= 0.55;
   return h;
 }
 
@@ -50,24 +71,7 @@ export function terrainHeightAt(x: number, z: number): number {
   if (!Number.isFinite(x) || !Number.isFinite(z)) return 0;
   const platform = platformHeightAt(x, z);
   if (platform > -Infinity) return platform;
-  // Big rolling hills (low frequency) + medium ridges + fine bumps
-  let h =
-    Math.sin(x * 0.012) * 1.4 +
-    Math.cos(z * 0.013) * 1.4 +
-    Math.sin((x + z) * 0.005) * 2.4 +
-    Math.cos((x - z) * 0.008) * 1.0 +
-    // extra octave for realism — small noisy bumps you actually feel as you walk
-    Math.sin(x * 0.04 + z * 0.03) * 0.35 +
-    Math.cos(x * 0.06 - z * 0.05) * 0.25;
-
-  // Riverbed channel near +X: carves a smooth valley
-  const river = Math.exp(-Math.pow((x - 180) / 30, 2));
-  h -= river * 3.2;
-
-  // WindClan moor (low rolling flatland) west of -120
-  if (x < -120) h *= 0.4;
-
-  return h;
+  return naturalTerrain(x, z);
 }
 
 // Approximate slope from the analytical field (used for sliding/orientation).
