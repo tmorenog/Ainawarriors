@@ -54,20 +54,27 @@ export function Tutorial() {
     } catch {}
   }, []);
 
-  // Press X (or ?) on a keyboard to toggle the hint screen.
+  // Press X (or ?) on a keyboard to toggle the hint screen. Listen on
+  // both keydown directly AND a window-level "wotc-hint-toggle" custom
+  // event — useControls dispatches that too, so this still works if
+  // focus is on a weird element where keydown wouldn't bubble normally.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const onKey = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
       if (k === 'x' || k === '?') {
-        // Don't fire when typing in chat or any other input
         const t = e.target as HTMLElement | null;
         if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || (t as any).isContentEditable)) return;
         setOpen((v) => !v);
       }
     };
+    const onCustom = () => setOpen((v) => !v);
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('wotc-hint-toggle', onCustom);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('wotc-hint-toggle', onCustom);
+    };
   }, []);
 
   const dismiss = () => {

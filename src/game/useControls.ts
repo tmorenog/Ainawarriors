@@ -55,6 +55,13 @@ export function useKeyboardControls(controlsRef: React.MutableRefObject<Controls
           s.setPaused(!s.paused);
         } catch {}
       }
+      // X / ? toggles the in-game hint screen (Tutorial). We dispatch a
+      // window event AND skip the input-focus check, so it works even
+      // if the user's focus is somewhere unexpected. Tutorial.tsx also
+      // listens directly to keydown as a backup.
+      if (k === 'x' || k === '?') {
+        try { window.dispatchEvent(new CustomEvent('wotc-hint-toggle')); } catch {}
+      }
       recompute();
     }
     function up(e: KeyboardEvent) {
