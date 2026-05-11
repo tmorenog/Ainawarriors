@@ -20,6 +20,7 @@ import { MapPanel } from '@/components/MapPanel';
 import { BattleOverlay } from '@/components/BattleOverlay';
 import { SwipeFX } from '@/components/SwipeFX';
 import { WarriorsGuide } from '@/components/WarriorsGuide';
+import { ActivityBook } from '@/components/ActivityBook';
 import { useGameStore } from '@/game/useGameStore';
 import { useMultiplayer } from '@/game/useMultiplayer';
 import { patchSave, loadSave } from '@/lib/persist';
@@ -146,6 +147,7 @@ export default function Page() {
           <BattleOverlay />
           <SwipeFX />
           <WarriorsGuide />
+          <ActivityBook />
         </>
       )}
 
