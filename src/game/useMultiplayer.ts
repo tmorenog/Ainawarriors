@@ -200,6 +200,13 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
     };
     if (typeof window !== 'undefined') window.addEventListener('storage', onStorage);
 
+    // Expose a dual-channel broadcaster on window so modules outside the
+    // hook (e.g. Game.tsx disaster ticker) can fan messages out through
+    // BOTH BroadcastChannel and the localStorage fallback.
+    try {
+      (window as any).__WOTC_SEND__ = (m: BcMessage) => send(m);
+    } catch {}
+
     // Announce ourselves and ask everyone else to announce themselves.
     // Send a few times in case the receiver tab's BC handler attached just
     // after we sent.
@@ -330,6 +337,7 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
         try { bc.close(); } catch {}
         bcRef.current = null;
         try { delete (window as any).__WOTC_BC__; } catch {}
+        try { delete (window as any).__WOTC_SEND__; } catch {}
       }
       if (heartbeatRef.current != null) {
         clearInterval(heartbeatRef.current);

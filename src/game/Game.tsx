@@ -955,24 +955,43 @@ export function Game({ room, net }: GameProps) {
     return () => clearInterval(id);
   }, []);
 
-  // Random disasters — every ~60s we roll. ~5% chance each of fire,
-  // flood, twoleg invasion. Only one active at a time. Each runs 45s,
-  // shown via a banner overlay and drains a little HP/hunger to keep it
-  // dramatic but never fatal on its own.
+  // Random disasters — every ~60s we roll. Only one active at a time.
+  // Each runs 45s. When one fires we fan it out via the dual-channel
+  // broadcaster (BC + localStorage) so every multiplayer tab gets the
+  // SAME disaster at the SAME time. While a disaster is active we also
+  // re-broadcast it every 5s so any tab that joined late catches up.
   useEffect(() => {
+    let lastRebroadcastAt = 0;
+    let lastRollAt = 0;
+    const broadcast = (msg: any) => {
+      try {
+        const w = window as any;
+        if (typeof w.__WOTC_SEND__ === 'function') w.__WOTC_SEND__(msg);
+        else if (w.__WOTC_BC__) (w.__WOTC_BC__ as BroadcastChannel).postMessage(msg);
+      } catch {}
+    };
     const id = setInterval(() => {
       const s = useGameStore.getState();
-      if (s.disaster && Date.now() < s.disaster.until) return; // active
+      if (s.disaster && Date.now() < s.disaster.until) {
+        // While active, re-broadcast every 5s so late joiners sync up.
+        if (Date.now() - lastRebroadcastAt > 5000) {
+          lastRebroadcastAt = Date.now();
+          broadcast({ kind: 'disaster', disaster: s.disaster });
+        }
+        return;
+      }
       if (s.disaster && Date.now() >= s.disaster.until) {
         s.setDisaster(null);
         s.pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
           text: 'The danger has passed. The forest holds its breath.', at: Date.now() });
         return;
       }
+      // Only roll a fresh disaster once a minute, even though the tick
+      // runs more often (so we can re-broadcast active ones quickly).
+      if (Date.now() - lastRollAt < 60_000) return;
+      lastRollAt = Date.now();
       const roll = Math.random();
       let pick: 'twoleg' | 'flood' | 'fire' | null = null;
-      // 2% chance each (~6% total per roll). Rare enough that they feel
-      // like real events instead of constant chaos.
       if (roll < 0.02) pick = 'twoleg';
       else if (roll < 0.04) pick = 'flood';
       else if (roll < 0.06) pick = 'fire';
@@ -986,13 +1005,9 @@ export function Game({ room, net }: GameProps) {
       s.setDisaster(d);
       s.pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
         text: messages[pick], at: Date.now() });
-      // Mirror to every other tab so the disaster is shared across the
-      // BroadcastChannel multiplayer session.
-      try {
-        const w = window as any;
-        if (w.__WOTC_BC__) (w.__WOTC_BC__ as BroadcastChannel).postMessage({ kind: 'disaster', disaster: d });
-      } catch {}
-    }, 60_000);
+      broadcast({ kind: 'disaster', disaster: d });
+      lastRebroadcastAt = Date.now();
+    }, 4_000);
     return () => clearInterval(id);
   }, []);
 
