@@ -60,73 +60,91 @@ function makeTerrain(size = 600, seg = 96, season: WorldProps['season']) {
 function Trees({ count, season }: { count: number; season: WorldProps['season'] }) {
   const rand = useMemo(() => seededRand(1337), []);
   const list = useMemo(() => {
-    const arr: { p: [number, number, number]; s: number; kind: 'oak' | 'pine' | 'birch' }[] = [];
+    const arr: { p: [number, number, number]; s: number; yaw: number; tilt: number; variant: number }[] = [];
     for (let i = 0; i < count; i++) {
       const x = (rand() - 0.5) * 540;
       const z = (rand() - 0.5) * 540;
       // keep clear of river
       if (Math.abs(x - 180) < 28) continue;
       const moor = x < -120;
-      if (moor && rand() > 0.15) continue;
-      const shadow = z > 90 && x < 30;
-      const kind: 'oak' | 'pine' | 'birch' = shadow ? 'pine' : moor ? 'birch' : (rand() < 0.6 ? 'oak' : 'birch');
-      // Plant the tree at its actual terrain height so trunks aren't floating
+      if (moor && rand() > 0.15) continue; // pine forest is thinner on the moor
       const y = terrainHeightAt(x, z);
-      arr.push({ p: [x, y, z], s: 0.7 + rand() * 1.6, kind });
+      arr.push({
+        p: [x, y, z],
+        s: 0.8 + rand() * 1.5,
+        yaw: rand() * Math.PI * 2,
+        tilt: (rand() - 0.5) * 0.08, // slight per-tree lean
+        variant: Math.floor(rand() * 3), // 0,1,2 different layer counts
+      });
     }
     return arr;
   }, [count, rand]);
 
-  const trunkMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#3b2a1c', roughness: 0.95 }), []);
-  const oakLeaf = useMemo(() => new THREE.MeshStandardMaterial({
-    color: season === 'leaf-bare' ? '#5b4a36' : season === 'leaf-fall' ? '#c47a2a' : season === 'newleaf' ? '#7fb04a' : '#3f6c34',
-    roughness: 0.85,
+  // Pine bark — slightly textured-looking dark brown with a hint of red.
+  const trunkMat = useMemo(() => new THREE.MeshStandardMaterial({
+    color: '#3a2818', roughness: 1.0, flatShading: true,
+  }), []);
+  // Layered greens for the needles — deeper in late season.
+  const needleDark = useMemo(() => new THREE.MeshStandardMaterial({
+    color: season === 'leaf-bare' ? '#1c3324' : season === 'newleaf' ? '#3a6e44' : '#23502f',
+    roughness: 0.95, flatShading: true,
   }), [season]);
-  const pineLeaf = useMemo(() => new THREE.MeshStandardMaterial({
-    color: season === 'leaf-bare' ? '#2a4030' : '#2c5a3a',
-    roughness: 0.85,
+  const needleMid = useMemo(() => new THREE.MeshStandardMaterial({
+    color: season === 'leaf-bare' ? '#2a4530' : season === 'newleaf' ? '#4e8552' : '#306d3a',
+    roughness: 0.95, flatShading: true,
   }), [season]);
-  const birchLeaf = useMemo(() => new THREE.MeshStandardMaterial({
-    color: season === 'leaf-fall' ? '#e2bb4b' : season === 'leaf-bare' ? '#b6ac88' : '#9bbf6a',
-    roughness: 0.85,
+  const needleLight = useMemo(() => new THREE.MeshStandardMaterial({
+    color: season === 'leaf-bare' ? '#3a563d' : season === 'newleaf' ? '#62a063' : '#3f8246',
+    roughness: 0.95, flatShading: true,
   }), [season]);
-  const birchTrunkMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#e8e2d2', roughness: 0.9 }), []);
 
   return (
     <group>
       {list.map((t, i) => {
-        if (t.kind === 'pine') {
-          return (
-            <group key={i} position={t.p} scale={t.s}>
-              <mesh position={[0, 1.6, 0]} material={trunkMat}>
-                <cylinderGeometry args={[0.18, 0.26, 3.2, 8]} />
-              </mesh>
-              <mesh position={[0, 3.2, 0]} material={pineLeaf}><coneGeometry args={[1.3, 2.2, 10]} /></mesh>
-              <mesh position={[0, 4.0, 0]} material={pineLeaf}><coneGeometry args={[1.0, 1.8, 10]} /></mesh>
-              <mesh position={[0, 4.8, 0]} material={pineLeaf}><coneGeometry args={[0.7, 1.4, 10]} /></mesh>
-            </group>
-          );
-        }
-        if (t.kind === 'birch') {
-          return (
-            <group key={i} position={t.p} scale={t.s}>
-              <mesh position={[0, 1.4, 0]} material={birchTrunkMat}>
-                <cylinderGeometry args={[0.13, 0.17, 2.8, 8]} />
-              </mesh>
-              <mesh position={[0, 2.9, 0]} material={birchLeaf}>
-                <sphereGeometry args={[1.0, 10, 8]} />
-              </mesh>
-            </group>
-          );
-        }
+        // A pine with 5 layered cones: bigger / darker at the base, slimmer
+        // / brighter near the top. Trunk is a tapered cylinder with a tiny
+        // root flare. Per-tree yaw + slight tilt + variant offsets keep
+        // them from looking identical.
+        const base = 1.55 + (t.variant === 2 ? 0.1 : 0);
+        const layers = [
+          { y: 2.8, r: base * 1.20, h: 2.2, mat: needleDark },
+          { y: 3.7, r: base * 1.00, h: 2.0, mat: needleDark },
+          { y: 4.6, r: base * 0.82, h: 1.8, mat: needleMid },
+          { y: 5.4, r: base * 0.62, h: 1.5, mat: needleMid },
+          { y: 6.1, r: base * 0.42, h: 1.2, mat: needleLight },
+        ];
+        if (t.variant === 1) layers.pop(); // shorter pine — 4 layers
         return (
-          <group key={i} position={t.p} scale={t.s}>
-            <mesh position={[0, 1.5, 0]} material={trunkMat}>
-              <cylinderGeometry args={[0.28, 0.4, 3.0, 10]} />
+          <group key={i} position={t.p} scale={t.s} rotation={[t.tilt, t.yaw, 0]}>
+            {/* root flare */}
+            <mesh position={[0, 0.05, 0]} material={trunkMat}>
+              <coneGeometry args={[0.36, 0.25, 8]} />
             </mesh>
-            <mesh position={[0, 3.4, 0]} material={oakLeaf}><sphereGeometry args={[1.6, 12, 10]} /></mesh>
-            <mesh position={[0.6, 3.2, 0.6]} material={oakLeaf}><sphereGeometry args={[1.0, 10, 8]} /></mesh>
-            <mesh position={[-0.7, 3.0, -0.5]} material={oakLeaf}><sphereGeometry args={[1.1, 10, 8]} /></mesh>
+            {/* trunk — tapered, taller than the old version */}
+            <mesh position={[0, 1.8, 0]} material={trunkMat}>
+              <cylinderGeometry args={[0.16, 0.30, 3.4, 10]} />
+            </mesh>
+            {/* needle layers */}
+            {layers.map((L, j) => (
+              <mesh key={j} position={[0, L.y, 0]} material={L.mat}>
+                <coneGeometry args={[L.r, L.h, 12]} />
+              </mesh>
+            ))}
+            {/* a few dangling needle clusters on the outer edge of the lowest
+                layer so the silhouette reads as bushy from afar */}
+            {t.variant !== 1 && (
+              <>
+                <mesh position={[0.7, 2.6, 0]} material={needleDark}>
+                  <sphereGeometry args={[0.45, 8, 6]} />
+                </mesh>
+                <mesh position={[-0.6, 2.7, 0.3]} material={needleDark}>
+                  <sphereGeometry args={[0.4, 8, 6]} />
+                </mesh>
+                <mesh position={[0.1, 2.55, -0.6]} material={needleDark}>
+                  <sphereGeometry args={[0.42, 8, 6]} />
+                </mesh>
+              </>
+            )}
           </group>
         );
       })}
