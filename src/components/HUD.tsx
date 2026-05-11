@@ -103,8 +103,13 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
 
         <div className="bg-black/45 backdrop-blur rounded-xl px-3 py-2 text-xs text-right">
           <div>{time} · {room.season} · {room.weather}</div>
-          <div className="opacity-70">{Object.keys(players).length} cat(s) nearby</div>
+          <div className="opacity-70">
+            👥 {Object.keys(players).length} cat{Object.keys(players).length === 1 ? '' : 's'} in forest
+          </div>
           <div className="opacity-60 text-[10px] mt-1">Room: {room.roomId}</div>
+          {Object.keys(players).length > 1 && (
+            <div className="opacity-80 text-[10px] mt-1 text-thunder">✓ multiplayer live</div>
+          )}
         </div>
       </div>
 
@@ -208,7 +213,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-42 · x hint key fixed
+        wotc-43 · multiplayer indicator + ls fallback
       </div>
     </div>
   );
