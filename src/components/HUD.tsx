@@ -120,7 +120,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
       </div>
 
       {/* bottom-left action buttons */}
-      <div className="absolute left-3 bottom-3 flex flex-col gap-2 pointer-events-auto">
+      <div className="absolute left-3 bottom-3 [@media(pointer:coarse)]:bottom-[260px] flex flex-col gap-2 pointer-events-auto">
         {carrying && (
           <button onClick={drop} className="rounded-full bg-thunder px-3 py-2 text-xs shadow">Drop {carrying} at camp pile</button>
         )}
@@ -213,7 +213,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-46 · task button z-fix
+        wotc-47 · actions above joystick
       </div>
     </div>
   );
