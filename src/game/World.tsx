@@ -685,6 +685,264 @@ function Snow({ intensity = 400, hidden }: { intensity?: number; hidden?: boolea
   );
 }
 
+// Twoleg place — a small village with two paved paths crossing, twelve
+// houses of varying sizes / colours arranged along them, a small park,
+// streetlamps, and a parked twoleg "monster" (car). Anchored at the
+// world position picked by the World render.
+function TwolegPlace({ isNight }: { isNight: boolean }) {
+  const anchorX = 260, anchorZ = 240;
+  const y = terrainHeightAt(anchorX, anchorZ);
+
+  // Path width / extents. Two crossing paths form a "+" shape.
+  // North-south path runs along z, east-west along x.
+  const NS_LEN = 50, EW_LEN = 50, PATH_W = 4;
+
+  // Helper to build one house from a config. Position is local to the
+  // group; size, palette, and y-shift are randomized via the config.
+  const houses = useMemo(() => {
+    // Deterministic-ish layout — fixed seed so the village doesn't move
+    // between renders.
+    const rand = seededRand(7777);
+    const palettes = [
+      { wall: '#a04848', roof: '#5a2828', shutter: '#3a2018' },
+      { wall: '#cdb673', roof: '#6a4a2a', shutter: '#3a2418' },
+      { wall: '#7a8a9c', roof: '#3a4250', shutter: '#1c2030' },
+      { wall: '#e2c89a', roof: '#7a5a2a', shutter: '#3a2418' },
+      { wall: '#9ac08a', roof: '#3a5a3a', shutter: '#1c2a18' },
+      { wall: '#c46a4a', roof: '#6a2828', shutter: '#2a1410' },
+      { wall: '#bfb0a0', roof: '#5a4030', shutter: '#1c1410' },
+      { wall: '#f4d49a', roof: '#7a4a2a', shutter: '#3a2010' },
+    ];
+    // Place houses on either side of the NS path (x = ±5..±18) and along
+    // the EW path (z = ±5..±18), avoiding the paths themselves.
+    const slots: Array<{ x: number; z: number; w: number; d: number; h: number; rotY: number; palette: typeof palettes[number] }> = [];
+    // North row (z < -5)
+    for (let i = 0; i < 3; i++) {
+      slots.push({
+        x: -18 + i * 12 + (rand() - 0.5) * 2,
+        z: -10 - rand() * 5,
+        w: 4 + rand() * 1.5,
+        d: 4 + rand() * 1.5,
+        h: 3 + rand() * 1.2,
+        rotY: (rand() - 0.5) * 0.15,
+        palette: palettes[Math.floor(rand() * palettes.length)],
+      });
+    }
+    // South row (z > +5)
+    for (let i = 0; i < 3; i++) {
+      slots.push({
+        x: -18 + i * 12 + (rand() - 0.5) * 2,
+        z: 10 + rand() * 5,
+        w: 4 + rand() * 1.5,
+        d: 4 + rand() * 1.5,
+        h: 3 + rand() * 1.2,
+        rotY: (rand() - 0.5) * 0.15,
+        palette: palettes[Math.floor(rand() * palettes.length)],
+      });
+    }
+    // West row (x < -5)
+    for (let i = 0; i < 2; i++) {
+      slots.push({
+        x: -22 - rand() * 4,
+        z: -8 + i * 16 + (rand() - 0.5) * 2,
+        w: 4 + rand() * 1.5,
+        d: 4 + rand() * 1.5,
+        h: 3 + rand() * 1.2,
+        rotY: (rand() - 0.5) * 0.15 + Math.PI / 2,
+        palette: palettes[Math.floor(rand() * palettes.length)],
+      });
+    }
+    // East row (x > +5)
+    for (let i = 0; i < 2; i++) {
+      slots.push({
+        x: 22 + rand() * 4,
+        z: -8 + i * 16 + (rand() - 0.5) * 2,
+        w: 4 + rand() * 1.5,
+        d: 4 + rand() * 1.5,
+        h: 3 + rand() * 1.2,
+        rotY: (rand() - 0.5) * 0.15 - Math.PI / 2,
+        palette: palettes[Math.floor(rand() * palettes.length)],
+      });
+    }
+    // Two larger buildings at the corners — barn / shop
+    slots.push({
+      x: 18, z: -22,
+      w: 6.5, d: 5, h: 3.5, rotY: 0,
+      palette: { wall: '#8a4a2a', roof: '#3a1c10', shutter: '#1c1410' },
+    });
+    slots.push({
+      x: -20, z: 22,
+      w: 5.5, d: 5.5, h: 3.0, rotY: Math.PI / 6,
+      palette: { wall: '#dcc89c', roof: '#5a3a20', shutter: '#1c1410' },
+    });
+    return slots;
+  }, []);
+
+  // Streetlamps along the path edges
+  const lamps = useMemo(() => {
+    const out: [number, number][] = [];
+    for (let i = -2; i <= 2; i++) out.push([i * 10, -PATH_W / 2 - 0.6]); // EW path north side
+    for (let i = -2; i <= 2; i++) out.push([i * 10,  PATH_W / 2 + 0.6]); // EW path south side
+    for (let i = -2; i <= 2; i++) out.push([-PATH_W / 2 - 0.6, i * 10]); // NS path west side
+    for (let i = -2; i <= 2; i++) out.push([ PATH_W / 2 + 0.6, i * 10]); // NS path east side
+    return out;
+  }, []);
+
+  return (
+    <group position={[anchorX, y, anchorZ]}>
+      {/* Two crossing paved paths — flat grey rectangles laid just above
+          the terrain so they don't z-fight the grass. */}
+      <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[NS_LEN, PATH_W]} />
+        <meshStandardMaterial color={'#8a8276'} roughness={1} />
+      </mesh>
+      <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+        <planeGeometry args={[EW_LEN, PATH_W]} />
+        <meshStandardMaterial color={'#8a8276'} roughness={1} />
+      </mesh>
+      {/* Path stripes — three lighter rectangles down the middle of each
+          for that worn-cobbled look */}
+      {Array.from({ length: 7 }).map((_, i) => (
+        <mesh key={`ns-stripe-${i}`} position={[0, 0.05, -NS_LEN / 2 + 3 + i * 7]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.25, 2.5]} />
+          <meshStandardMaterial color={'#a6a094'} roughness={1} />
+        </mesh>
+      ))}
+
+      {/* Houses */}
+      {houses.map((h, i) => (
+        <group key={i} position={[h.x, 0, h.z]} rotation={[0, h.rotY, 0]}>
+          {/* foundation */}
+          <mesh position={[0, 0.15, 0]}>
+            <boxGeometry args={[h.w + 0.4, 0.3, h.d + 0.4]} />
+            <meshStandardMaterial color={'#5e5448'} roughness={1} />
+          </mesh>
+          {/* walls */}
+          <mesh position={[0, h.h / 2 + 0.3, 0]}>
+            <boxGeometry args={[h.w, h.h, h.d]} />
+            <meshStandardMaterial color={h.palette.wall} roughness={0.9} />
+          </mesh>
+          {/* pitched roof (4-sided pyramid) */}
+          <mesh position={[0, h.h + 0.3 + (h.w + h.d) * 0.18, 0]}>
+            <coneGeometry args={[Math.max(h.w, h.d) * 0.78, (h.w + h.d) * 0.36, 4]} />
+            <meshStandardMaterial color={h.palette.roof} roughness={0.95} flatShading />
+          </mesh>
+          {/* chimney */}
+          <mesh position={[h.w * 0.25, h.h + 0.3 + (h.w + h.d) * 0.45, h.d * 0.2]}>
+            <boxGeometry args={[0.5, 0.9, 0.5]} />
+            <meshStandardMaterial color={'#6a5a4a'} roughness={1} />
+          </mesh>
+          {/* front shutters + glowing pane */}
+          <mesh position={[-h.w * 0.28, h.h * 0.6 + 0.3, h.d / 2 + 0.02]}>
+            <boxGeometry args={[0.8, 0.8, 0.05]} />
+            <meshStandardMaterial color={h.palette.shutter} roughness={0.6} />
+          </mesh>
+          <mesh position={[ h.w * 0.28, h.h * 0.6 + 0.3, h.d / 2 + 0.02]}>
+            <boxGeometry args={[0.8, 0.8, 0.05]} />
+            <meshStandardMaterial color={h.palette.shutter} roughness={0.6} />
+          </mesh>
+          <mesh position={[-h.w * 0.28, h.h * 0.6 + 0.3, h.d / 2 + 0.04]}>
+            <boxGeometry args={[0.5, 0.5, 0.05]} />
+            <meshStandardMaterial color={'#f6d97a'} emissive={'#a07020'} emissiveIntensity={isNight ? 0.6 : 0.05} roughness={0.5} />
+          </mesh>
+          <mesh position={[ h.w * 0.28, h.h * 0.6 + 0.3, h.d / 2 + 0.04]}>
+            <boxGeometry args={[0.5, 0.5, 0.05]} />
+            <meshStandardMaterial color={'#f6d97a'} emissive={'#a07020'} emissiveIntensity={isNight ? 0.6 : 0.05} roughness={0.5} />
+          </mesh>
+          {/* door */}
+          <mesh position={[0, 0.95, h.d / 2 + 0.02]}>
+            <boxGeometry args={[0.9, 1.7, 0.05]} />
+            <meshStandardMaterial color={h.palette.shutter} roughness={0.7} />
+          </mesh>
+          {/* doorstep */}
+          <mesh position={[0, 0.1, h.d / 2 + 0.4]}>
+            <boxGeometry args={[1.4, 0.18, 0.6]} />
+            <meshStandardMaterial color={'#6a635a'} roughness={1} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Streetlamps — wooden post + a small glowing lantern at night */}
+      {lamps.map(([lx, lz], i) => (
+        <group key={`lamp-${i}`} position={[lx, 0, lz]}>
+          <mesh position={[0, 1.3, 0]}>
+            <cylinderGeometry args={[0.06, 0.06, 2.6, 8]} />
+            <meshStandardMaterial color={'#3a2818'} roughness={1} />
+          </mesh>
+          <mesh position={[0, 2.7, 0]}>
+            <sphereGeometry args={[0.22, 10, 8]} />
+            <meshStandardMaterial color={'#f6d97a'} emissive={'#c07020'} emissiveIntensity={isNight ? 0.9 : 0.05} roughness={0.5} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Small parked twoleg "monster" (car) at the crossroads */}
+      <group position={[6, 0, 0]} rotation={[0, 0.3, 0]}>
+        <mesh position={[0, 0.6, 0]}>
+          <boxGeometry args={[3.2, 1.0, 1.6]} />
+          <meshStandardMaterial color={'#3a4a6a'} roughness={0.5} metalness={0.4} />
+        </mesh>
+        {/* roof / cabin */}
+        <mesh position={[0.1, 1.25, 0]}>
+          <boxGeometry args={[2.0, 0.7, 1.5]} />
+          <meshStandardMaterial color={'#3a4a6a'} roughness={0.5} metalness={0.4} />
+        </mesh>
+        {/* wheels */}
+        {[[1.0, 0.3, 0.7], [-1.0, 0.3, 0.7], [1.0, 0.3, -0.7], [-1.0, 0.3, -0.7]].map((p, j) => (
+          <mesh key={j} position={p as [number, number, number]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.3, 0.3, 0.25, 14]} />
+            <meshStandardMaterial color={'#1a1a1a'} roughness={1} />
+          </mesh>
+        ))}
+        {/* windscreen — yellow at night */}
+        <mesh position={[0.1, 1.25, 0.76]}>
+          <boxGeometry args={[1.8, 0.5, 0.04]} />
+          <meshStandardMaterial color={'#9ab8d8'} emissive={'#445a78'} emissiveIntensity={isNight ? 0.35 : 0.05} roughness={0.2} />
+        </mesh>
+      </group>
+
+      {/* A small park with bushes — north-east corner */}
+      <group position={[16, 0, -14]}>
+        <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[6, 5]} />
+          <meshStandardMaterial color={'#5a8a4a'} roughness={1} />
+        </mesh>
+        {[[1.5, 0.45, 0.5], [-1.5, 0.55, -0.6], [0.4, 0.5, 1.5], [-1.0, 0.4, 1.5]].map((p, j) => (
+          <mesh key={j} position={p as [number, number, number]}>
+            <sphereGeometry args={[p[1], 10, 8]} />
+            <meshStandardMaterial color={'#3f6c34'} roughness={0.95} />
+          </mesh>
+        ))}
+        {/* park bench */}
+        <mesh position={[0, 0.4, -1.6]}>
+          <boxGeometry args={[1.8, 0.1, 0.4]} />
+          <meshStandardMaterial color={'#5a3a20'} roughness={1} />
+        </mesh>
+        <mesh position={[0, 0.75, -1.8]}>
+          <boxGeometry args={[1.8, 0.6, 0.08]} />
+          <meshStandardMaterial color={'#5a3a20'} roughness={1} />
+        </mesh>
+      </group>
+
+      {/* Fence line bordering the south side of the village */}
+      {Array.from({ length: 24 }).map((_, i) => (
+        <mesh key={`f${i}`} position={[-24 + i * 2, 0.45, 16]}>
+          <boxGeometry args={[0.08, 0.9, 0.08]} />
+          <meshStandardMaterial color={'#7a5a3a'} roughness={1} />
+        </mesh>
+      ))}
+      <mesh position={[-1, 0.75, 16]}>
+        <boxGeometry args={[48, 0.06, 0.06]} />
+        <meshStandardMaterial color={'#8a6a44'} roughness={1} />
+      </mesh>
+      <mesh position={[-1, 0.3, 16]}>
+        <boxGeometry args={[48, 0.06, 0.06]} />
+        <meshStandardMaterial color={'#8a6a44'} roughness={1} />
+      </mesh>
+    </group>
+  );
+}
+
 export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
   const treeCount = graphics === 'low' ? 50 : graphics === 'medium' ? 120 : 240;
   const grassCount = graphics === 'low' ? 0 : graphics === 'medium' ? 220 : 480;
@@ -737,77 +995,7 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
       <Stars visible={isNight} count={graphics === 'low' ? 140 : graphics === 'medium' ? 240 : 380} />
       <Camps />
 
-      {/* twoleg place — boxy houses with pitched roofs, painted shutters,
-          and a low wooden fence around the lane. */}
-      <group position={[260, terrainHeightAt(260, 240), 240]}>
-        {[
-          { wall: '#a04848', roof: '#5a2828', shutter: '#3a2018' },
-          { wall: '#cdb673', roof: '#6a4a2a', shutter: '#3a2418' },
-          { wall: '#7a8a9c', roof: '#3a4250', shutter: '#1c2030' },
-          { wall: '#e2c89a', roof: '#7a5a2a', shutter: '#3a2418' },
-        ].map((c, i) => {
-          const x = i * 6 - 9;
-          const z = (i % 2) * 5;
-          return (
-            <group key={i} position={[x, 0, z]}>
-              {/* walls */}
-              <mesh position={[0, 1.5, 0]}>
-                <boxGeometry args={[4, 3, 4]} />
-                <meshStandardMaterial color={c.wall} roughness={0.9} />
-              </mesh>
-              {/* pitched roof — a wide triangular prism made of two angled boxes */}
-              <mesh position={[0, 3.4, 0]} rotation={[0, 0, 0]}>
-                <coneGeometry args={[3.0, 1.5, 4]} />
-                <meshStandardMaterial color={c.roof} roughness={0.95} flatShading />
-              </mesh>
-              {/* chimney */}
-              <mesh position={[1.2, 4.0, 0.5]}>
-                <boxGeometry args={[0.5, 0.9, 0.5]} />
-                <meshStandardMaterial color={'#6a5a4a'} roughness={1} />
-              </mesh>
-              {/* shutters (windows) */}
-              <mesh position={[-1.2, 1.7, 2.01]}>
-                <boxGeometry args={[0.8, 0.8, 0.05]} />
-                <meshStandardMaterial color={c.shutter} roughness={0.6} />
-              </mesh>
-              <mesh position={[1.2, 1.7, 2.01]}>
-                <boxGeometry args={[0.8, 0.8, 0.05]} />
-                <meshStandardMaterial color={c.shutter} roughness={0.6} />
-              </mesh>
-              {/* yellow window glow in the panes when it's dark */}
-              <mesh position={[-1.2, 1.7, 2.025]}>
-                <boxGeometry args={[0.5, 0.5, 0.05]} />
-                <meshStandardMaterial color={'#f6d97a'} emissive={'#a07020'} emissiveIntensity={isNight ? 0.6 : 0.05} roughness={0.5} />
-              </mesh>
-              <mesh position={[1.2, 1.7, 2.025]}>
-                <boxGeometry args={[0.5, 0.5, 0.05]} />
-                <meshStandardMaterial color={'#f6d97a'} emissive={'#a07020'} emissiveIntensity={isNight ? 0.6 : 0.05} roughness={0.5} />
-              </mesh>
-              {/* door */}
-              <mesh position={[0, 0.9, 2.01]}>
-                <boxGeometry args={[0.9, 1.7, 0.05]} />
-                <meshStandardMaterial color={c.shutter} roughness={0.7} />
-              </mesh>
-            </group>
-          );
-        })}
-        {/* low wooden fence along the lane */}
-        {Array.from({ length: 14 }).map((_, i) => (
-          <mesh key={`f${i}`} position={[-12 + i * 1.5, 0.45, -3]}>
-            <boxGeometry args={[0.08, 0.9, 0.08]} />
-            <meshStandardMaterial color={'#7a5a3a'} roughness={1} />
-          </mesh>
-        ))}
-        {/* fence rails */}
-        <mesh position={[-5.5, 0.75, -3]}>
-          <boxGeometry args={[19, 0.06, 0.06]} />
-          <meshStandardMaterial color={'#8a6a44'} roughness={1} />
-        </mesh>
-        <mesh position={[-5.5, 0.3, -3]}>
-          <boxGeometry args={[19, 0.06, 0.06]} />
-          <meshStandardMaterial color={'#8a6a44'} roughness={1} />
-        </mesh>
-      </group>
+      <TwolegPlace isNight={isNight} />
 
       {/* moonpool — uneven stone ring surrounding a glowing silver pool */}
       <group position={[-220, terrainHeightAt(-220, -220), -220]}>
