@@ -233,7 +233,9 @@ function Rocks({ count }: { count: number }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const rand = useMemo(() => seededRand(9911), []);
   const rockGeo = useMemo(() => new THREE.DodecahedronGeometry(0.6, 0), []);
-  const rockMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#7d7872', roughness: 1, flatShading: true }), []);
+  // Per-instance color: a mix of bare stone (greys / browns) and mossy
+  // rocks (greens). Stones near the river bank get a touch of damp.
+  const rockMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1, flatShading: true, vertexColors: false }), []);
   useEffect(() => () => { rockGeo.dispose(); rockMat.dispose(); }, [rockGeo, rockMat]);
 
   useEffect(() => {
@@ -243,6 +245,16 @@ function Rocks({ count }: { count: number }) {
     const q = new THREE.Quaternion();
     const s = new THREE.Vector3();
     const p = new THREE.Vector3();
+    const col = new THREE.Color();
+    const palette = [
+      '#7d7872', // base grey stone
+      '#8a8278', // lighter stone
+      '#6a6058', // shadow stone
+      '#a09682', // sandstone
+      '#5e6a48', // mossy
+      '#4a5a36', // deep moss
+      '#7a684a', // tan
+    ];
     let placed = 0;
     let attempts = 0;
     while (placed < count && attempts < count * 6) {
@@ -261,10 +273,13 @@ function Rocks({ count }: { count: number }) {
       p.set(x, y + sy * 0.35, z);
       m.compose(p, q, s);
       rocks.setMatrixAt(placed, m);
+      col.set(palette[Math.floor(rand() * palette.length)]);
+      rocks.setColorAt(placed, col);
       placed++;
     }
     rocks.count = placed;
     rocks.instanceMatrix.needsUpdate = true;
+    if (rocks.instanceColor) rocks.instanceColor.needsUpdate = true;
   }, [count, rand]);
 
   if (count <= 0) return null;
@@ -402,21 +417,48 @@ function Camps() {
             <meshStandardMaterial color={'#7a6a4a'} roughness={1} />
           </mesh>
 
-          {/* High Rock — a layered crag the leader stands on to address the
-              clan. Built from stacked boxes plus a sloped "step path" so cats
-              can visually walk up to the top. */}
+          {/* High Rock — irregular layered crag. Multiple stacked + tilted
+              stones with slight per-stone shade variation so it reads as
+              real rock rather than a box. The flat top (kept walkable via
+              terrain.ts) is the leader's perch. */}
           <group position={[0, 0, -7]}>
-            <mesh position={[0, 1.1, 0]}>
+            {/* Main mass — base block, slightly skewed */}
+            <mesh position={[0, 1.1, 0]} rotation={[0, 0.12, 0.04]}>
               <boxGeometry args={[4.2, 2.2, 2.6]} />
               <meshStandardMaterial color={'#8a8276'} roughness={1} flatShading />
             </mesh>
+            {/* Outcrop on the right — bigger angled chunk */}
+            <mesh position={[1.7, 0.9, 0.6]} rotation={[0, -0.22, -0.18]}>
+              <boxGeometry args={[1.8, 1.7, 1.4]} />
+              <meshStandardMaterial color={'#7a7268'} roughness={1} flatShading />
+            </mesh>
+            {/* Outcrop on the left */}
+            <mesh position={[-1.6, 0.7, 0.3]} rotation={[0.05, 0.1, 0.22]}>
+              <boxGeometry args={[1.5, 1.4, 1.3]} />
+              <meshStandardMaterial color={'#9a948a'} roughness={1} flatShading />
+            </mesh>
+            {/* Flat-ish summit slab — top of the rock, where the leader stands */}
             <mesh position={[0, 2.35, -0.2]}>
               <boxGeometry args={[3.2, 0.5, 2.2]} />
               <meshStandardMaterial color={'#9a948a'} roughness={1} flatShading />
             </mesh>
-            <mesh position={[1.7, 0.45, 1.2]} rotation={[0, 0, -0.18]}>
+            {/* Step-stones leading up */}
+            <mesh position={[1.7, 0.25, 1.2]} rotation={[0, 0, -0.18]}>
               <boxGeometry args={[1.6, 0.3, 1.0]} />
               <meshStandardMaterial color={'#7a7268'} roughness={1} flatShading />
+            </mesh>
+            <mesh position={[2.4, 0.55, 0.9]} rotation={[0, 0.18, -0.22]}>
+              <boxGeometry args={[1.0, 0.4, 0.85]} />
+              <meshStandardMaterial color={'#8a8278'} roughness={1} flatShading />
+            </mesh>
+            {/* Two small mossy boulders at the base */}
+            <mesh position={[-2.2, 0.32, 1.3]} rotation={[0.2, 1.1, 0.1]}>
+              <dodecahedronGeometry args={[0.45, 0]} />
+              <meshStandardMaterial color={'#5e6a48'} roughness={1} flatShading />
+            </mesh>
+            <mesh position={[2.7, 0.28, -1.1]} rotation={[0.1, 0.5, -0.08]}>
+              <dodecahedronGeometry args={[0.38, 0]} />
+              <meshStandardMaterial color={'#4a5a36'} roughness={1} flatShading />
             </mesh>
             {/* Clan banner stone glowing on top */}
             <mesh position={[0, 2.85, -0.2]}>
@@ -695,31 +737,110 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
       <Stars visible={isNight} count={graphics === 'low' ? 140 : graphics === 'medium' ? 240 : 380} />
       <Camps />
 
-      {/* twoleg place: simple boxy buildings */}
+      {/* twoleg place — boxy houses with pitched roofs, painted shutters,
+          and a low wooden fence around the lane. */}
       <group position={[260, terrainHeightAt(260, 240), 240]}>
-        {[0, 1, 2, 3].map((i) => (
-          <mesh key={i} position={[i * 6 - 9, 1.5, (i % 2) * 5]}>
-            <boxGeometry args={[4, 3, 4]} />
-            <meshStandardMaterial color={['#a04848', '#cdb673', '#7a8a9c', '#e2c89a'][i]} roughness={0.9} />
+        {[
+          { wall: '#a04848', roof: '#5a2828', shutter: '#3a2018' },
+          { wall: '#cdb673', roof: '#6a4a2a', shutter: '#3a2418' },
+          { wall: '#7a8a9c', roof: '#3a4250', shutter: '#1c2030' },
+          { wall: '#e2c89a', roof: '#7a5a2a', shutter: '#3a2418' },
+        ].map((c, i) => {
+          const x = i * 6 - 9;
+          const z = (i % 2) * 5;
+          return (
+            <group key={i} position={[x, 0, z]}>
+              {/* walls */}
+              <mesh position={[0, 1.5, 0]}>
+                <boxGeometry args={[4, 3, 4]} />
+                <meshStandardMaterial color={c.wall} roughness={0.9} />
+              </mesh>
+              {/* pitched roof — a wide triangular prism made of two angled boxes */}
+              <mesh position={[0, 3.4, 0]} rotation={[0, 0, 0]}>
+                <coneGeometry args={[3.0, 1.5, 4]} />
+                <meshStandardMaterial color={c.roof} roughness={0.95} flatShading />
+              </mesh>
+              {/* chimney */}
+              <mesh position={[1.2, 4.0, 0.5]}>
+                <boxGeometry args={[0.5, 0.9, 0.5]} />
+                <meshStandardMaterial color={'#6a5a4a'} roughness={1} />
+              </mesh>
+              {/* shutters (windows) */}
+              <mesh position={[-1.2, 1.7, 2.01]}>
+                <boxGeometry args={[0.8, 0.8, 0.05]} />
+                <meshStandardMaterial color={c.shutter} roughness={0.6} />
+              </mesh>
+              <mesh position={[1.2, 1.7, 2.01]}>
+                <boxGeometry args={[0.8, 0.8, 0.05]} />
+                <meshStandardMaterial color={c.shutter} roughness={0.6} />
+              </mesh>
+              {/* yellow window glow in the panes when it's dark */}
+              <mesh position={[-1.2, 1.7, 2.025]}>
+                <boxGeometry args={[0.5, 0.5, 0.05]} />
+                <meshStandardMaterial color={'#f6d97a'} emissive={'#a07020'} emissiveIntensity={isNight ? 0.6 : 0.05} roughness={0.5} />
+              </mesh>
+              <mesh position={[1.2, 1.7, 2.025]}>
+                <boxGeometry args={[0.5, 0.5, 0.05]} />
+                <meshStandardMaterial color={'#f6d97a'} emissive={'#a07020'} emissiveIntensity={isNight ? 0.6 : 0.05} roughness={0.5} />
+              </mesh>
+              {/* door */}
+              <mesh position={[0, 0.9, 2.01]}>
+                <boxGeometry args={[0.9, 1.7, 0.05]} />
+                <meshStandardMaterial color={c.shutter} roughness={0.7} />
+              </mesh>
+            </group>
+          );
+        })}
+        {/* low wooden fence along the lane */}
+        {Array.from({ length: 14 }).map((_, i) => (
+          <mesh key={`f${i}`} position={[-12 + i * 1.5, 0.45, -3]}>
+            <boxGeometry args={[0.08, 0.9, 0.08]} />
+            <meshStandardMaterial color={'#7a5a3a'} roughness={1} />
           </mesh>
         ))}
+        {/* fence rails */}
+        <mesh position={[-5.5, 0.75, -3]}>
+          <boxGeometry args={[19, 0.06, 0.06]} />
+          <meshStandardMaterial color={'#8a6a44'} roughness={1} />
+        </mesh>
+        <mesh position={[-5.5, 0.3, -3]}>
+          <boxGeometry args={[19, 0.06, 0.06]} />
+          <meshStandardMaterial color={'#8a6a44'} roughness={1} />
+        </mesh>
       </group>
 
-      {/* moonpool stone ring */}
+      {/* moonpool — uneven stone ring surrounding a glowing silver pool */}
       <group position={[-220, terrainHeightAt(-220, -220), -220]}>
-        {Array.from({ length: 8 }).map((_, i) => {
-          const a = (i / 8) * Math.PI * 2;
+        {Array.from({ length: 10 }).map((_, i) => {
+          const a = (i / 10) * Math.PI * 2;
+          // Slight per-stone variation so the ring isn't perfectly round.
+          const r = 3 + Math.sin(i * 1.7) * 0.25;
+          const h = 0.6 + Math.cos(i * 2.3) * 0.25;
+          const w = 0.7 + Math.sin(i * 0.9) * 0.2;
+          const tilt = Math.sin(i * 3.1) * 0.18;
           return (
-            <mesh key={i} position={[Math.cos(a) * 3, 0.4, Math.sin(a) * 3]}>
-              <boxGeometry args={[0.8, 0.8, 0.6]} />
-              <meshStandardMaterial color={'#7a7a82'} roughness={1} />
+            <mesh
+              key={i}
+              position={[Math.cos(a) * r, h * 0.5, Math.sin(a) * r]}
+              rotation={[tilt, a + Math.PI / 2, tilt * 0.5]}
+            >
+              <boxGeometry args={[w, h, 0.6]} />
+              <meshStandardMaterial color={'#7a7a82'} roughness={1} flatShading />
             </mesh>
           );
         })}
+        {/* Pool surface — brighter and slightly transparent at night */}
         <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[2.6, 24]} />
-          <meshStandardMaterial color={isNight ? '#8aaef0' : '#5a8ad8'} emissive={isNight ? '#3a5a9a' : '#000'} emissiveIntensity={isNight ? 0.7 : 0} />
+          <circleGeometry args={[2.6, 32]} />
+          <meshStandardMaterial color={isNight ? '#8aaef0' : '#5a8ad8'} emissive={isNight ? '#3a5a9a' : '#000'} emissiveIntensity={isNight ? 0.7 : 0} transparent opacity={0.92} />
         </mesh>
+        {/* Faint outer ripple ring at night */}
+        {isNight && (
+          <mesh position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[2.6, 3.0, 48]} />
+            <meshBasicMaterial color={'#aac6ff'} transparent opacity={0.35} />
+          </mesh>
+        )}
       </group>
 
       {/* weather */}
