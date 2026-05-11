@@ -21,12 +21,29 @@ export interface MultiplayerHandle {
 // browser bundle. So if you're deploying on Vercel / Next you actually
 // want NEXT_PUBLIC_WARRIOR_CATS_SOCKET_URL — we read that too. The legacy
 // NEXT_PUBLIC_SOCKET_URL still works for back-compat.
-const SOCKET_URL =
-  (typeof window !== 'undefined' ? (window as any).__WOTC_SOCKET_URL__ : null) ||
-  process.env.WARRIOR_CATS_PUBLIC_SOCKET_URL ||
-  process.env.NEXT_PUBLIC_WARRIOR_CATS_SOCKET_URL ||
-  process.env.NEXT_PUBLIC_SOCKET_URL ||
-  '';
+function resolveSocketUrl(): string {
+  const explicit =
+    (typeof window !== 'undefined' ? (window as any).__WOTC_SOCKET_URL__ : null) ||
+    process.env.WARRIOR_CATS_PUBLIC_SOCKET_URL ||
+    process.env.NEXT_PUBLIC_WARRIOR_CATS_SOCKET_URL ||
+    process.env.NEXT_PUBLIC_SOCKET_URL ||
+    '';
+  if (explicit) return explicit;
+  // Zero-config LAN fallback: when the page is served from localhost or a
+  // private IP, assume the relay is running on the same host on :3001
+  // (npm run dev:all does this). That makes iPad + computer multiplayer
+  // work on the same Wi-Fi with no config.
+  if (typeof window !== 'undefined') {
+    const h = window.location.hostname;
+    const isLan = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\])/.test(h);
+    if (isLan) {
+      const proto = window.location.protocol === 'https:' ? 'https:' : 'http:';
+      return `${proto}//${h}:3001`;
+    }
+  }
+  return '';
+}
+const SOCKET_URL = resolveSocketUrl();
 
 // Module-level singleton so multiple components in the tree share one socket.
 let _socket: Socket | null = null;
@@ -100,6 +117,13 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
       const onLeave = (id: string) => removePlayer(id);
       const onChat = (m: ChatMessage) => { if (!muted.has(m.fromId)) pushChat(m); };
       const onSystem = (text: string) => pushChat({ id: 's' + Date.now(), fromId: 'system', fromName: 'System', scope: 'system', text, at: Date.now() });
+      const onDisaster = (d: { kind: 'twoleg' | 'flood' | 'fire'; until: number; message: string }) => {
+        const st = useGameStore.getState();
+        if (!st.disaster || st.disaster.until < d.until) {
+          st.setDisaster(d);
+          st.pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: d.message, at: Date.now() });
+        }
+      };
 
       s.on('connect', onConnect);
       s.on('room:state', onRoomState);
@@ -108,6 +132,7 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
       s.on('player:leave', onLeave);
       s.on('chat', onChat);
       s.on('system', onSystem);
+      s.on('disaster', onDisaster);
 
       if (s.connected) onConnect();
 
@@ -119,6 +144,7 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
         s.off('player:leave', onLeave);
         s.off('chat', onChat);
         s.off('system', onSystem);
+        s.off('disaster', onDisaster);
         _refs -= 1;
         if (_refs <= 0 && _socket) {
           _socket.disconnect();
@@ -448,7 +474,10 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
     sendCatch: (preyId, kind) => socketRef.current?.emit('catch', { preyId, kind }),
     sendDisaster: (d) => {
       // Mirror the disaster locally so the originator sees it too, then
-      // broadcast so every other tab applies the same event.
+      // broadcast so every other tab/device applies the same event. We
+      // fan it out across BOTH transports — the BroadcastChannel handles
+      // same-browser tabs even when a socket is connected, the socket
+      // handles other devices in the room.
       const s = useGameStore.getState();
       s.setDisaster(d);
       s.pushChat({
@@ -459,6 +488,7 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
         text: d.message,
         at: Date.now(),
       });
+      try { socketRef.current?.emit('disaster', d); } catch {}
       try { bcRef.current?.postMessage({ kind: 'disaster', disaster: d } as BcMessage); } catch {}
     },
   };

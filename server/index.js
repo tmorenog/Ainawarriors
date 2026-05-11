@@ -211,6 +211,17 @@ io.on('connection', (socket) => {
     io.to(joinedRoom).emit('system', `Prey caught: ${kind || 'unknown'}.`);
   });
 
+  socket.on('disaster', (d) => {
+    if (!joinedRoom || !d || typeof d !== 'object') return;
+    const kind = ['twoleg', 'flood', 'fire'].includes(d.kind) ? d.kind : null;
+    const until = Number(d.until);
+    const message = String(d.message || '').slice(0, 240);
+    if (!kind || !Number.isFinite(until) || !message) return;
+    // Fan out to everyone in the room EXCEPT the originator — they already
+    // applied it locally before emitting.
+    socket.to(joinedRoom).emit('disaster', { kind, until, message });
+  });
+
   socket.on('command', ({ kind, payload }) => {
     if (!joinedRoom) return;
     const r = getRoom(joinedRoom);
