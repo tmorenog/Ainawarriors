@@ -16,15 +16,32 @@ npm run server    # multiplayer server only
 
 Open http://localhost:3000.
 
-To enable multiplayer locally, copy `.env.example` to `.env.local` and set:
+### Multiplayer across devices on the same Wi-Fi (zero config)
 
-```
-WARRIOR_CATS_PUBLIC_SOCKET_URL=http://localhost:3001
-# On Vercel / Next deployments, also set this so the browser bundle sees it:
-# NEXT_PUBLIC_WARRIOR_CATS_SOCKET_URL=http://localhost:3001
-```
+`npm run dev:all` starts both servers. Find your computer's LAN IP (e.g.
+`192.168.1.42`) and open `http://192.168.1.42:3000` on your iPad / phone /
+another laptop on the same network — the client auto-detects the LAN and
+talks to the relay at `:3001` automatically. No env var needed.
 
-Without that variable the game runs in offline single-player mode, where you are the leader of your chosen clan.
+### Multiplayer over the public internet
+
+Vercel serverless cannot keep WebSocket connections open, so the relay
+must run on a separate Node host. Easiest path:
+
+1. Push this repo to GitHub.
+2. **Deploy the relay** to Render (free tier works): in the Render dashboard
+   click **New → Blueprint**, point at this repo, and it will pick up
+   `render.yaml` and spin up the `server/` directory as a web service.
+   (Alternatively: Railway / Fly.io / your own VPS — anything that runs
+   `cd server && npm install && node index.js`.)
+3. Note the public URL Render gives you, e.g. `https://warriors-clans-relay.onrender.com`.
+4. **Deploy the frontend** to Vercel. Set the env var
+   `NEXT_PUBLIC_WARRIOR_CATS_SOCKET_URL` to that relay URL and redeploy.
+5. Done — iPad and computer (any device with a browser) can now play
+   together in the same room.
+
+If no env var is set and you're not on a LAN, the game falls back to
+offline single-player + same-browser cross-tab multiplayer.
 
 ## Deploying
 
