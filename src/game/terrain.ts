@@ -32,6 +32,10 @@ function platformHeightAt(x: number, z: number): number {
   return -Infinity;
 }
 
+// The Lake — large circular basin with a small raised island near the
+// centre (the Gathering island where the Great Oak grows).
+export const LAKE = { x: -50, z: 280, r: 60, islandR: 9 };
+
 function naturalTerrain(x: number, z: number): number {
   // Base rolling hills (low-frequency)
   let h =
@@ -62,8 +66,33 @@ function naturalTerrain(x: number, z: number): number {
   const trib2 = Math.exp(-Math.pow((x - t2Center) / 9, 2));
   h -= trib2 * 2.0;
 
+  // Small stream — narrow winding watercourse feeding the lake from the
+  // west side. Only cut where it isn't already inside the lake basin.
+  const sCenter = 240 + Math.sin(x * 0.03) * 10;
+  const lakeDx = x - LAKE.x;
+  const lakeDz = z - LAKE.z;
+  const lakeDist = Math.hypot(lakeDx, lakeDz);
+  if (lakeDist > LAKE.r - 4 && x < -100 && x > -260) {
+    const stream = Math.exp(-Math.pow((z - sCenter) / 6, 2));
+    h -= stream * 1.4;
+  }
+
   // WindClan moor — flatter but still has rolling hills (was 0.4 → 0.55).
   if (x < -120) h *= 0.55;
+
+  // Lake basin — flat-ish floor sloping smoothly up to the bank.
+  if (lakeDist < LAKE.r) {
+    const t = lakeDist / LAKE.r;
+    const lakeFloor = -2.6 + Math.pow(t, 2) * 2.3;
+    h = Math.min(h, lakeFloor);
+    // Gathering island — a shallow dome rising above the water.
+    if (lakeDist < LAKE.islandR) {
+      const it = lakeDist / LAKE.islandR;
+      const islandTop = 1.2 - Math.pow(it, 2) * 0.8;
+      h = Math.max(h, islandTop);
+    }
+  }
+
   return h;
 }
 
