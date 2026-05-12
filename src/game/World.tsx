@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CLAN_LIST } from '@/lib/clans';
-import { terrainHeightAt, LAKE } from './terrain';
+import { terrainHeightAt, LAKE, STREAM } from './terrain';
 
 interface WorldProps {
   timeOfDay: number; // 0..1
@@ -67,8 +67,8 @@ function makeTerrain(size = 600, seg = 96, season: WorldProps['season']) {
     if (lakeDist < LAKE.r + 5 && lakeDist > LAKE.r - 4) c.lerp(sand, 0.55);
     if (lakeDist < LAKE.r - 4 && lakeDist > LAKE.islandR + 1) c.set('#3a78a8');
     if (lakeDist < LAKE.islandR + 1 && lakeDist > LAKE.islandR - 1) c.lerp(sand, 0.6);
-    // Small stream feeding the lake from the west
-    if (x > -260 && x < -100 && Math.abs(z - (240 + Math.sin(x * 0.03) * 10)) < 5) c.set('#4886b2');
+    // Small stream feeding the lake from the south
+    if (z > STREAM.zMin && z < STREAM.zMax && Math.abs(x - (STREAM.xCenter + Math.sin(z * 0.04) * STREAM.wave)) < STREAM.half - 1) c.set('#4886b2');
     colors.push(c.r, c.g, c.b);
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -99,8 +99,8 @@ function Trees({ count, season }: { count: number; season: WorldProps['season'] 
       const ldx = x - LAKE.x, ldz = z - LAKE.z;
       const ldist = Math.hypot(ldx, ldz);
       if (ldist < LAKE.r + 3 && ldist > LAKE.islandR + 1.5) continue; // water + beach
-      if (x > -260 && x < -100 && Math.abs(z - (240 + Math.sin(x * 0.03) * 10)) < 6) continue; // stream
-      if (Math.abs(x - 50) < 12 && Math.abs(z - 240) < 10) continue; // greenleaf cabins
+      if (z > STREAM.zMin && z < STREAM.zMax && Math.abs(x - (STREAM.xCenter + Math.sin(z * 0.04) * STREAM.wave)) < STREAM.half + 1) continue; // stream
+      if (Math.abs(x - 60) < 12 && Math.abs(z - 145) < 10) continue; // greenleaf cabins
       if (Math.abs(x - 130) < 14 && Math.abs(z - 110) < 14) continue; // abandoned twoleg nest
       if (Math.abs(x - 220) < 22 && Math.abs(z - 60) < 22) continue; // skyclan camp clearing
       if (Math.abs(x + 130) < 4 && z > -180 && z < -30) continue;    // small thunderpath
@@ -1328,18 +1328,19 @@ function Halfbridge({ side, broken }: { side: 'south' | 'east'; broken: boolean 
           </group>
         );
       })}
-      {/* support posts every couple of planks */}
+      {/* support posts every couple of planks — short, sitting on the
+          shallow lake floor and just kissing the underside of the planks */}
       {Array.from({ length: Math.floor(planks / 2) }).map((_, i) => {
         const cx = startX + dirX * ((i * 2) * plankLen + plankLen / 2);
         const cz = startZ + dirZ * ((i * 2) * plankLen + plankLen / 2);
         return (
-          <group key={`p${i}`} position={[cx, -1.0, cz]}>
+          <group key={`p${i}`} position={[cx, -0.12, cz]}>
             <mesh position={[0.7, 0, 0]}>
-              <boxGeometry args={[0.12, 1.6, 0.12]} />
+              <boxGeometry args={[0.12, 0.4, 0.12]} />
               <meshStandardMaterial color={'#4a3018'} roughness={1} />
             </mesh>
             <mesh position={[-0.7, 0, 0]}>
-              <boxGeometry args={[0.12, 1.6, 0.12]} />
+              <boxGeometry args={[0.12, 0.4, 0.12]} />
               <meshStandardMaterial color={'#4a3018'} roughness={1} />
             </mesh>
           </group>
@@ -1389,7 +1390,7 @@ function AncientOak() {
 // Greenleaf Twolegplace — a small cluster of seasonal log cabins near
 // the lake shore. Smaller and rougher than the main twoleg village.
 function GreenleafCabins({ isNight }: { isNight: boolean }) {
-  const ax = 50, az = 240;
+  const ax = 60, az = 145;
   const cabins = useMemo(() => {
     const rand = seededRand(5151);
     const arr: Array<{ x: number; z: number; w: number; d: number; h: number; rotY: number; wall: string; roof: string }> = [];

@@ -33,8 +33,13 @@ function platformHeightAt(x: number, z: number): number {
 }
 
 // The Lake — large circular basin with a small raised island near the
-// centre (the Gathering island where the Great Oak grows).
-export const LAKE = { x: -50, z: 280, r: 60, islandR: 9 };
+// centre (the Gathering island where the Great Oak grows). Positioned
+// fully inside the player's walkable radius (maxR=280 in Game.tsx).
+export const LAKE = { x: 40, z: 220, r: 55, islandR: 8 };
+
+// Small stream feeding the lake from the south-west. Centralised here so
+// the World colour / foliage exclusion / player ground all agree.
+export const STREAM = { xCenter: 80, zMin: 80, zMax: 170, wave: 8, half: 5 };
 
 function naturalTerrain(x: number, z: number): number {
   // Base rolling hills (low-frequency)
@@ -67,28 +72,34 @@ function naturalTerrain(x: number, z: number): number {
   h -= trib2 * 2.0;
 
   // Small stream — narrow winding watercourse feeding the lake from the
-  // west side. Only cut where it isn't already inside the lake basin.
-  const sCenter = 240 + Math.sin(x * 0.03) * 10;
+  // south. Only cut where it isn't already inside the lake basin.
   const lakeDx = x - LAKE.x;
   const lakeDz = z - LAKE.z;
   const lakeDist = Math.hypot(lakeDx, lakeDz);
-  if (lakeDist > LAKE.r - 4 && x < -100 && x > -260) {
-    const stream = Math.exp(-Math.pow((z - sCenter) / 6, 2));
-    h -= stream * 1.4;
+  if (lakeDist > LAKE.r - 4 && z > STREAM.zMin && z < STREAM.zMax) {
+    const sx = STREAM.xCenter + Math.sin(z * 0.04) * STREAM.wave;
+    const stream = Math.exp(-Math.pow((x - sx) / STREAM.half, 2));
+    h -= stream * 1.0;
   }
 
   // WindClan moor — flatter but still has rolling hills (was 0.4 → 0.55).
   if (x < -120) h *= 0.55;
 
-  // Lake basin — flat-ish floor sloping smoothly up to the bank.
+  // Lake basin — DELIBERATELY very shallow so the cat appears to wade on
+  // the surface (the World water plane sits at y ≈ -0.15) rather than
+  // dropping into a deep pit and walking underwater. The depth is
+  // visually carried by the blue/sand colouring in makeTerrain, not by
+  // an actual hole in the ground.
   if (lakeDist < LAKE.r) {
     const t = lakeDist / LAKE.r;
-    const lakeFloor = -2.6 + Math.pow(t, 2) * 2.3;
+    // -0.25 at the centre, smoothly back up to 0 at the rim.
+    const lakeFloor = -0.25 + Math.pow(t, 2) * 0.25;
     h = Math.min(h, lakeFloor);
-    // Gathering island — a shallow dome rising above the water.
+    // Gathering island — smooth dome that meets the lake floor at the
+    // island edge so there's no vertical step at the shore.
     if (lakeDist < LAKE.islandR) {
       const it = lakeDist / LAKE.islandR;
-      const islandTop = 1.2 - Math.pow(it, 2) * 0.8;
+      const islandTop = -0.25 + Math.cos((it * Math.PI) / 2) * 1.45;
       h = Math.max(h, islandTop);
     }
   }
