@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CLAN_LIST } from '@/lib/clans';
-import { terrainHeightAt } from './terrain';
+import { terrainHeightAt, LAKE } from './terrain';
 
 interface WorldProps {
   timeOfDay: number; // 0..1
@@ -60,6 +60,15 @@ function makeTerrain(size = 600, seg = 96, season: WorldProps['season']) {
     const dt2 = Math.abs(x - t2Center);
     if (dt2 < 11 && dt2 > 6) c.lerp(sand, 0.45);
     if (dt2 < 6) c.set('#4886b2');
+    // Lake — bigger water body, with sandy beach + the island at the centre.
+    const lakeDx = x - LAKE.x;
+    const lakeDz = z - LAKE.z;
+    const lakeDist = Math.hypot(lakeDx, lakeDz);
+    if (lakeDist < LAKE.r + 5 && lakeDist > LAKE.r - 4) c.lerp(sand, 0.55);
+    if (lakeDist < LAKE.r - 4 && lakeDist > LAKE.islandR + 1) c.set('#3a78a8');
+    if (lakeDist < LAKE.islandR + 1 && lakeDist > LAKE.islandR - 1) c.lerp(sand, 0.6);
+    // Small stream feeding the lake from the west
+    if (x > -260 && x < -100 && Math.abs(z - (240 + Math.sin(x * 0.03) * 10)) < 5) c.set('#4886b2');
     colors.push(c.r, c.g, c.b);
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -86,6 +95,17 @@ function Trees({ count, season }: { count: number; season: WorldProps['season'] 
       if (Math.abs(x + 280) < 12 && Math.abs(z + 260) < 12) continue;
       if (Math.abs(x - 60) < 10 && Math.abs(z - 70) < 10) continue;
       if (x > -185 && x < 85 && Math.abs(z - 95 - Math.sin(x * 0.015) * 6) < 5) continue;
+      // keep clear of the Lake + island, stream, lake-side landmarks
+      const ldx = x - LAKE.x, ldz = z - LAKE.z;
+      const ldist = Math.hypot(ldx, ldz);
+      if (ldist < LAKE.r + 3 && ldist > LAKE.islandR + 1.5) continue; // water + beach
+      if (x > -260 && x < -100 && Math.abs(z - (240 + Math.sin(x * 0.03) * 10)) < 6) continue; // stream
+      if (Math.abs(x - 50) < 12 && Math.abs(z - 240) < 10) continue; // greenleaf cabins
+      if (Math.abs(x - 130) < 14 && Math.abs(z - 110) < 14) continue; // abandoned twoleg nest
+      if (Math.abs(x - 220) < 22 && Math.abs(z - 60) < 22) continue; // skyclan camp clearing
+      if (Math.abs(x + 130) < 4 && z > -180 && z < -30) continue;    // small thunderpath
+      if (z > -90 && z < -70 && x > 100 && x < 240) continue;        // old thunderpath segment
+      if (Math.abs(x + 10) < 6 && Math.abs(z + 80) < 6) continue;    // ancient oak
       const moor = x < -120;
       if (moor && rand() > 0.15) continue; // pine forest is thinner on the moor
       const y = terrainHeightAt(x, z);
@@ -1223,6 +1243,397 @@ function Thunderpath() {
   );
 }
 
+// Lake water surface + Great Oak on the central island. The basin and
+// island shapes are baked into terrainHeightAt — this component just
+// adds the shimmering water plane and the gathering oak.
+function LakeAndIsland({ isNight }: { isNight: boolean }) {
+  return (
+    <group>
+      {/* Water surface — sits just above the floor so the bank reads as beach */}
+      <mesh position={[LAKE.x, -0.15, LAKE.z]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[LAKE.r - 2, 64]} />
+        <meshStandardMaterial
+          color={isNight ? '#1c2c4a' : '#3a78a8'}
+          roughness={0.25}
+          metalness={0.05}
+          transparent
+          opacity={0.92}
+        />
+      </mesh>
+      {/* Faint outer shimmer ring at night */}
+      {isNight && (
+        <mesh position={[LAKE.x, -0.1, LAKE.z]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[LAKE.r - 4, LAKE.r - 2, 64]} />
+          <meshBasicMaterial color={'#8aaadf'} transparent opacity={0.18} />
+        </mesh>
+      )}
+      {/* Great Oak on the island — taller / wider than forest trees */}
+      <group position={[LAKE.x, terrainHeightAt(LAKE.x, LAKE.z), LAKE.z]}>
+        <mesh position={[0, 5, 0]} castShadow>
+          <cylinderGeometry args={[0.9, 1.3, 10, 8]} />
+          <meshStandardMaterial color={'#4a3220'} roughness={1} flatShading />
+        </mesh>
+        {/* big rounded crown — three stacked clusters */}
+        <mesh position={[0, 10.5, 0]} castShadow>
+          <icosahedronGeometry args={[5.2, 0]} />
+          <meshStandardMaterial color={'#3f6e3f'} roughness={1} flatShading />
+        </mesh>
+        <mesh position={[1.6, 11.8, -0.6]} castShadow>
+          <icosahedronGeometry args={[3.2, 0]} />
+          <meshStandardMaterial color={'#5a8a4a'} roughness={1} flatShading />
+        </mesh>
+        <mesh position={[-1.8, 12.4, 0.8]} castShadow>
+          <icosahedronGeometry args={[3.6, 0]} />
+          <meshStandardMaterial color={'#4c7c44'} roughness={1} flatShading />
+        </mesh>
+        {/* a couple of roots */}
+        <mesh position={[1.4, 0.3, 0.6]} rotation={[0, 0.7, 0.3]}>
+          <boxGeometry args={[1.8, 0.5, 0.5]} />
+          <meshStandardMaterial color={'#4a3220'} roughness={1} flatShading />
+        </mesh>
+        <mesh position={[-1.6, 0.3, -0.4]} rotation={[0, -0.4, -0.25]}>
+          <boxGeometry args={[1.6, 0.45, 0.45]} />
+          <meshStandardMaterial color={'#4a3220'} roughness={1} flatShading />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
+// A pier of wooden planks running out into the lake from the south bank.
+// Two variants: an intact halfbridge and a broken one with gaps.
+function Halfbridge({ side, broken }: { side: 'south' | 'east'; broken: boolean }) {
+  const startX = side === 'south' ? LAKE.x : LAKE.x + (LAKE.r - 2);
+  const startZ = side === 'south' ? LAKE.z - (LAKE.r - 2) : LAKE.z;
+  const dirX = side === 'south' ? 0 : -1;
+  const dirZ = side === 'south' ? 1 : 0;
+  const planks = 10;
+  const plankLen = 1.6;
+  return (
+    <group>
+      {Array.from({ length: planks }).map((_, i) => {
+        // For a broken bridge, skip the last few planks and tilt some
+        const isMissing = broken && (i === planks - 1 || i === planks - 2 || i === 4);
+        const tilt = broken && (i === planks - 3 || i === 3) ? (Math.PI / 8) : 0;
+        if (isMissing) return null;
+        const cx = startX + dirX * (i * plankLen + plankLen / 2);
+        const cz = startZ + dirZ * (i * plankLen + plankLen / 2);
+        const y = -0.05; // just above the water
+        return (
+          <group key={i} position={[cx, y, cz]} rotation={[tilt, side === 'east' ? Math.PI / 2 : 0, 0]}>
+            <mesh receiveShadow>
+              <boxGeometry args={[1.6, 0.12, plankLen + 0.05]} />
+              <meshStandardMaterial color={broken ? '#5a3818' : '#7a5a3a'} roughness={1} flatShading />
+            </mesh>
+          </group>
+        );
+      })}
+      {/* support posts every couple of planks */}
+      {Array.from({ length: Math.floor(planks / 2) }).map((_, i) => {
+        const cx = startX + dirX * ((i * 2) * plankLen + plankLen / 2);
+        const cz = startZ + dirZ * ((i * 2) * plankLen + plankLen / 2);
+        return (
+          <group key={`p${i}`} position={[cx, -1.0, cz]}>
+            <mesh position={[0.7, 0, 0]}>
+              <boxGeometry args={[0.12, 1.6, 0.12]} />
+              <meshStandardMaterial color={'#4a3018'} roughness={1} />
+            </mesh>
+            <mesh position={[-0.7, 0, 0]}>
+              <boxGeometry args={[0.12, 1.6, 0.12]} />
+              <meshStandardMaterial color={'#4a3018'} roughness={1} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+// A single very large oak — the "Ancient Oak" landmark. Different style
+// than the procedural pines so it reads as a special tree.
+function AncientOak() {
+  const ax = -10, az = -80;
+  const y = terrainHeightAt(ax, az);
+  return (
+    <group position={[ax, y, az]}>
+      <mesh position={[0, 4.5, 0]} castShadow>
+        <cylinderGeometry args={[1.0, 1.5, 9, 8]} />
+        <meshStandardMaterial color={'#3e2a16'} roughness={1} flatShading />
+      </mesh>
+      <mesh position={[0, 9.5, 0]} castShadow>
+        <icosahedronGeometry args={[4.8, 0]} />
+        <meshStandardMaterial color={'#3a6a3a'} roughness={1} flatShading />
+      </mesh>
+      <mesh position={[2.0, 10.4, -0.8]} castShadow>
+        <icosahedronGeometry args={[3.0, 0]} />
+        <meshStandardMaterial color={'#578a52'} roughness={1} flatShading />
+      </mesh>
+      <mesh position={[-2.2, 11.2, 1.0]} castShadow>
+        <icosahedronGeometry args={[3.4, 0]} />
+        <meshStandardMaterial color={'#467a48'} roughness={1} flatShading />
+      </mesh>
+      {/* exposed gnarled roots */}
+      {[0, 1, 2, 3, 4].map((i) => {
+        const a = (i / 5) * Math.PI * 2;
+        return (
+          <mesh key={i} position={[Math.cos(a) * 1.3, 0.25, Math.sin(a) * 1.3]} rotation={[0, a, 0.3]}>
+            <boxGeometry args={[1.8, 0.4, 0.4]} />
+            <meshStandardMaterial color={'#3e2a16'} roughness={1} flatShading />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+// Greenleaf Twolegplace — a small cluster of seasonal log cabins near
+// the lake shore. Smaller and rougher than the main twoleg village.
+function GreenleafCabins({ isNight }: { isNight: boolean }) {
+  const ax = 50, az = 240;
+  const cabins = useMemo(() => {
+    const rand = seededRand(5151);
+    const arr: Array<{ x: number; z: number; w: number; d: number; h: number; rotY: number; wall: string; roof: string }> = [];
+    for (let i = 0; i < 3; i++) {
+      arr.push({
+        x: (i - 1) * 8 + (rand() - 0.5) * 2,
+        z: (rand() - 0.5) * 4,
+        w: 3.2 + rand() * 0.8,
+        d: 2.6 + rand() * 0.6,
+        h: 2.2 + rand() * 0.4,
+        rotY: (rand() - 0.5) * 0.5,
+        wall: ['#9a7a48', '#7a5e3a', '#a88a58'][i],
+        roof: ['#3a2818', '#4a3018', '#2a1c10'][i],
+      });
+    }
+    return arr;
+  }, []);
+  return (
+    <group position={[ax, terrainHeightAt(ax, az), az]}>
+      {cabins.map((b, i) => (
+        <group key={i} position={[b.x, 0, b.z]} rotation={[0, b.rotY, 0]}>
+          <mesh position={[0, b.h / 2, 0]} castShadow receiveShadow>
+            <boxGeometry args={[b.w, b.h, b.d]} />
+            <meshStandardMaterial color={b.wall} roughness={1} flatShading />
+          </mesh>
+          {/* pitched roof */}
+          <mesh position={[0, b.h + 0.3, -b.d * 0.2]} rotation={[-0.6, 0, 0]}>
+            <boxGeometry args={[b.w + 0.4, 0.1, b.d * 0.7]} />
+            <meshStandardMaterial color={b.roof} roughness={1} flatShading />
+          </mesh>
+          <mesh position={[0, b.h + 0.3, b.d * 0.2]} rotation={[0.6, 0, 0]}>
+            <boxGeometry args={[b.w + 0.4, 0.1, b.d * 0.7]} />
+            <meshStandardMaterial color={b.roof} roughness={1} flatShading />
+          </mesh>
+          {/* tiny door */}
+          <mesh position={[0, b.h * 0.35, b.d / 2 + 0.02]}>
+            <boxGeometry args={[0.6, b.h * 0.6, 0.04]} />
+            <meshStandardMaterial color={'#2a1810'} roughness={1} />
+          </mesh>
+          {/* lit window at night */}
+          <mesh position={[b.w * 0.3, b.h * 0.55, b.d / 2 + 0.02]}>
+            <boxGeometry args={[0.4, 0.4, 0.04]} />
+            <meshStandardMaterial
+              color={'#ffe79a'}
+              emissive={isNight ? '#ffd66a' : '#222'}
+              emissiveIntensity={isNight ? 1.0 : 0}
+            />
+          </mesh>
+        </group>
+      ))}
+      {/* a campfire ring between the cabins */}
+      <mesh position={[0, 0.05, 8]}>
+        <cylinderGeometry args={[0.9, 0.9, 0.1, 8]} />
+        <meshStandardMaterial color={'#5a4030'} roughness={1} />
+      </mesh>
+      {[0, 1, 2, 3, 4, 5].map((i) => {
+        const a = (i / 6) * Math.PI * 2;
+        return (
+          <mesh key={i} position={[Math.cos(a) * 0.8, 0.18, 8 + Math.sin(a) * 0.8]}>
+            <boxGeometry args={[0.18, 0.36, 0.18]} />
+            <meshStandardMaterial color={'#7a7a78'} roughness={1} />
+          </mesh>
+        );
+      })}
+      {isNight && (
+        <pointLight position={[0, 1.2, 8]} intensity={1.2} distance={14} color={'#ffb060'} />
+      )}
+    </group>
+  );
+}
+
+// Abandoned Twoleg Nest — a half-ruined building. Broken walls,
+// exposed roof beams, weeds.
+function AbandonedTwolegNest() {
+  const ax = 130, az = 110;
+  return (
+    <group position={[ax, terrainHeightAt(ax, az), az]}>
+      {/* main standing wall */}
+      <mesh position={[-2, 1.8, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.4, 3.6, 5]} />
+        <meshStandardMaterial color={'#8a7a68'} roughness={1} flatShading />
+      </mesh>
+      {/* short back wall (broken) */}
+      <mesh position={[2, 1.0, -1.5]} castShadow receiveShadow>
+        <boxGeometry args={[0.4, 2.0, 2]} />
+        <meshStandardMaterial color={'#7a6a58'} roughness={1} flatShading />
+      </mesh>
+      {/* side wall stub */}
+      <mesh position={[0, 0.8, 2.3]} rotation={[0, Math.PI / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.4, 1.6, 4]} />
+        <meshStandardMaterial color={'#7a6a58'} roughness={1} flatShading />
+      </mesh>
+      {/* exposed roof beams */}
+      {[0, 1, 2, 3].map((i) => (
+        <mesh key={i} position={[-2 + i * 1.3, 3.4, 0]} rotation={[0, 0, -0.4]}>
+          <boxGeometry args={[3.5, 0.12, 0.12]} />
+          <meshStandardMaterial color={'#3a2818'} roughness={1} />
+        </mesh>
+      ))}
+      {/* rubble scattered on the floor */}
+      {[0, 1, 2, 3, 4].map((i) => {
+        const a = i * 1.3;
+        return (
+          <mesh key={`r${i}`} position={[Math.cos(a) * 2.4, 0.15, Math.sin(a) * 2.4]} rotation={[0, a, 0.2]}>
+            <boxGeometry args={[0.5, 0.3, 0.5]} />
+            <meshStandardMaterial color={'#7a7268'} roughness={1} flatShading />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+// SkyClan Camp — a small clearing ringed by a rocky outcrop (in lore SkyClan
+// lived in a gorge). We approximate with a low rocky horseshoe + a flat
+// gathering rock in the middle.
+function SkyClanCamp() {
+  const ax = 220, az = 60;
+  return (
+    <group position={[ax, terrainHeightAt(ax, az), az]}>
+      {/* rocky ring */}
+      {Array.from({ length: 14 }).map((_, i) => {
+        const a = (i / 14) * Math.PI * 1.6 + Math.PI * 0.2; // horseshoe, open south
+        const r = 8 + Math.sin(i * 1.7) * 0.6;
+        return (
+          <mesh
+            key={i}
+            position={[Math.cos(a) * r, 0.9 + Math.cos(i) * 0.2, Math.sin(a) * r]}
+            rotation={[(Math.sin(i) * 0.3), a, 0.1 * Math.cos(i)]}
+            castShadow
+          >
+            <boxGeometry args={[1.6 + Math.sin(i * 0.7) * 0.4, 1.8, 1.4]} />
+            <meshStandardMaterial color={i % 2 === 0 ? '#8a8278' : '#6a6058'} roughness={1} flatShading />
+          </mesh>
+        );
+      })}
+      {/* central gathering ledge */}
+      <mesh position={[0, 0.7, -2]} castShadow receiveShadow>
+        <boxGeometry args={[3.6, 1.4, 2.2]} />
+        <meshStandardMaterial color={'#9a9286'} roughness={1} flatShading />
+      </mesh>
+      {/* a couple of brackeny tufts */}
+      <mesh position={[3, 0.3, 3]}>
+        <coneGeometry args={[0.8, 0.8, 6]} />
+        <meshStandardMaterial color={'#3a5a2a'} roughness={1} flatShading />
+      </mesh>
+      <mesh position={[-2.5, 0.3, 2.4]}>
+        <coneGeometry args={[0.7, 0.7, 6]} />
+        <meshStandardMaterial color={'#3a5a2a'} roughness={1} flatShading />
+      </mesh>
+    </group>
+  );
+}
+
+// Small Thunderpath — a narrower secondary road. Same terrain-following
+// segment approach as the main Thunderpath.
+function SmallThunderpath() {
+  const xCenter = -130;
+  const zMin = -180, zMax = -30;
+  const segLen = 8;
+  const segments = useMemo(() => {
+    const arr: Array<{ z: number; y: number; x: number }> = [];
+    for (let z = zMin + segLen / 2; z < zMax; z += segLen) {
+      const x = xCenter + Math.sin(z * 0.02) * 4;
+      arr.push({ z, y: terrainHeightAt(x, z) + 0.07, x });
+    }
+    return arr;
+  }, []);
+  return (
+    <group>
+      {segments.map((s, i) => (
+        <group key={i} position={[s.x, s.y, s.z]}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+            <planeGeometry args={[3.2, segLen + 0.2]} />
+            <meshStandardMaterial color={'#2c2a28'} roughness={0.9} />
+          </mesh>
+          {i % 2 === 0 && (
+            <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[0.18, segLen * 0.5]} />
+              <meshStandardMaterial color={'#c8c2a8'} roughness={0.9} />
+            </mesh>
+          )}
+        </group>
+      ))}
+    </group>
+  );
+}
+
+// Old Thunderpath — a short, cracked, partially-overgrown disused road
+// segment with gaps where the asphalt has crumbled.
+function OldThunderpath() {
+  const zCenter = -80;
+  const xMin = 100, xMax = 240;
+  const segLen = 7;
+  const segments = useMemo(() => {
+    const arr: Array<{ x: number; y: number; cracked: boolean; missing: boolean }> = [];
+    let i = 0;
+    for (let x = xMin + segLen / 2; x < xMax; x += segLen, i++) {
+      arr.push({
+        x,
+        y: terrainHeightAt(x, zCenter) + 0.06,
+        cracked: i % 3 === 1,
+        missing: i === 4 || i === 9,
+      });
+    }
+    return arr;
+  }, []);
+  return (
+    <group>
+      {segments.map((s, i) => {
+        if (s.missing) return null;
+        return (
+          <group key={i} position={[s.x, s.y, zCenter]}>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+              <planeGeometry args={[segLen + 0.2, 4.5]} />
+              <meshStandardMaterial color={s.cracked ? '#4a4642' : '#3a3834'} roughness={1} />
+            </mesh>
+            {/* weeds growing through the cracks */}
+            {s.cracked && (
+              <>
+                <mesh position={[0.5, 0.04, 0.6]}>
+                  <coneGeometry args={[0.25, 0.4, 5]} />
+                  <meshStandardMaterial color={'#3a6a3a'} roughness={1} flatShading />
+                </mesh>
+                <mesh position={[-1.4, 0.04, -0.8]}>
+                  <coneGeometry args={[0.22, 0.35, 5]} />
+                  <meshStandardMaterial color={'#3a6a3a'} roughness={1} flatShading />
+                </mesh>
+              </>
+            )}
+            {/* rubble at the broken ends */}
+            {(i === 3 || i === 5 || i === 8 || i === 10) && (
+              <mesh position={[segLen / 2 - 0.4, 0.15, 1.2]} rotation={[0, 0.4, 0.2]}>
+                <boxGeometry args={[0.7, 0.3, 0.5]} />
+                <meshStandardMaterial color={'#5a5650'} roughness={1} flatShading />
+              </mesh>
+            )}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
 export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
   const treeCount = graphics === 'low' ? 50 : graphics === 'medium' ? 120 : 240;
   const grassCount = graphics === 'low' ? 0 : graphics === 'medium' ? 220 : 480;
@@ -1280,6 +1691,15 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
       <Moonstone isNight={isNight} />
       <Snakerocks />
       <Thunderpath />
+      <LakeAndIsland isNight={isNight} />
+      <Halfbridge side="south" broken={false} />
+      <Halfbridge side="east" broken={true} />
+      <AncientOak />
+      <GreenleafCabins isNight={isNight} />
+      <AbandonedTwolegNest />
+      <SkyClanCamp />
+      <SmallThunderpath />
+      <OldThunderpath />
 
       {/* moonpool — uneven stone ring surrounding a glowing silver pool */}
       <group position={[-220, terrainHeightAt(-220, -220), -220]}>
