@@ -3,7 +3,7 @@
 import { useGameStore } from '@/game/useGameStore';
 import { CLANS } from '@/lib/clans';
 import { HERBS } from '@/lib/herbs';
-import { CLIMBABLE_TREES } from '@/game/terrain';
+import { CLIMBABLE_TREES, INJURED_WARRIOR } from '@/game/terrain';
 import { adjustCameraZoom } from '@/game/CameraRig';
 import { getAudioEngine } from '@/game/audio';
 import { useEffect, useState } from 'react';
@@ -147,10 +147,10 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
       <div className="absolute top-24 right-3 bg-black/45 backdrop-blur rounded-xl px-3 py-2 text-xs max-w-[220px] pointer-events-auto">
         <div className="text-[10px] uppercase tracking-wide opacity-70">Quest</div>
         <div>{questText}</div>
-        {!useGameStore.getState().healedWarriorAt && (
+        {!useGameStore.getState().injuredWarriorHealed && (
           <div className="mt-2 pt-2 border-t border-white/15">
             <div className="text-[10px] uppercase tracking-wide opacity-70">Side quest</div>
-            <div>Heal a wounded clanmate — open the Herb pouch and tap “use” on any herb.</div>
+            <div>Heal a wounded clanmate — find {INJURED_WARRIOR.name} near the ThunderClan high rock and use a herb at their side.</div>
           </div>
         )}
       </div>
@@ -317,13 +317,37 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
                           setHud({ hp: Math.min(100, hud.hp + 12) });
                           useGameStore.getState().bumpTask('use-herb-n', 1);
                           pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: `You used ${h?.name ?? id}.`, at: Date.now() });
-                          // Mark the heal-a-warrior side quest as done and
-                          // also fire the chapter trigger so chapter 52
-                          // ("Yellowfang's Secret") completes here.
-                          if (!useGameStore.getState().healedWarriorAt) {
-                            useGameStore.getState().setHealedWarriorAt(Date.now());
+                          // Heal-a-warrior side quest only counts if you
+                          // used the herb at the wounded warrior's side.
+                          // Anywhere else just heals YOU.
+                          const s = useGameStore.getState();
+                          const me = s.players[s.selfId];
+                          if (me && !s.injuredWarriorHealed) {
+                            const dx = me.pos[0] - INJURED_WARRIOR.x;
+                            const dz = me.pos[2] - INJURED_WARRIOR.z;
+                            if (dx * dx + dz * dz < 3 * 3) {
+                              s.setInjuredWarriorHealed(true);
+                              s.setHealedWarriorAt(Date.now());
+                              s.pushChat({
+                                id: 'sys' + Date.now(),
+                                fromId: 'system',
+                                fromName: 'StarClan',
+                                scope: 'system',
+                                text: `${INJURED_WARRIOR.name} grooms the wound clean and rises to their paws. "Thank you — I owe you my life."`,
+                                at: Date.now(),
+                              });
+                              try { (window as any).__WOTC_TRIGGER__?.('heal-warrior'); } catch {}
+                            } else {
+                              s.pushChat({
+                                id: 'sys' + Date.now(),
+                                fromId: 'system',
+                                fromName: 'StarClan',
+                                scope: 'system',
+                                text: `You should find a wounded clanmate before spending herbs — try the medicine den near ThunderClan camp.`,
+                                at: Date.now(),
+                              });
+                            }
                           }
-                          try { (window as any).__WOTC_TRIGGER__?.('heal-warrior'); } catch {}
                         }
                       }}
                     >use</button>
@@ -341,7 +365,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-62 · climb button + visible gardens + role fix
+        wotc-63 · wounded warrior
       </div>
     </div>
   );

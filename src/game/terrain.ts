@@ -60,6 +60,11 @@ export const CLIMBABLE_TREES: Array<{ x: number; z: number }> = [
   { x: -90,   z: 100 },
 ];
 
+// Wounded warrior — fixed spot near the ThunderClan medicine den where
+// the "heal a wounded clanmate" side quest's target lies. Shared so
+// both the World mesh and the HUD proximity check stay in sync.
+export const INJURED_WARRIOR = { x: 4, z: 4, name: 'Bramblepaw' };
+
 function naturalTerrain(x: number, z: number): number {
   // Base rolling hills (low-frequency)
   let h =

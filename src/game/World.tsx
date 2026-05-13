@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { CLAN_LIST } from '@/lib/clans';
 import { useGameStore } from './useGameStore';
-import { terrainHeightAt, LAKE, STREAM, CLIMBABLE_TREES } from './terrain';
+import { terrainHeightAt, LAKE, STREAM, CLIMBABLE_TREES, INJURED_WARRIOR } from './terrain';
 import { THUNDERPATH, NUM_MONSTERS, monsterAt } from './vehicles';
 
 interface WorldProps {
@@ -1843,6 +1843,55 @@ function HerbGardens() {
   );
 }
 
+// Wounded warrior lying near the ThunderClan medicine den. Renders a
+// crude cat-shaped silhouette curled on its side with red claw marks
+// on the flank. Disappears once the heal quest is complete (the
+// warrior gets up and walks off — represented here by the mesh
+// fading out and being removed).
+function InjuredWarrior() {
+  const healed = useGameStore((s) => s.injuredWarriorHealed);
+  if (healed) return null;
+  const y = terrainHeightAt(INJURED_WARRIOR.x, INJURED_WARRIOR.z);
+  return (
+    <group position={[INJURED_WARRIOR.x, y, INJURED_WARRIOR.z]}>
+      {/* curled body */}
+      <mesh position={[0, 0.18, 0]} rotation={[0, 0.4, 0.1]}>
+        <capsuleGeometry args={[0.22, 0.6, 6, 12]} />
+        <meshStandardMaterial color={'#7a5a3a'} roughness={1} flatShading />
+      </mesh>
+      {/* head tucked in */}
+      <mesh position={[0.42, 0.25, 0.18]}>
+        <sphereGeometry args={[0.18, 12, 10]} />
+        <meshStandardMaterial color={'#7a5a3a'} roughness={1} flatShading />
+      </mesh>
+      {/* ears */}
+      <mesh position={[0.48, 0.36, 0.10]} rotation={[0, 0, 0.4]}>
+        <coneGeometry args={[0.06, 0.12, 4]} />
+        <meshStandardMaterial color={'#7a5a3a'} roughness={1} flatShading />
+      </mesh>
+      <mesh position={[0.48, 0.36, 0.26]} rotation={[0, 0, 0.4]}>
+        <coneGeometry args={[0.06, 0.12, 4]} />
+        <meshStandardMaterial color={'#7a5a3a'} roughness={1} flatShading />
+      </mesh>
+      {/* tail draped behind */}
+      <mesh position={[-0.45, 0.18, -0.05]} rotation={[0, 0.6, 0]}>
+        <cylinderGeometry args={[0.05, 0.05, 0.5, 6]} />
+        <meshStandardMaterial color={'#7a5a3a'} roughness={1} flatShading />
+      </mesh>
+      {/* red claw marks on the flank */}
+      <mesh position={[0.1, 0.28, 0.06]} rotation={[0, 0, 0.5]}>
+        <boxGeometry args={[0.25, 0.02, 0.04]} />
+        <meshStandardMaterial color={'#a02020'} emissive={'#5a0808'} emissiveIntensity={0.5} roughness={0.7} />
+      </mesh>
+      <mesh position={[-0.05, 0.28, 0.08]} rotation={[0, 0, 0.55]}>
+        <boxGeometry args={[0.22, 0.02, 0.04]} />
+        <meshStandardMaterial color={'#a02020'} emissive={'#5a0808'} emissiveIntensity={0.5} roughness={0.7} />
+      </mesh>
+      {/* faint "ouch" Html label */}
+    </group>
+  );
+}
+
 function ClimbableOaks() {
   return (
     <group>
@@ -1955,6 +2004,7 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
       <OldThunderpath />
       <ClimbableOaks />
       <HerbGardens />
+      <InjuredWarrior />
 
       {/* moonpool — uneven stone ring surrounding a glowing silver pool */}
       <group position={[-220, terrainHeightAt(-220, -220), -220]}>

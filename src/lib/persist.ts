@@ -17,6 +17,9 @@ export interface SaveData {
   mission: 'none' | 'accepted' | 'won';
   // Med-cat herb gardens — persisted so they don't disappear on reload.
   herbGardens: Array<{ id: string; x: number; z: number; plantedAt: number; herbs: string[] }>;
+  // Heal-a-warrior side quest — once you've patched up Bramblepaw next
+  // to the medicine den, the wounded mesh stays healed across reloads.
+  injuredWarriorHealed: boolean;
 }
 
 export interface GameSettings {
@@ -59,6 +62,7 @@ export function loadSave(): SaveData {
       guestId: 'guest_ssr',
       mission: 'none',
       herbGardens: [],
+      injuredWarriorHealed: false,
     };
   }
   try {
@@ -75,6 +79,7 @@ export function loadSave(): SaveData {
         guestId: newGuestId(),
         mission: 'none',
         herbGardens: [],
+        injuredWarriorHealed: false,
       };
       localStorage.setItem(KEY, JSON.stringify(fresh));
       return fresh;
@@ -91,6 +96,7 @@ export function loadSave(): SaveData {
       guestId: typeof parsed.guestId === 'string' ? parsed.guestId : newGuestId(),
       mission: parsed.mission === 'won' || parsed.mission === 'accepted' || parsed.mission === 'none' ? parsed.mission : 'none',
       herbGardens: Array.isArray(parsed.herbGardens) ? parsed.herbGardens : [],
+      injuredWarriorHealed: typeof parsed.injuredWarriorHealed === 'boolean' ? parsed.injuredWarriorHealed : false,
     };
   } catch {
     return {
@@ -104,6 +110,7 @@ export function loadSave(): SaveData {
       guestId: newGuestId(),
       mission: 'none',
       herbGardens: [],
+      injuredWarriorHealed: false,
     };
   }
 }
