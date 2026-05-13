@@ -112,13 +112,15 @@ class AudioEngine {
     const ctx = this.ctx!, master = this.master!;
     const stops: (() => void)[] = [];
 
-    // Crickets — short bursts of band-passed white noise at ~5kHz, every ~0.6s
+    // Crickets — short bursts of band-passed white noise at random
+    // intervals. We deliberately avoid any rhythmic grouping (the old
+    // "3 quick chirps then a long silence" pattern made the chorus
+    // sound melodic — players were hearing a "twinkle twinkle" rhythm).
+    // Each chirp has its own delay, pitch, length, and gain so it
+    // reads as a few separate crickets calling at random.
     let cancelled = false;
     const cricket = () => {
       if (cancelled) return;
-      // Fresh noise per chirp + a wider band-pass sweep so each cricket has
-      // a slightly different "voice". The previous version reused a static
-      // buffer which made the chorus sound mechanical.
       const buf = ctx.createBuffer(1, 1024 + Math.floor(Math.random() * 1536), ctx.sampleRate);
       const data = buf.getChannelData(0);
       for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
@@ -126,37 +128,46 @@ class AudioEngine {
       src.buffer = buf;
       const bp = ctx.createBiquadFilter();
       bp.type = 'bandpass';
-      bp.frequency.value = 3800 + Math.random() * 2200;
-      bp.Q.value = 18 + Math.random() * 10;
+      // Wider pitch spread so successive chirps don't lock onto a scale.
+      bp.frequency.value = 3200 + Math.random() * 3000;
+      bp.Q.value = 14 + Math.random() * 14;
       const g = ctx.createGain();
+      const gain = 0.06 + Math.random() * 0.06;
+      const dur = 0.04 + Math.random() * 0.05;
       g.gain.setValueAtTime(0, ctx.currentTime);
-      g.gain.linearRampToValueAtTime(0.10, ctx.currentTime + 0.005);
-      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+      g.gain.linearRampToValueAtTime(gain, ctx.currentTime + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
       src.connect(bp).connect(g).connect(master);
       src.start();
-      src.stop(ctx.currentTime + 0.06);
-      // chirp pattern: 3 quick chirps then a longer silence
-      let next = 0.12 + Math.random() * 0.05;
-      if (Math.random() < 0.3) next = 1.4 + Math.random() * 1.6;
+      src.stop(ctx.currentTime + dur + 0.01);
+      // Single random delay, no grouping. Long-tailed distribution so
+      // most chirps are close together but the occasional pause is much
+      // longer — that breaks any sense of beat.
+      const r = Math.random();
+      const next = r < 0.7 ? 0.18 + Math.random() * 0.5
+                  : r < 0.95 ? 0.6 + Math.random() * 1.4
+                  : 2.0 + Math.random() * 2.5;
       setTimeout(cricket, next * 1000);
     };
     cricket();
 
-    // Owl hoots — rare deep sine
+    // Owl hoots — rare, breathier and pitch-stable so it doesn't drop
+    // a "Twinkle Twinkle"-style melodic note over the cricket bed.
     const owl = () => {
       if (cancelled) return;
       const o = ctx.createOscillator();
       const g = ctx.createGain();
       o.type = 'sine';
-      o.frequency.setValueAtTime(220, ctx.currentTime);
-      o.frequency.linearRampToValueAtTime(180, ctx.currentTime + 0.4);
+      // Fixed-ish low pitch with only a tiny detune jitter — no glide.
+      const f = 165 + Math.random() * 25;
+      o.frequency.setValueAtTime(f, ctx.currentTime);
       g.gain.setValueAtTime(0, ctx.currentTime);
-      g.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 0.05);
-      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      g.gain.linearRampToValueAtTime(0.035, ctx.currentTime + 0.08);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
       o.connect(g).connect(master);
       o.start();
-      o.stop(ctx.currentTime + 0.55);
-      setTimeout(owl, 9000 + Math.random() * 14000);
+      o.stop(ctx.currentTime + 0.65);
+      setTimeout(owl, 22_000 + Math.random() * 25_000);
     };
     setTimeout(owl, 5000);
 
