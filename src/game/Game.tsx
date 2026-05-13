@@ -215,14 +215,16 @@ function PlayerController({
 
     // Twoleg monster (vehicle) collision on the Thunderpath. The big
     // metal monsters do not slow down for warriors — touching one is an
-    // instant kill (drop HP to 0 → the WASTED cutscene fires this
-    // frame). Camera-shakes once on impact so the kill feels like one.
+    // instant kill. We trigger the WASTED cutscene directly here so the
+    // same-frame HP-regen path can't accidentally restore HP back to
+    // ~100 (which was happening when we only wrote hp = 0 and relied
+    // on the death check below to fire on the next frame).
     {
       const now = Date.now();
       const { distance } = nearestMonsterDistance(pos.current.x, pos.current.z, now);
       if (distance < MONSTER_KILL_RADIUS) {
         const s = useGameStore.getState();
-        if (!lastMonsterContactHit.current) {
+        if (!lastMonsterContactHit.current && !s.cutscene) {
           s.setCameraShake(0.8);
           s.pushChat({
             id: 'sys' + Date.now(),
@@ -232,9 +234,10 @@ function PlayerController({
             text: 'A monster strikes! Your bones are crushed beneath its wheels.',
             at: Date.now(),
           });
+          s.setHud({ hp: 0 });
+          s.setCutscene({ kind: 'wasted', startedAt: Date.now() });
           lastMonsterContactHit.current = true;
         }
-        s.setHud({ hp: 0 });
       } else if (distance > MONSTER_KILL_RADIUS + 0.6) {
         lastMonsterContactHit.current = false;
       }
