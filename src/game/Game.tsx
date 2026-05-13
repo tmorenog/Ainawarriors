@@ -14,6 +14,7 @@ import { CLANS } from '@/lib/clans';
 import { SIZE_STATS, type PlayerState } from './types';
 import { SilentErrorBoundary } from '@/components/SilentErrorBoundary';
 import { terrainHeightAt, resolveBlockers } from './terrain';
+import { nearestMonsterDistance, MONSTER_KILL_RADIUS, MONSTER_WARN_RADIUS } from './vehicles';
 import { getAudioEngine } from './audio';
 import { Npcs } from './Npcs';
 import { NPCS } from '@/lib/npcs';
@@ -166,6 +167,18 @@ function PlayerController({
       const [nx, nz] = resolveBlockers(pos.current.x, pos.current.z);
       pos.current.x = nx;
       pos.current.z = nz;
+    }
+
+    // Twoleg monster (vehicle) collision on the Thunderpath. Hitting one
+    // deals massive HP damage every frame until the cat steps clear, so
+    // staying in the road kills you fast.
+    {
+      const now = Date.now();
+      const { distance } = nearestMonsterDistance(pos.current.x, pos.current.z, now);
+      if (distance < MONSTER_KILL_RADIUS) {
+        useGameStore.getState().setHud({ hp: Math.max(0, hud.hp - 90 * dt) });
+        useGameStore.getState().setCameraShake(0.6);
+      }
     }
 
     // Tasks — track total distance walked (in 1-unit chunks) and clan camp
