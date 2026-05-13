@@ -63,6 +63,18 @@ interface GameStore {
   setChapterIndex: (n: number) => void;
   chapterProgress: number;
   bumpChapterProgress: (n?: number) => void;
+  // Timestamp of the last chapter card opening — drives the in/out fade.
+  chapterCardAt: number;
+  showChapterCard: () => void;
+  // Cinematic cutscene currently playing (full-screen overlay). null when
+  // gameplay is in control. The various overlays watch this and render
+  // their own art / text / audio based on `kind`.
+  cutscene: null | { kind: 'wasted' | 'kidnap' | 'firestar-dies' | 'graystripe-flashback' | 'starclan-walk'; startedAt: number };
+  setCutscene: (c: GameStore['cutscene']) => void;
+  // True after Firestar's StarClan death event has fired so we don't
+  // re-trigger it.
+  firestarDeadAt: number;
+  setFirestarDeadAt: (n: number) => void;
 
   // Sleep cutscene — when true the world dims and a soft pad plays for a
   // few seconds before fading back in (also doubles as a Book objective).
@@ -218,10 +230,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
   bookMode: false,
   setBookMode: (v) => set({ bookMode: v }),
   chapterIndex: 0,
-  setChapterIndex: (n) => set({ chapterIndex: n, chapterProgress: 0 }),
+  setChapterIndex: (n) => set({ chapterIndex: n, chapterProgress: 0, chapterCardAt: Date.now() }),
   chapterProgress: 0,
   bumpChapterProgress: (n = 1) =>
     set((st) => ({ chapterProgress: st.chapterProgress + n })),
+  chapterCardAt: Date.now(),
+  showChapterCard: () => set({ chapterCardAt: Date.now() }),
+  cutscene: null,
+  setCutscene: (c) => set({ cutscene: c }),
+  firestarDeadAt: 0,
+  setFirestarDeadAt: (n) => set({ firestarDeadAt: n }),
 
   sleeping: false,
   setSleeping: (v) => set({ sleeping: v }),

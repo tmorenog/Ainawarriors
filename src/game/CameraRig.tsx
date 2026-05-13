@@ -94,11 +94,21 @@ export function CameraRig({ target, yaw, pitch, mode }: Props) {
   // Slowly advancing angle for the sleep cinematic — the camera orbits
   // around the cat while it loafs / curls / sleeps.
   const sleepAngle = useRef(0);
+  // Low-pass-filtered cat Y. The terrain is bumpy at high frequencies and
+  // following the cat's Y exactly makes the camera bob/shake as the cat
+  // walks. We follow this smoothed value instead.
+  const smoothY = useRef<number | null>(null);
 
   useFrame((_, dt) => {
     if (!target.current) return;
     const t = target.current.position;
     const p = Math.max(-0.9, Math.min(0.9, pitch.current));
+
+    // Maintain the smoothed cat Y. Initialise on first frame, then ease
+    // toward the real Y at a much slower rate than X/Z follow (~3/sec).
+    if (smoothY.current == null) smoothY.current = t.y;
+    smoothY.current += (t.y - smoothY.current) * Math.min(1, dt * 3);
+    const ty = smoothY.current;
 
     // Camera shake — decay the global magnitude each frame and apply a
     // small randomised offset to the camera's position.
@@ -134,16 +144,16 @@ export function CameraRig({ target, yaw, pitch, mode }: Props) {
       const cx = t.x + Math.sin(sleepAngle.current) * baseDist;
       const cz = t.z + Math.cos(sleepAngle.current) * baseDist;
       const a = Math.min(1, dt * 4);
-      camera.position.lerp(tmp.current.set(cx + shakeX, t.y + baseHeight + shakeY, cz + shakeZ), a);
-      camera.lookAt(t.x, t.y + 0.35, t.z);
+      camera.position.lerp(tmp.current.set(cx + shakeX, ty + baseHeight + shakeY, cz + shakeZ), a);
+      camera.lookAt(t.x, ty + 0.35, t.z);
       return;
     }
 
     if (mode === 'first') {
-      camera.position.set(t.x + Math.sin(yaw.current) * 0.4 + shakeX, t.y + 0.55 + shakeY, t.z + Math.cos(yaw.current) * 0.4 + shakeZ);
+      camera.position.set(t.x + Math.sin(yaw.current) * 0.4 + shakeX, ty + 0.55 + shakeY, t.z + Math.cos(yaw.current) * 0.4 + shakeZ);
       const look = tmp.current.set(
         t.x + Math.sin(yaw.current) * 8,
-        t.y + 0.55 + p * 4,
+        ty + 0.55 + p * 4,
         t.z + Math.cos(yaw.current) * 8
       );
       camera.lookAt(look);
@@ -153,8 +163,8 @@ export function CameraRig({ target, yaw, pitch, mode }: Props) {
       const cx = t.x - Math.sin(yaw.current) * dist;
       const cz = t.z - Math.cos(yaw.current) * dist;
       const a = Math.min(1, dt * 8);
-      camera.position.lerp(tmp.current.set(cx + shakeX, t.y + offY + shakeY, cz + shakeZ), a);
-      camera.lookAt(t.x, t.y + 0.6, t.z);
+      camera.position.lerp(tmp.current.set(cx + shakeX, ty + offY + shakeY, cz + shakeZ), a);
+      camera.lookAt(t.x, ty + 0.6, t.z);
     }
   });
 

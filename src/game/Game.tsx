@@ -12,7 +12,7 @@ import { createControls, useKeyboardControls, useMouseLook } from './useControls
 import { useGameStore } from './useGameStore';
 import { CLANS } from '@/lib/clans';
 import { SIZE_STATS, type PlayerState } from './types';
-import { terrainHeightAt } from './terrain';
+import { terrainHeightAt, resolveBlockers } from './terrain';
 import { getAudioEngine } from './audio';
 import { Npcs } from './Npcs';
 import { NPCS } from '@/lib/npcs';
@@ -158,6 +158,14 @@ function PlayerController({
     );
     if (dir.lengthSq() > 0) dir.normalize();
     pos.current.addScaledVector(dir, speed * dt);
+
+    // Solid-object collision — push the cat out of buildings / big trunks
+    // / rock piles. Cheap radial resolution (see resolveBlockers).
+    {
+      const [nx, nz] = resolveBlockers(pos.current.x, pos.current.z);
+      pos.current.x = nx;
+      pos.current.z = nz;
+    }
 
     // Tasks — track total distance walked (in 1-unit chunks) and clan camp
     // visits. We avoid spamming bumpTask by accumulating distance here.
@@ -337,19 +345,14 @@ function PlayerController({
       hp: Math.max(0, Math.min(100, hud.hp + (hpRegen - hpDrain) * dt)),
     });
 
-    // Death — HP hit zero. Respawn back at the camp with a system message,
-    // partial hunger restored. A real game would gate this behind StarClan
-    // narration, but for now a quick respawn keeps the loop playable.
+    // Death — HP hit zero. Trigger the WASTED cutscene (which then rolls
+    // into the StarClan walk and respawns the cat at camp). The cutscene
+    // overlay handles the actual respawn via __WOTC_RESPAWN__.
     if (hud.hp <= 0) {
       const dStore = useGameStore.getState();
-      const [cx, , cz] = CLANS[cat.clan].campCenter as [number, number, number];
-      pos.current.set(cx, terrainHeightAt(cx, cz), cz);
-      vy.current = 0;
-      grounded.current = true;
       if (dStore.battleActive) {
         // Defeat path during the Tigerstar fight — keep mission='accepted'
-        // so the player can come back and try again. Firestar's StarClan
-        // line plays under a "DEFEAT" banner.
+        // so the player can come back and try again.
         dStore.setBattlePhase('defeat');
         dStore.pushChat({
           id: 'sys' + Date.now(),
@@ -359,7 +362,6 @@ function PlayerController({
           text: 'You are in StarClan\'s hands now, brave one.',
           at: Date.now(),
         });
-        // Reset battle and respawn back at camp after the defeat cutscene
         setTimeout(() => {
           const s = useGameStore.getState();
           s.setBattleActive(false);
@@ -367,16 +369,24 @@ function PlayerController({
           s.setTigerstarHp(100);
           s.setHud({ hp: 70, stamina: 70, hunger: 50 });
         }, 3000);
-      } else {
-        setHud({ hp: 60, hunger: 50, stamina: 60 });
-        dStore.pushChat({
-          id: 'sys' + Date.now(),
-          fromId: 'system',
-          fromName: 'StarClan',
-          scope: 'system',
-          text: `${cat.name}'s spirit walks among the stars... but you are returned to your clan.`,
-          at: Date.now(),
-        });
+      } else if (!dStore.cutscene) {
+        // Normal HP-zero death — show WASTED, then walk in StarClan, then
+        // respawn. Set HP to 1 immediately so we don't re-trigger every
+        // frame while the cutscene plays.
+        dStore.setHud({ hp: 1 });
+        dStore.setCutscene({ kind: 'wasted', startedAt: Date.now() });
+      }
+    }
+
+    // Honour respawn requests from cutscene overlays — the WASTED /
+    // kidnap flows poke a global with the target XZ once they finish.
+    {
+      const req = (window as any).__WOTC_RESPAWN__;
+      if (req && typeof req.x === 'number' && typeof req.z === 'number') {
+        pos.current.set(req.x, terrainHeightAt(req.x, req.z), req.z);
+        vy.current = 0;
+        grounded.current = true;
+        try { delete (window as any).__WOTC_RESPAWN__; } catch {}
       }
     }
 
@@ -852,8 +862,42 @@ function RemoteCat({ player, bubble, viewerRef }: { player: PlayerState; bubble?
 function RemoteBubble({ text }: { text: string }) {
   return (
     <Html position={[0, 1.2, 0]} center distanceFactor={6}>
-      <div className="px-2 py-1 rounded-xl bg-white/85 text-bark text-xs shadow border border-bone whitespace-nowrap max-w-[220px]">
+      <div className="relative px-3 py-2 rounded-2xl text-xs whitespace-nowrap max-w-[220px]"
+           style={{
+             backgroundColor: '#f3e7c9',
+             color: '#3a2418',
+             border: '3px solid #5a3a20',
+             boxShadow: '0 2px 0 rgba(0,0,0,0.18)',
+             fontFamily: 'inherit',
+           }}>
         {text}
+        {/* tail */}
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: '14px',
+            bottom: '-10px',
+            width: 0,
+            height: 0,
+            borderLeft: '8px solid transparent',
+            borderRight: '8px solid transparent',
+            borderTop: '12px solid #5a3a20',
+          }}
+        />
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: '17px',
+            bottom: '-5px',
+            width: 0,
+            height: 0,
+            borderLeft: '5px solid transparent',
+            borderRight: '5px solid transparent',
+            borderTop: '8px solid #f3e7c9',
+          }}
+        />
       </div>
     </Html>
   );
@@ -973,12 +1017,32 @@ export function Game({ room, net }: GameProps) {
     const id = setInterval(() => {
       const s = useGameStore.getState();
       if (s.disaster && Date.now() < s.disaster.until) {
+        // Disaster damage / capture — flood and fire chip HP every tick;
+        // twoleg has a small per-tick chance of capturing the player and
+        // launching the kidnap cutscene. Disabled while another cutscene
+        // is already running (don't double up).
+        if (!s.cutscene) {
+          if (s.disaster.kind === 'flood') {
+            s.setHud({ hp: Math.max(0, s.hud.hp - 2) });
+          } else if (s.disaster.kind === 'fire') {
+            s.setHud({ hp: Math.max(0, s.hud.hp - 3) });
+          } else if (s.disaster.kind === 'twoleg' && Math.random() < 0.06) {
+            s.setCutscene({ kind: 'kidnap', startedAt: Date.now() });
+            // Mark the survive-disaster trigger as used (advances ch4)
+            try { (window as any).__WOTC_TRIGGER__?.('survive-disaster'); } catch {}
+          }
+        }
         // While active, re-broadcast every 5s so late joiners sync up.
         if (Date.now() - lastRebroadcastAt > 5000) {
           lastRebroadcastAt = Date.now();
           broadcast({ kind: 'disaster', disaster: s.disaster });
         }
         return;
+      }
+      // Disaster just ended. If the player survived (cutscene didn't fire),
+      // credit the survive-disaster trigger so chapter 4 can advance.
+      if (s.disaster && Date.now() >= s.disaster.until) {
+        try { (window as any).__WOTC_TRIGGER__?.('survive-disaster'); } catch {}
       }
       if (s.disaster && Date.now() >= s.disaster.until) {
         s.setDisaster(null);
