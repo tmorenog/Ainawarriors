@@ -13,7 +13,7 @@ import { useGameStore } from './useGameStore';
 import { CLANS } from '@/lib/clans';
 import { SIZE_STATS, type PlayerState } from './types';
 import { SilentErrorBoundary } from '@/components/SilentErrorBoundary';
-import { terrainHeightAt, resolveBlockers } from './terrain';
+import { terrainHeightAt, resolveBlockers, LAKE } from './terrain';
 import { nearestMonsterDistance, MONSTER_KILL_RADIUS, MONSTER_WARN_RADIUS } from './vehicles';
 import { getAudioEngine } from './audio';
 import { Npcs } from './Npcs';
@@ -132,21 +132,37 @@ function PlayerController({
     if (c.interact) {
       c.interact = false;
       const myClan = CLANS[cat.clan];
-      if (myClan) {
-        const px = myClan.campCenter[0];
-        const pz = myClan.campCenter[2] + 2;
-        const dx = pos.current.x - px;
-        const dz = pos.current.z - pz;
-        if (dx * dx + dz * dz < 3 * 3) eatFromPile();
+      const px = myClan ? myClan.campCenter[0] : 0;
+      const pz = myClan ? myClan.campCenter[2] + 2 : 0;
+      const dx = pos.current.x - px;
+      const dz = pos.current.z - pz;
+      const atPile = myClan && dx * dx + dz * dz < 3 * 3;
+      if (atPile) {
+        eatFromPile();
+      } else if (useGameStore.getState().carrying) {
+        // Selfish field-meal — eat the carried prey wherever you are.
+        // Smaller hunger gain than dropping it on the pile (which would
+        // also reward the clan), but a real option when you're far from
+        // camp and starving.
+        eatCarried();
       }
     }
 
     const stats = SIZE_STATS[cat.size];
     const clanBonus = (CLANS[cat.clan].bonuses.speed ?? 1) as number;
     const base = 6 * stats.speed * clanBonus;
+    // Swimming — when the cat is inside the lake basin (excluding the
+    // small Gathering island in the middle), movement slows to roughly
+    // half. This is the closest thing to a "swim" state the procedural
+    // cat rig has today; the visual is a slow wade rather than a stroke
+    // animation, but it reads clearly as "in the water".
+    const lakeDx = pos.current.x - LAKE.x;
+    const lakeDz = pos.current.z - LAKE.z;
+    const lakeDist2 = lakeDx * lakeDx + lakeDz * lakeDz;
+    const inLake = lakeDist2 < (LAKE.r - 1) * (LAKE.r - 1) && lakeDist2 > LAKE.islandR * LAKE.islandR;
     // Crouch is a deliberate slow stalk — slower than before so the
     // player can creep up on prey instead of zipping past them.
-    const speed = (c.sprint ? base * 1.7 : base) * (c.crouch ? 0.32 : 1) * (hud.stamina < 5 ? 0.5 : 1);
+    const speed = (c.sprint ? base * 1.7 : base) * (c.crouch ? 0.32 : 1) * (hud.stamina < 5 ? 0.5 : 1) * (inLake ? 0.45 : 1);
     const fwd = c.forward;
     const sd = c.strafe;
 
@@ -370,7 +386,10 @@ function PlayerController({
     const hpDrain = starving ? 1.5 : 0;
     setHud({
       stamina: Math.max(0, Math.min(100, hud.stamina + (draining ? -20 : 8) * dt)),
-      hunger: Math.max(0, hud.hunger - 0.4 * dt),
+      // Hunger drains much slower now (was 0.4/sec → 0.12/sec). A full
+      // hunger bar (100) lasts ~14 minutes of active play before it
+      // bottoms out instead of ~4 minutes.
+      hunger: Math.max(0, hud.hunger - 0.12 * dt),
       hp: Math.max(0, Math.min(100, hud.hp + (hpRegen - hpDrain) * dt)),
     });
 
@@ -790,6 +809,29 @@ function FreshKillPile({ viewerRef }: { viewerRef: React.MutableRefObject<THREE.
 // spammed every frame. If you're already carrying prey, dropping it onto
 // the pile gives a richer meal.
 let _lastEatAt = 0;
+
+// Eat the prey you're carrying right where you stand — no need to walk
+// it back to the pile. Smaller hunger gain (20 vs the 35 the pile route
+// gives) since you're not sharing.
+function eatCarried() {
+  const now = performance.now();
+  if (now - _lastEatAt < 800) return;
+  _lastEatAt = now;
+  const s = useGameStore.getState();
+  if (!s.carrying) return;
+  const piece = s.carrying;
+  s.setCarrying(null);
+  s.setHud({ hunger: Math.min(100, s.hud.hunger + 20) });
+  s.bumpTask('eat-pile-n', 1);
+  if (piece === 'fish') s.bumpTask('eat-fish', 1);
+  if (piece === 'rabbit') s.bumpTask('eat-rabbit', 1);
+  s.pushChat({
+    id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
+    text: `You crouch over your ${piece} and eat it where you caught it.`,
+    at: Date.now(),
+  });
+}
+
 function eatFromPile() {
   const now = performance.now();
   if (now - _lastEatAt < 800) return;
@@ -1007,7 +1049,9 @@ export function Game({ room, net }: GameProps) {
     const id = setInterval(() => {
       setRoom({
         ...roomState,
-        timeOfDay: (roomState.timeOfDay + 0.001) % 1,
+        // ~2-minute day/night cycle (was ~10 min) — bumped from +0.001 to
+        // +0.005 per 0.6s tick.
+        timeOfDay: (roomState.timeOfDay + 0.005) % 1,
       });
     }, 600);
     return () => clearInterval(id);
@@ -1051,19 +1095,27 @@ export function Game({ room, net }: GameProps) {
       if (s.disaster && Date.now() < s.disaster.until) {
         // Disaster damage / capture (the outer tick fires every 4s):
         //   - Flood / fire deal real HP damage so disasters feel deadly.
-        //     Roughly  flood ~10 hp / 4s  and  fire ~14 hp / 4s , so a
-        //     full-health cat takes ~30s in a fire or 40s in a flood
-        //     before the WASTED cutscene fires.
-        //   - The twoleg disaster intentionally does NOT damage HP. It
-        //     instead has a chance to kidnap you each tick, which plays
-        //     the cage-bars cutscene and auto-respawns you at camp.
+        //   - Dog pack: very rare, tears a big chunk of HP per tick (~22).
+        //   - Twoleg: no HP damage; instead a chance to kidnap you.
         if (!s.cutscene) {
           if (s.disaster.kind === 'flood') {
             s.setHud({ hp: Math.max(0, s.hud.hp - 10) });
           } else if (s.disaster.kind === 'fire') {
             s.setHud({ hp: Math.max(0, s.hud.hp - 14) });
+          } else if (s.disaster.kind === 'dogpack') {
+            s.setHud({ hp: Math.max(0, s.hud.hp - 22) });
+            useGameStore.getState().setCameraShake(0.5);
           } else if (s.disaster.kind === 'twoleg' && Math.random() < 0.18) {
-            s.setCutscene({ kind: 'kidnap', startedAt: Date.now() });
+            // Kitty Pets and Kits aren't dragged off by twolegs — kitty
+            // pets *belong* to twolegs, and kits stay in the nursery
+            // where the warriors protect them. Both are immune to the
+            // kidnap cutscene (the rest of the clan still suffers it).
+            const myRole = s.cat?.role;
+            const myClan = s.cat?.clan;
+            const immune = myRole === 'Kit' || myRole === 'KittyPet' || myClan === 'KittyPet';
+            if (!immune) {
+              s.setCutscene({ kind: 'kidnap', startedAt: Date.now() });
+            }
             try { (window as any).__WOTC_TRIGGER__?.('survive-disaster'); } catch {}
           }
         }
@@ -1083,6 +1135,22 @@ export function Game({ room, net }: GameProps) {
         s.setDisaster(null);
         s.pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
           text: 'The danger has passed. The forest holds its breath.', at: Date.now() });
+        return;
+      }
+      // Independent of the 40-min cadence, every 4s tick there's a tiny
+      // 0.1% chance a dog pack bursts through a fence and tears across
+      // the territories. Shorter window (15s) but very high damage.
+      if (Math.random() < 0.001) {
+        const d = {
+          kind: 'dogpack' as const,
+          until: Date.now() + 15_000,
+          message: 'DOG PACK in the territories! Run! Run! Their teeth will tear you apart!',
+        };
+        s.setDisaster(d);
+        s.pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system',
+          text: d.message, at: Date.now() });
+        broadcast({ kind: 'disaster', disaster: d });
+        lastRebroadcastAt = Date.now();
         return;
       }
       // Roll a fresh disaster on a long cadence — about every 40 minutes
@@ -1197,8 +1265,10 @@ export function Game({ room, net }: GameProps) {
         }
       }
       let mode: 'day' | 'night' | 'hunt' | 'battle' = isNight ? 'night' : 'day';
-      if (anim === 'crouch' || anim === 'pounce') mode = 'hunt';
+      if (anim === 'crouch' || anim === 'pounce' || useGameStore.getState().targetPreyId) mode = 'hunt';
       if (nearbyCat && (anim === 'pounce' || anim === 'run')) mode = 'battle';
+      // Tigerstar fight forces full-on battle music for the entire encounter.
+      if (useGameStore.getState().battleActive) mode = 'battle';
       engine.setMode(mode);
     };
     const id = setInterval(tick, 500);

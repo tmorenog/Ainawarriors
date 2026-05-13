@@ -36,6 +36,21 @@ const SECTIONS: { title: string; body: string }[] = [
     body:
       'Speak to Firestar in ThunderClan camp to begin the mission to defeat Tigerstar. Firestar will lead the way. Pounce or swipe him in battle. If you fail, you wake at camp; try again. Win, and Firestar gives you a fresh-kill prize.',
   },
+  {
+    title: 'The four seasons',
+    body:
+      'Newleaf is spring — the forest wakes, prey is plentiful, and the grass turns bright green. Greenleaf is summer — long days, warm nights, and the strongest hunting season. Leaf-fall is autumn — the trees go gold and brown, prey hides away, and clans store food for what comes next. Leaf-bare is winter — the river freezes, hunting is hard, and elders and kits suffer the most.',
+  },
+  {
+    title: 'Disasters in the forest',
+    body:
+      'Every now and then, the forest turns against the clans. Floods rise from the river — get to high ground. Fires roar through the pines — run for water. Twolegs walk the territory carrying cages — hide, or they will carry you away. Dog packs sometimes burst through fences — they hit hard and run on. Kitty pets and kits are safer from twolegs than warriors.',
+  },
+  {
+    title: 'Roads and monsters',
+    body:
+      'The Thunderpath is the long black road that splits the territories. Monsters (twoleg vehicles) prowl it, and they do not slow down for warriors. Cross only when you must, and never stop in the middle of the road. The Small Thunderpath and the Old Thunderpath are narrower and quieter, but still dangerous.',
+  },
 ];
 
 export function WarriorsGuide() {

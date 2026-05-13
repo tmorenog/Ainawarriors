@@ -471,24 +471,25 @@ function Camps() {
               real rock rather than a box. The flat top (kept walkable via
               terrain.ts) is the leader's perch. */}
           <group position={[0, 0, -7]}>
-            {/* Main mass — base block, slightly skewed */}
-            <mesh position={[0, 1.1, 0]} rotation={[0, 0.12, 0.04]}>
-              <boxGeometry args={[4.2, 2.2, 2.6]} />
+            {/* Main mass — base block, slightly skewed. Lowered so the
+                camp clearing isn't dominated by a 2-metre wall. */}
+            <mesh position={[0, 0.65, 0]} rotation={[0, 0.12, 0.04]}>
+              <boxGeometry args={[4.2, 1.3, 2.6]} />
               <meshStandardMaterial color={'#8a8276'} roughness={1} flatShading />
             </mesh>
             {/* Outcrop on the right — bigger angled chunk */}
-            <mesh position={[1.7, 0.9, 0.6]} rotation={[0, -0.22, -0.18]}>
-              <boxGeometry args={[1.8, 1.7, 1.4]} />
+            <mesh position={[1.7, 0.55, 0.6]} rotation={[0, -0.22, -0.18]}>
+              <boxGeometry args={[1.8, 1.0, 1.4]} />
               <meshStandardMaterial color={'#7a7268'} roughness={1} flatShading />
             </mesh>
             {/* Outcrop on the left */}
-            <mesh position={[-1.6, 0.7, 0.3]} rotation={[0.05, 0.1, 0.22]}>
-              <boxGeometry args={[1.5, 1.4, 1.3]} />
+            <mesh position={[-1.6, 0.42, 0.3]} rotation={[0.05, 0.1, 0.22]}>
+              <boxGeometry args={[1.5, 0.85, 1.3]} />
               <meshStandardMaterial color={'#9a948a'} roughness={1} flatShading />
             </mesh>
             {/* Flat-ish summit slab — top of the rock, where the leader stands */}
-            <mesh position={[0, 2.35, -0.2]}>
-              <boxGeometry args={[3.2, 0.5, 2.2]} />
+            <mesh position={[0, 1.45, -0.2]}>
+              <boxGeometry args={[3.2, 0.3, 2.2]} />
               <meshStandardMaterial color={'#9a948a'} roughness={1} flatShading />
             </mesh>
             {/* Step-stones leading up */}
@@ -1251,20 +1252,6 @@ function Thunderpath() {
   };
   const roadGeo   = useMemo(() => buildRoadGeometry(path, 80, THUNDERPATH.halfWidth,        0.08), []);
   const gravelGeo = useMemo(() => buildRoadGeometry(path, 80, THUNDERPATH.halfWidth + 0.9,  0.04), []);
-  // Lay 30 dashed centre marks aligned with the tangent.
-  const dashes = useMemo(() => {
-    const arr: Array<{ x: number; z: number; y: number; angle: number }> = [];
-    for (let i = 0; i < 30; i++) {
-      const t = (i + 0.5) / 30;
-      const [cx, cz] = path(t);
-      const dt = 1e-3;
-      const [px, pz] = path(Math.max(0, t - dt));
-      const [nx, nz] = path(Math.min(1, t + dt));
-      const angle = Math.atan2(nx - px, nz - pz);
-      arr.push({ x: cx, z: cz, y: terrainHeightAt(cx, cz) + 0.10, angle });
-    }
-    return arr;
-  }, []);
   useEffect(() => () => { roadGeo.dispose(); gravelGeo.dispose(); }, [roadGeo, gravelGeo]);
   return (
     <group>
@@ -1274,12 +1261,6 @@ function Thunderpath() {
       <mesh geometry={roadGeo} receiveShadow>
         <meshStandardMaterial color={'#2a2826'} roughness={0.85} />
       </mesh>
-      {dashes.map((d, i) => (
-        <mesh key={i} position={[d.x, d.y, d.z]} rotation={[-Math.PI / 2, d.angle, 0]}>
-          <planeGeometry args={[2.4, 0.22]} />
-          <meshStandardMaterial color={'#d8d2b8'} roughness={0.9} />
-        </mesh>
-      ))}
       <Monsters />
     </group>
   );

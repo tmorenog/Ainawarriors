@@ -48,6 +48,28 @@ export default function Page() {
     }
   }, [settings.colorblind]);
 
+  // Global keyboard shortcuts:
+  //   M  — toggle the territory map
+  //   /  — open the chat panel and focus the input
+  // We skip these when the user is already typing into an input or
+  // textarea so we don't hijack their text.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        const s = useGameStore.getState();
+        s.setMapOpen(!s.mapOpen);
+      } else if (e.key === '/') {
+        e.preventDefault();
+        useGameStore.getState().focusChat();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // Hydrate the saved Tigerstar-mission state on app load so that once
   // the player has won the fight, Tigerstar stays dead across reloads
   // (previously the store re-defaulted to 'none' every refresh, which

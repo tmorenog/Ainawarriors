@@ -147,8 +147,18 @@ interface GameStore {
   paused: boolean;
   setPaused: (v: boolean) => void;
 
+  // Whether the territory map and the chat panel are currently open.
+  // Stored centrally so keyboard shortcuts (M, /) can toggle them.
+  mapOpen: boolean;
+  setMapOpen: (v: boolean) => void;
+  chatOpen: boolean;
+  setChatOpen: (v: boolean) => void;
+  // Bumped whenever someone requests the chat input get focus (e.g. /).
+  chatFocusAt: number;
+  focusChat: () => void;
+
   // Active disaster (random rare event) and its visible kind.
-  disaster: null | { kind: 'twoleg' | 'flood' | 'fire'; until: number; message: string };
+  disaster: null | { kind: 'twoleg' | 'flood' | 'fire' | 'dogpack'; until: number; message: string };
   setDisaster: (d: GameStore['disaster']) => void;
 
   // Latest StarClan dream — shown as a card during the deep stage of
@@ -284,6 +294,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   paused: false,
   setPaused: (v) => set({ paused: v }),
+
+  mapOpen: false,
+  setMapOpen: (v) => set({ mapOpen: v }),
+  chatOpen: false,
+  setChatOpen: (v) => set({ chatOpen: v }),
+  chatFocusAt: 0,
+  focusChat: () => set({ chatOpen: true, chatFocusAt: Date.now() }),
 
   disaster: null,
   setDisaster: (d) => set({ disaster: d }),

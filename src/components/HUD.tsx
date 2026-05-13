@@ -130,6 +130,31 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
         <button onClick={() => setShowHerbs((v) => !v)} className="rounded-full bg-forest-700 px-3 py-2 text-xs shadow">
           Herb pouch ({Object.values(herbInventory).reduce((a, b) => a + b, 0)})
         </button>
+        {(cat?.role === 'MedicineCat' || cat?.role === 'MedicineCatApprentice') && (
+          <button
+            onClick={() => {
+              // Plant a small herb garden — picks three different herbs
+              // at random from the canonical list and seeds them into
+              // your pouch. Medicine cats only.
+              const addHerb = useGameStore.getState().addHerb;
+              const shuffled = [...HERBS].sort(() => Math.random() - 0.5).slice(0, 3);
+              for (const h of shuffled) addHerb(h.id, 1);
+              pushChat({
+                id: 'sys' + Date.now(),
+                fromId: 'system',
+                fromName: 'StarClan',
+                scope: 'system',
+                text: `You plant a small garden behind the medicine den — ${shuffled.map((h) => h.name).join(', ')}.`,
+                at: Date.now(),
+              });
+              useGameStore.getState().bumpTask('gather-herbs-n', 3);
+            }}
+            className="rounded-full bg-forest-700/90 hover:bg-forest-600 px-3 py-2 text-xs shadow"
+            title="Medicine cats only — plant three random herbs in a small garden"
+          >
+            🌱 Plant herb garden
+          </button>
+        )}
         <button
           onClick={triggerSleep}
           className="rounded-full bg-river/80 hover:bg-river px-3 py-2 text-xs shadow"
@@ -196,6 +221,9 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
                           setHud({ hp: Math.min(100, hud.hp + 12) });
                           useGameStore.getState().bumpTask('use-herb-n', 1);
                           pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: `You used ${h?.name ?? id}.`, at: Date.now() });
+                          // Heal-warrior chapter trigger — using a herb to
+                          // patch up an injury counts as healing a warrior.
+                          try { (window as any).__WOTC_TRIGGER__?.('heal-warrior'); } catch {}
                         }
                       }}
                     >use</button>
@@ -213,7 +241,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-58 · disasters 40min + tigerstar stays dead
+        wotc-59 · 14-feature pass
       </div>
     </div>
   );

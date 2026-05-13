@@ -74,7 +74,7 @@ export const CHAPTERS: Chapter[] = [
   ch(49, "Firestar's Echo",      'A flame that never quite goes out.',                              'Honor Firestar at the High Rock.'),
   ch(50, "Bluestar's Memory",    'An old leader\'s nine lives still ripple in the forest.',         'Tell a kit a story from the warriors\' den.'),
   ch(51, "Crookedstar's Promise",'A jagged-jaw tom keeps a promise to the river.',                  'Stand at the river bank in moonlight.'),
-  ch(52, "Yellowfang's Secret",  'A medicine cat carries a heavy past.',                            'Heal a wounded clanmate.'),
+  ch(52, "Yellowfang's Secret",  'A medicine cat carries a heavy past.',                            'Heal a wounded clanmate — open the Herbs panel and use a herb.', 'heal-warrior'),
   ch(53, "Tallstar's Revenge",   'WindClan\'s last good hunt in the old territory.',                'Chase a rabbit across the moor.'),
   ch(54, "Bramblestar's Storm",  'A flood reshapes the lake.',                                      'Help rebuild a camp after a flood.'),
   ch(55, "Moth Flight's Vision", 'The first medicine cat sees StarClan.',                           'Reach the Moonstone cave.'),

@@ -213,7 +213,7 @@ io.on('connection', (socket) => {
 
   socket.on('disaster', (d) => {
     if (!joinedRoom || !d || typeof d !== 'object') return;
-    const kind = ['twoleg', 'flood', 'fire'].includes(d.kind) ? d.kind : null;
+    const kind = ['twoleg', 'flood', 'fire', 'dogpack'].includes(d.kind) ? d.kind : null;
     const until = Number(d.until);
     const message = String(d.message || '').slice(0, 240);
     if (!kind || !Number.isFinite(until) || !message) return;

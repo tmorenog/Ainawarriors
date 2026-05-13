@@ -18,13 +18,22 @@ export function Chat({ onSend, onEmote }: Props) {
   const friends = useGameStore((s) => s.friends);
   const toggleFriend = useGameStore((s) => s.toggleFriend);
   const selfId = useGameStore((s) => s.selfId);
-  // Default closed — show a small 💬 button. Tap it to expand the chat.
-  const [open, setOpen] = useState(false);
+  const open = useGameStore((s) => s.chatOpen);
+  const setOpen = useGameStore((s) => s.setChatOpen);
+  const chatFocusAt = useGameStore((s) => s.chatFocusAt);
   const [text, setText] = useState('');
   const [scope, setScope] = useState<'nearby' | 'clan'>('nearby');
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chat]);
+  // When something asks the chat to focus (e.g. pressing "/"), jump the
+  // cursor into the text input on the next tick.
+  useEffect(() => {
+    if (!chatFocusAt) return;
+    const id = setTimeout(() => inputRef.current?.focus(), 30);
+    return () => clearTimeout(id);
+  }, [chatFocusAt]);
 
   const submit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -61,7 +70,7 @@ export function Chat({ onSend, onEmote }: Props) {
   };
 
   return (
-    <div className="absolute top-[140px] left-3 w-[min(86vw,320px)] z-30 pointer-events-auto">
+    <div className="absolute top-[200px] left-3 w-[min(86vw,320px)] z-30 pointer-events-auto">
       {open ? (
         <div className="rounded-2xl bg-black/55 backdrop-blur border border-white/10 text-bone overflow-hidden">
           <div className="max-h-44 overflow-y-auto px-3 py-2 text-xs space-y-0.5">
@@ -94,6 +103,7 @@ export function Chat({ onSend, onEmote }: Props) {
               <option value="clan">Clan</option>
             </select>
             <input
+              ref={inputRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Speak..."
