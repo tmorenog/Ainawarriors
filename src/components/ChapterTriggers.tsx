@@ -113,6 +113,17 @@ export function ChapterTriggers() {
     setQuest(CHAPTERS[0].quest);
   }, [cat]);  // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Chapters 8-80 advance on a slow 3-minute ticker so the campaign
+  // keeps moving even when the player is just exploring. The hand-
+  // scripted chapters above (1-7) ignore this trigger; only chapters
+  // whose `completeOn` is 'tick-3min' react.
+  useEffect(() => {
+    const id = setInterval(() => {
+      (window as any).__WOTC_TRIGGER__?.('tick-3min');
+    }, 180_000);
+    return () => clearInterval(id);
+  }, []);
+
   // After the Graystripe flashback ends, returning home (visiting your
   // own camp) wraps up chapter 6 → 7.
   useEffect(() => {

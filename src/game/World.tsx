@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CLAN_LIST } from '@/lib/clans';
 import { terrainHeightAt, LAKE, STREAM } from './terrain';
+import { THUNDERPATH, NUM_MONSTERS, monsterAt } from './vehicles';
 
 interface WorldProps {
   timeOfDay: number; // 0..1
@@ -1196,49 +1197,161 @@ function Snakerocks() {
 // ShadowClan. East–west segments stitched together so the path follows
 // the rolling terrain rather than floating above it. White dashed lane
 // markings down the middle.
+// Build a continuous road strip along an arbitrary parametric path in XZ.
+// Each "slice" is two vertices on either side of the centre, with Y
+// sampled from terrainHeightAt so the road follows the hills smoothly
+// without the stair-step cracks the old per-tile approach produced.
+function buildRoadGeometry(
+  path: (t: number) => [number, number],
+  steps: number,
+  halfWidth: number,
+  yOffset: number,
+): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const [cx, cz] = path(t);
+    const dt = 1e-3;
+    const [px, pz] = path(Math.max(0, t - dt));
+    const [nx, nz] = path(Math.min(1, t + dt));
+    const tx = nx - px;
+    const tz = nz - pz;
+    const tlen = Math.hypot(tx, tz) || 1;
+    // Perpendicular vector in XZ.
+    const perpX = -tz / tlen;
+    const perpZ =  tx / tlen;
+    const lx = cx + perpX * halfWidth;
+    const lz = cz + perpZ * halfWidth;
+    const rx = cx - perpX * halfWidth;
+    const rz = cz - perpZ * halfWidth;
+    const ly = terrainHeightAt(lx, lz) + yOffset;
+    const ry = terrainHeightAt(rx, rz) + yOffset;
+    positions.push(lx, ly, lz, rx, ry, rz);
+    uvs.push(0, t, 1, t);
+  }
+  for (let i = 0; i < steps; i++) {
+    const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+    indices.push(a, c, b, b, c, d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  g.setIndex(indices);
+  g.computeVertexNormals();
+  return g;
+}
+
 function Thunderpath() {
-  const z0 = 95; // band between ThunderClan (z=0) and ShadowClan (z=180)
-  const xMin = -180, xMax = 80;
-  const segLen = 8;
-  const segments = useMemo(() => {
-    const arr: Array<{ x: number; y: number }> = [];
-    for (let x = xMin + segLen / 2; x < xMax; x += segLen) {
-      // Slight wind to z so the road meanders gently rather than ruler-straight
-      const zCenter = z0 + Math.sin(x * 0.015) * 6;
-      arr.push({ x, y: terrainHeightAt(x, zCenter) + 0.08 });
+  const path = (t: number): [number, number] => {
+    const x = THUNDERPATH.xMin + (THUNDERPATH.xMax - THUNDERPATH.xMin) * t;
+    const z = THUNDERPATH.z0 + Math.sin(x * THUNDERPATH.waveFreq) * THUNDERPATH.waveAmp;
+    return [x, z];
+  };
+  const roadGeo   = useMemo(() => buildRoadGeometry(path, 80, THUNDERPATH.halfWidth,        0.08), []);
+  const gravelGeo = useMemo(() => buildRoadGeometry(path, 80, THUNDERPATH.halfWidth + 0.9,  0.04), []);
+  // Lay 30 dashed centre marks aligned with the tangent.
+  const dashes = useMemo(() => {
+    const arr: Array<{ x: number; z: number; y: number; angle: number }> = [];
+    for (let i = 0; i < 30; i++) {
+      const t = (i + 0.5) / 30;
+      const [cx, cz] = path(t);
+      const dt = 1e-3;
+      const [px, pz] = path(Math.max(0, t - dt));
+      const [nx, nz] = path(Math.min(1, t + dt));
+      const angle = Math.atan2(nx - px, nz - pz);
+      arr.push({ x: cx, z: cz, y: terrainHeightAt(cx, cz) + 0.10, angle });
     }
     return arr;
   }, []);
-  // Dashed white lane markings — every other segment.
+  useEffect(() => () => { roadGeo.dispose(); gravelGeo.dispose(); }, [roadGeo, gravelGeo]);
   return (
     <group>
-      {segments.map((s, i) => {
-        const zCenter = z0 + Math.sin(s.x * 0.015) * 6;
-        return (
-          <group key={i} position={[s.x, s.y, zCenter]}>
-            <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-              <planeGeometry args={[segLen + 0.2, 6]} />
-              <meshStandardMaterial color={'#2a2826'} roughness={0.85} />
+      <mesh geometry={gravelGeo} receiveShadow>
+        <meshStandardMaterial color={'#8a7a5a'} roughness={1} />
+      </mesh>
+      <mesh geometry={roadGeo} receiveShadow>
+        <meshStandardMaterial color={'#2a2826'} roughness={0.85} />
+      </mesh>
+      {dashes.map((d, i) => (
+        <mesh key={i} position={[d.x, d.y, d.z]} rotation={[-Math.PI / 2, d.angle, 0]}>
+          <planeGeometry args={[2.4, 0.22]} />
+          <meshStandardMaterial color={'#d8d2b8'} roughness={0.9} />
+        </mesh>
+      ))}
+      <Monsters />
+    </group>
+  );
+}
+
+// Twoleg vehicles ("monsters") prowling the main Thunderpath. Two of
+// them, opposite directions, deterministic positions (see vehicles.ts).
+// They render as boxy cars with headlights and an unpleasant honk on
+// approach (handled by the player-side proximity check in Game.tsx).
+function Monsters() {
+  const refs = useRef<Array<THREE.Group | null>>([]);
+  // Per-monster headlight refs so we can toggle them off in daytime if
+  // we ever want to (not toggled today; the cones look fine 24/7).
+  useFrame(() => {
+    const now = Date.now();
+    for (let i = 0; i < NUM_MONSTERS; i++) {
+      const m = monsterAt(i, now);
+      const g = refs.current[i];
+      if (!g) continue;
+      g.position.set(m.x, m.y, m.z);
+      g.rotation.y = m.yaw;
+    }
+  });
+  return (
+    <group>
+      {Array.from({ length: NUM_MONSTERS }).map((_, i) => (
+        <group key={i} ref={(el) => { refs.current[i] = el; }}>
+          {/* lower chassis */}
+          <mesh position={[0, 0, 0]} castShadow receiveShadow>
+            <boxGeometry args={[1.7, 0.6, 3.6]} />
+            <meshStandardMaterial color={i === 0 ? '#a82828' : '#283e7a'} roughness={0.7} metalness={0.2} />
+          </mesh>
+          {/* upper cab */}
+          <mesh position={[0, 0.55, -0.2]} castShadow>
+            <boxGeometry args={[1.5, 0.65, 1.9]} />
+            <meshStandardMaterial color={i === 0 ? '#7a1818' : '#1a2c5a'} roughness={0.7} metalness={0.2} />
+          </mesh>
+          {/* windshield (dark) */}
+          <mesh position={[0, 0.58, 0.65]} rotation={[-0.35, 0, 0]}>
+            <boxGeometry args={[1.42, 0.5, 0.05]} />
+            <meshStandardMaterial color={'#08101c'} roughness={0.3} metalness={0.6} />
+          </mesh>
+          {/* wheels (4) */}
+          {[
+            [-0.85, -0.22, 1.2], [0.85, -0.22, 1.2],
+            [-0.85, -0.22, -1.2], [0.85, -0.22, -1.2],
+          ].map((p, j) => (
+            <mesh key={j} position={p as [number, number, number]} rotation={[0, 0, Math.PI / 2]}>
+              <cylinderGeometry args={[0.32, 0.32, 0.3, 12]} />
+              <meshStandardMaterial color={'#1a1816'} roughness={0.95} />
             </mesh>
-            {/* dashed center line — only on alternate segments */}
-            {i % 2 === 0 && (
-              <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[segLen * 0.55, 0.22]} />
-                <meshStandardMaterial color={'#d8d2b8'} roughness={0.9} />
-              </mesh>
-            )}
-            {/* gravel shoulders — a thin sandy strip along each edge */}
-            <mesh position={[0, 0.005, -3.2]} rotation={[-Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[segLen + 0.2, 0.8]} />
-              <meshStandardMaterial color={'#8a7a5a'} roughness={1} />
-            </mesh>
-            <mesh position={[0, 0.005, 3.2]} rotation={[-Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[segLen + 0.2, 0.8]} />
-              <meshStandardMaterial color={'#8a7a5a'} roughness={1} />
-            </mesh>
-          </group>
-        );
-      })}
+          ))}
+          {/* headlights — small bright cones in front */}
+          <mesh position={[-0.55, 0.05, 1.85]}>
+            <sphereGeometry args={[0.14, 8, 8]} />
+            <meshStandardMaterial color={'#fff6c0'} emissive={'#fff0a0'} emissiveIntensity={1.6} />
+          </mesh>
+          <mesh position={[0.55, 0.05, 1.85]}>
+            <sphereGeometry args={[0.14, 8, 8]} />
+            <meshStandardMaterial color={'#fff6c0'} emissive={'#fff0a0'} emissiveIntensity={1.6} />
+          </mesh>
+          {/* taillights */}
+          <mesh position={[-0.55, 0.05, -1.85]}>
+            <sphereGeometry args={[0.1, 8, 8]} />
+            <meshStandardMaterial color={'#a20000'} emissive={'#c00000'} emissiveIntensity={1.0} />
+          </mesh>
+          <mesh position={[0.55, 0.05, -1.85]}>
+            <sphereGeometry args={[0.1, 8, 8]} />
+            <meshStandardMaterial color={'#a20000'} emissive={'#c00000'} emissiveIntensity={1.0} />
+          </mesh>
+        </group>
+      ))}
     </group>
   );
 }
@@ -1545,92 +1658,108 @@ function SkyClanCamp() {
   );
 }
 
-// Small Thunderpath — a narrower secondary road. Same terrain-following
-// segment approach as the main Thunderpath.
+// Small Thunderpath — a narrower secondary road, north-south.
 function SmallThunderpath() {
-  const xCenter = -130;
-  const zMin = -180, zMax = -30;
-  const segLen = 8;
-  const segments = useMemo(() => {
-    const arr: Array<{ z: number; y: number; x: number }> = [];
-    for (let z = zMin + segLen / 2; z < zMax; z += segLen) {
-      const x = xCenter + Math.sin(z * 0.02) * 4;
-      arr.push({ z, y: terrainHeightAt(x, z) + 0.07, x });
+  const xCenter = -130, zMin = -180, zMax = -30;
+  const path = (t: number): [number, number] => {
+    const z = zMin + (zMax - zMin) * t;
+    const x = xCenter + Math.sin(z * 0.02) * 4;
+    return [x, z];
+  };
+  const roadGeo = useMemo(() => buildRoadGeometry(path, 50, 1.6, 0.07), []);
+  const dashes = useMemo(() => {
+    const arr: Array<{ x: number; z: number; y: number; angle: number }> = [];
+    for (let i = 0; i < 18; i++) {
+      const t = (i + 0.5) / 18;
+      const [cx, cz] = path(t);
+      const dt = 1e-3;
+      const [px, pz] = path(Math.max(0, t - dt));
+      const [nx, nz] = path(Math.min(1, t + dt));
+      arr.push({ x: cx, z: cz, y: terrainHeightAt(cx, cz) + 0.09, angle: Math.atan2(nx - px, nz - pz) });
     }
     return arr;
   }, []);
+  useEffect(() => () => { roadGeo.dispose(); }, [roadGeo]);
   return (
     <group>
-      {segments.map((s, i) => (
-        <group key={i} position={[s.x, s.y, s.z]}>
-          <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-            <planeGeometry args={[3.2, segLen + 0.2]} />
-            <meshStandardMaterial color={'#2c2a28'} roughness={0.9} />
-          </mesh>
-          {i % 2 === 0 && (
-            <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[0.18, segLen * 0.5]} />
-              <meshStandardMaterial color={'#c8c2a8'} roughness={0.9} />
-            </mesh>
-          )}
-        </group>
+      <mesh geometry={roadGeo} receiveShadow>
+        <meshStandardMaterial color={'#2c2a28'} roughness={0.9} />
+      </mesh>
+      {dashes.map((d, i) => (
+        <mesh key={i} position={[d.x, d.y, d.z]} rotation={[-Math.PI / 2, d.angle, 0]}>
+          <planeGeometry args={[0.18, 2]} />
+          <meshStandardMaterial color={'#c8c2a8'} roughness={0.9} />
+        </mesh>
       ))}
     </group>
   );
 }
 
 // Old Thunderpath — a short, cracked, partially-overgrown disused road
-// segment with gaps where the asphalt has crumbled.
+// with gaps where the asphalt has crumbled. Built as several short
+// continuous strips so the gaps remain but each strip itself follows
+// the hill smoothly.
 function OldThunderpath() {
   const zCenter = -80;
   const xMin = 100, xMax = 240;
-  const segLen = 7;
-  const segments = useMemo(() => {
-    const arr: Array<{ x: number; y: number; cracked: boolean; missing: boolean }> = [];
-    let i = 0;
-    for (let x = xMin + segLen / 2; x < xMax; x += segLen, i++) {
-      arr.push({
-        x,
-        y: terrainHeightAt(x, zCenter) + 0.06,
-        cracked: i % 3 === 1,
-        missing: i === 4 || i === 9,
-      });
+  // Define segment ranges (x ranges) with gaps between
+  const segments: Array<{ a: number; b: number }> = [
+    { a: 100, b: 132 },
+    { a: 138, b: 168 },
+    { a: 174, b: 196 },
+    { a: 204, b: 240 },
+  ];
+  const strips = useMemo(() => segments.map((seg) => {
+    const path = (t: number): [number, number] => [seg.a + (seg.b - seg.a) * t, zCenter];
+    return { geo: buildRoadGeometry(path, 12, 2.25, 0.06), seg };
+  }), []);
+  // Weeds growing in the cracks — scattered tufts along the road centre.
+  const weeds = useMemo(() => {
+    const arr: Array<{ x: number; z: number; y: number }> = [];
+    for (const seg of segments) {
+      for (let k = 0; k < 4; k++) {
+        const x = seg.a + ((k + 0.5) / 4) * (seg.b - seg.a) + (k % 2 === 0 ? -0.6 : 0.7);
+        const z = zCenter + (k % 2 === 0 ? 0.6 : -0.8);
+        arr.push({ x, z, y: terrainHeightAt(x, z) + 0.1 });
+      }
     }
     return arr;
   }, []);
+  // Rubble at the broken ends.
+  const rubble = useMemo(() => {
+    const arr: Array<{ x: number; z: number; y: number; rot: number }> = [];
+    segments.forEach((s, i) => {
+      if (i < segments.length - 1) {
+        const x = s.b + 1;
+        arr.push({ x, z: zCenter + 1.2, y: terrainHeightAt(x, zCenter) + 0.15, rot: 0.4 });
+      }
+      if (i > 0) {
+        const x = s.a - 1;
+        arr.push({ x, z: zCenter - 1.2, y: terrainHeightAt(x, zCenter) + 0.15, rot: -0.5 });
+      }
+    });
+    return arr;
+  }, []);
+  useEffect(() => () => { strips.forEach((s) => s.geo.dispose()); }, [strips]);
   return (
     <group>
-      {segments.map((s, i) => {
-        if (s.missing) return null;
-        return (
-          <group key={i} position={[s.x, s.y, zCenter]}>
-            <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-              <planeGeometry args={[segLen + 0.2, 4.5]} />
-              <meshStandardMaterial color={s.cracked ? '#4a4642' : '#3a3834'} roughness={1} />
-            </mesh>
-            {/* weeds growing through the cracks */}
-            {s.cracked && (
-              <>
-                <mesh position={[0.5, 0.04, 0.6]}>
-                  <coneGeometry args={[0.25, 0.4, 5]} />
-                  <meshStandardMaterial color={'#3a6a3a'} roughness={1} flatShading />
-                </mesh>
-                <mesh position={[-1.4, 0.04, -0.8]}>
-                  <coneGeometry args={[0.22, 0.35, 5]} />
-                  <meshStandardMaterial color={'#3a6a3a'} roughness={1} flatShading />
-                </mesh>
-              </>
-            )}
-            {/* rubble at the broken ends */}
-            {(i === 3 || i === 5 || i === 8 || i === 10) && (
-              <mesh position={[segLen / 2 - 0.4, 0.15, 1.2]} rotation={[0, 0.4, 0.2]}>
-                <boxGeometry args={[0.7, 0.3, 0.5]} />
-                <meshStandardMaterial color={'#5a5650'} roughness={1} flatShading />
-              </mesh>
-            )}
-          </group>
-        );
-      })}
+      {strips.map((s, i) => (
+        <mesh key={i} geometry={s.geo} receiveShadow>
+          <meshStandardMaterial color={i % 2 === 0 ? '#3a3834' : '#4a4642'} roughness={1} />
+        </mesh>
+      ))}
+      {weeds.map((w, i) => (
+        <mesh key={`w${i}`} position={[w.x, w.y, w.z]}>
+          <coneGeometry args={[0.22, 0.4, 5]} />
+          <meshStandardMaterial color={'#3a6a3a'} roughness={1} flatShading />
+        </mesh>
+      ))}
+      {rubble.map((r, i) => (
+        <mesh key={`r${i}`} position={[r.x, r.y, r.z]} rotation={[0, r.rot, 0.2]}>
+          <boxGeometry args={[0.7, 0.3, 0.5]} />
+          <meshStandardMaterial color={'#5a5650'} roughness={1} flatShading />
+        </mesh>
+      ))}
     </group>
   );
 }
