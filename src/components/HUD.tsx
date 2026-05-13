@@ -3,9 +3,10 @@
 import { useGameStore } from '@/game/useGameStore';
 import { CLANS } from '@/lib/clans';
 import { HERBS } from '@/lib/herbs';
+import { CLIMBABLE_TREES } from '@/game/terrain';
 import { adjustCameraZoom } from '@/game/CameraRig';
 import { getAudioEngine } from '@/game/audio';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => void; onOpenLeader: () => void }) {
   const cat = useGameStore((s) => s.cat);
@@ -24,6 +25,35 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
   const settings = useGameStore((s) => s.settings);
 
   const [showHerbs, setShowHerbs] = useState(false);
+
+  // Poll the player position 4x/sec to decide if the climb-tree or
+  // eat-veggies HUD buttons should be visible. We don't subscribe to
+  // `players` directly because that re-renders the whole HUD every
+  // frame, which is wasteful.
+  const [nearTree, setNearTree] = useState(false);
+  const [nearRipeGarden, setNearRipeGarden] = useState<string | null>(null);
+  useEffect(() => {
+    const id = setInterval(() => {
+      const s = useGameStore.getState();
+      const me = s.players[s.selfId];
+      if (!me) { setNearTree(false); setNearRipeGarden(null); return; }
+      const treeFound = CLIMBABLE_TREES.some((t) => {
+        const dx = me.pos[0] - t.x;
+        const dz = me.pos[2] - t.z;
+        return dx * dx + dz * dz < 5 * 5;
+      });
+      setNearTree(treeFound);
+      const now = Date.now();
+      const ripe = s.herbGardens.find((g) => {
+        if (now - g.plantedAt < 60_000) return false;
+        const dx = me.pos[0] - g.x;
+        const dz = me.pos[2] - g.z;
+        return dx * dx + dz * dz < 4 * 4;
+      });
+      setNearRipeGarden(ripe?.id ?? null);
+    }, 250);
+    return () => clearInterval(id);
+  }, []);
 
   if (!cat || !room) return null;
   const me = players[selfId];
@@ -159,30 +189,64 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
         <button onClick={gather} disabled={gathering} className={`rounded-full px-3 py-2 text-xs shadow ${gathering ? 'bg-forest-700/40 cursor-wait' : 'bg-forest-700'}`}>
           {gathering ? 'Searching the undergrowth…' : 'Gather herbs'}
         </button>
+        {nearTree && (
+          <button
+            onClick={() => { try { (window as any).__WOTC_INTERACT__?.(); } catch {} }}
+            className="rounded-full bg-forest-700/90 hover:bg-forest-600 px-3 py-2 text-xs shadow"
+            title="Climb the nearby oak (E)"
+          >
+            🌲 Climb tree
+          </button>
+        )}
+        {nearRipeGarden && (
+          <button
+            onClick={() => {
+              const s = useGameStore.getState();
+              s.removeHerbGarden(nearRipeGarden);
+              s.setHud({ hunger: Math.min(100, s.hud.hunger + 25) });
+              s.pushChat({
+                id: 'sys' + Date.now(),
+                fromId: 'system',
+                fromName: 'StarClan',
+                scope: 'system',
+                text: 'You crunch through the cabbages and carrots — strange, but filling.',
+                at: Date.now(),
+              });
+            }}
+            className="rounded-full bg-forest-500/90 hover:bg-forest-500 px-3 py-2 text-xs shadow"
+            title="Eat the ripe veggies from this garden (+25 hunger)"
+          >
+            🥬 Eat veggies
+          </button>
+        )}
         <button onClick={() => setShowHerbs((v) => !v)} className="rounded-full bg-forest-700 px-3 py-2 text-xs shadow">
           Herb pouch ({Object.values(herbInventory).reduce((a, b) => a + b, 0)})
         </button>
         {(cat?.role === 'MedicineCat' || cat?.role === 'MedicineCatApprentice') && (
           <button
             onClick={() => {
-              // Plant a small herb garden — picks three different herbs
-              // at random from the canonical list and seeds them into
-              // your pouch. Medicine cats only.
-              const addHerb = useGameStore.getState().addHerb;
+              // Plant a herb garden right where you're standing. It
+              // appears in the world as a small fenced plot of seedlings
+              // and ripens (with little veggie cabbages and carrots)
+              // about a minute later. Walk back to a ripe garden and
+              // eat from it to top up hunger.
+              const s = useGameStore.getState();
+              const me = s.players[s.selfId];
+              if (!me) return;
               const shuffled = [...HERBS].sort(() => Math.random() - 0.5).slice(0, 3);
-              for (const h of shuffled) addHerb(h.id, 1);
+              s.plantHerbGarden(me.pos[0], me.pos[2], shuffled.map((h) => h.id));
               pushChat({
                 id: 'sys' + Date.now(),
                 fromId: 'system',
                 fromName: 'StarClan',
                 scope: 'system',
-                text: `You plant a small garden behind the medicine den — ${shuffled.map((h) => h.name).join(', ')}.`,
+                text: `You plant a small garden — ${shuffled.map((h) => h.name).join(', ')}. Give it a minute to grow.`,
                 at: Date.now(),
               });
-              useGameStore.getState().bumpTask('gather-herbs-n', 3);
+              s.bumpTask('gather-herbs-n', 3);
             }}
             className="rounded-full bg-forest-700/90 hover:bg-forest-600 px-3 py-2 text-xs shadow"
-            title="Medicine cats only — plant three random herbs in a small garden"
+            title="Medicine cats only — plant a small garden where you stand"
           >
             🌱 Plant herb garden
           </button>
@@ -277,7 +341,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-61 · monster instakill fix
+        wotc-62 · climb button + visible gardens + role fix
       </div>
     </div>
   );

@@ -137,6 +137,9 @@ function PlayerController({
     // fresh-kill pile", which fires when E is pressed within ~3 units of
     // the player's own clan camp pile. The same pile shows a tappable
     // button on touch devices via FreshKillPile.
+    // Window-level helper so HUD buttons can trigger the same interact
+    // path as pressing E (used by the touchscreen "Climb tree" button).
+    try { (window as any).__WOTC_INTERACT__ = () => { c.interact = true; }; } catch {}
     if (c.interact) {
       c.interact = false;
       const myClan = CLANS[cat.clan];
@@ -157,7 +160,7 @@ function PlayerController({
           const tdx = pos.current.x - t.x;
           const tdz = pos.current.z - t.z;
           const d2 = tdx * tdx + tdz * tdz;
-          if (d2 < 3.5 * 3.5 && (!closest || d2 < closest.d)) {
+          if (d2 < 5 * 5 && (!closest || d2 < closest.d)) {
             closest = { x: t.x, z: t.z, d: d2 };
           }
         }

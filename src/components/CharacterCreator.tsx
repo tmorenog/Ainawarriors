@@ -330,7 +330,7 @@ export function CharacterCreator({ onSave, onPlay, onCancel }: Props) {
                   {CLAN_LIST.map((c) => (
                     <button
                       key={c.id}
-                      onClick={() => update({ clan: c.id as ClanId, role: defaultRoleForClan(c.id) })}
+                      onClick={() => update({ clan: c.id as ClanId })}
                       className={`text-left p-3 rounded border flex gap-3 items-start ${cat.clan === c.id ? 'border-bone' : 'border-white/10 hover:bg-white/5'}`}
                     >
                       <div className="w-3 h-3 mt-1 rounded-full" style={{ background: c.color }} />
