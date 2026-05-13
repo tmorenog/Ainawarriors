@@ -81,12 +81,20 @@ export default function Page() {
       if (save.mission && save.mission !== 'none') {
         useGameStore.getState().setMission(save.mission);
       }
+      if (Array.isArray(save.herbGardens) && save.herbGardens.length > 0) {
+        useGameStore.getState().setHerbGardens(save.herbGardens);
+      }
     } catch {}
     let lastMission = useGameStore.getState().mission;
+    let lastGardens = useGameStore.getState().herbGardens;
     const unsub = useGameStore.subscribe((s) => {
       if (s.mission !== lastMission) {
         lastMission = s.mission;
         try { patchSave({ mission: s.mission }); } catch {}
+      }
+      if (s.herbGardens !== lastGardens) {
+        lastGardens = s.herbGardens;
+        try { patchSave({ herbGardens: s.herbGardens }); } catch {}
       }
     });
     return () => unsub();

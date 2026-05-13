@@ -1,9 +1,10 @@
 'use client';
 
 import { useFrame } from '@react-three/fiber';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { CLAN_LIST } from '@/lib/clans';
+import { useGameStore } from './useGameStore';
 import { terrainHeightAt, LAKE, STREAM, CLIMBABLE_TREES } from './terrain';
 import { THUNDERPATH, NUM_MONSTERS, monsterAt } from './vehicles';
 
@@ -1748,6 +1749,100 @@ function OldThunderpath() {
 // Climbable oaks — a chunky standalone trunk at every spot listed in
 // CLIMBABLE_TREES. Tall enough that perching at +3.6 looks like sitting
 // on a real branch.
+// Med-cat herb gardens — small fenced plots planted by the player.
+// Renders seedling tufts for the first 60 seconds after planting, then
+// ripe little cabbages and carrots once mature.
+function HerbGardens() {
+  const gardens = useGameStore((s) => s.herbGardens);
+  // Re-render every 5s so the "ripe" check (Date.now() >= plantedAt+60s)
+  // flips on at the right moment without forcing a fast re-render loop.
+  const [, setT] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setT(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <group>
+      {gardens.map((g) => {
+        const y = terrainHeightAt(g.x, g.z);
+        const age = Date.now() - g.plantedAt;
+        const ripe = age >= 60_000;
+        // Four fence posts
+        const fence = [-1.2, 1.2].flatMap((dx) => [-1.2, 1.2].map((dz) => [dx, dz] as [number, number]));
+        // Row of 6 seedlings / veggies in a 3x2 grid
+        const rows = [-0.6, 0, 0.6];
+        const cols = [-0.4, 0.4];
+        return (
+          <group key={g.id} position={[g.x, y, g.z]}>
+            {/* dirt patch */}
+            <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+              <planeGeometry args={[2.6, 1.8]} />
+              <meshStandardMaterial color={'#5a4028'} roughness={1} />
+            </mesh>
+            {/* fence */}
+            {fence.map(([dx, dz], i) => (
+              <mesh key={`f${i}`} position={[dx, 0.3, dz]}>
+                <boxGeometry args={[0.08, 0.6, 0.08]} />
+                <meshStandardMaterial color={'#7a5a3a'} roughness={1} />
+              </mesh>
+            ))}
+            {/* fence rails */}
+            <mesh position={[0, 0.55, -1.2]}>
+              <boxGeometry args={[2.4, 0.06, 0.06]} />
+              <meshStandardMaterial color={'#7a5a3a'} roughness={1} />
+            </mesh>
+            <mesh position={[0, 0.55, 1.2]}>
+              <boxGeometry args={[2.4, 0.06, 0.06]} />
+              <meshStandardMaterial color={'#7a5a3a'} roughness={1} />
+            </mesh>
+            {/* plants */}
+            {rows.map((cx, i) => cols.map((cz, j) => {
+              const k = i * 2 + j;
+              if (!ripe) {
+                // seedling — tiny green sprig
+                return (
+                  <mesh key={`s${k}`} position={[cx, 0.18, cz]}>
+                    <coneGeometry args={[0.12, 0.3, 5]} />
+                    <meshStandardMaterial color={'#4a7a3a'} roughness={1} flatShading />
+                  </mesh>
+                );
+              }
+              // ripe — alternate cabbage (round green) and carrot (orange)
+              const isCarrot = k % 2 === 0;
+              return (
+                <group key={`r${k}`} position={[cx, 0.22, cz]}>
+                  {isCarrot ? (
+                    <>
+                      {/* carrot tip poking up */}
+                      <mesh position={[0, 0.12, 0]}>
+                        <coneGeometry args={[0.16, 0.32, 6]} />
+                        <meshStandardMaterial color={'#e07a30'} roughness={0.9} />
+                      </mesh>
+                      {/* leafy top */}
+                      <mesh position={[0, 0.32, 0]}>
+                        <coneGeometry args={[0.18, 0.24, 5]} />
+                        <meshStandardMaterial color={'#3a8a3a'} roughness={1} flatShading />
+                      </mesh>
+                    </>
+                  ) : (
+                    <>
+                      {/* cabbage head */}
+                      <mesh position={[0, 0.16, 0]}>
+                        <icosahedronGeometry args={[0.24, 0]} />
+                        <meshStandardMaterial color={'#7ab048'} roughness={1} flatShading />
+                      </mesh>
+                    </>
+                  )}
+                </group>
+              );
+            }))}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
 function ClimbableOaks() {
   return (
     <group>
@@ -1773,6 +1868,17 @@ function ClimbableOaks() {
             <mesh position={[1.0, 6.4, -0.4]} castShadow>
               <icosahedronGeometry args={[1.4, 0]} />
               <meshStandardMaterial color={'#4a7a4a'} roughness={1} flatShading />
+            </mesh>
+            {/* glowing claw-mark on the trunk — visual cue this oak is
+                climbable, so the player can tell it apart from the
+                procedural pine forest */}
+            <mesh position={[0.5, 1.4, 0.55]}>
+              <sphereGeometry args={[0.18, 8, 8]} />
+              <meshStandardMaterial
+                color={'#ffd066'}
+                emissive={'#ffb84a'}
+                emissiveIntensity={1.6}
+              />
             </mesh>
           </group>
         );
@@ -1848,6 +1954,7 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
       <SmallThunderpath />
       <OldThunderpath />
       <ClimbableOaks />
+      <HerbGardens />
 
       {/* moonpool — uneven stone ring surrounding a glowing silver pool */}
       <group position={[-220, terrainHeightAt(-220, -220), -220]}>

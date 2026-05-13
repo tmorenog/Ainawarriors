@@ -15,6 +15,8 @@ export interface SaveData {
   // Story state — keeps Tigerstar permanently dead once he's been
   // defeated, instead of respawning every time the page reloads.
   mission: 'none' | 'accepted' | 'won';
+  // Med-cat herb gardens — persisted so they don't disappear on reload.
+  herbGardens: Array<{ id: string; x: number; z: number; plantedAt: number; herbs: string[] }>;
 }
 
 export interface GameSettings {
@@ -56,6 +58,7 @@ export function loadSave(): SaveData {
       lastClan: null,
       guestId: 'guest_ssr',
       mission: 'none',
+      herbGardens: [],
     };
   }
   try {
@@ -71,6 +74,7 @@ export function loadSave(): SaveData {
         lastClan: null,
         guestId: newGuestId(),
         mission: 'none',
+        herbGardens: [],
       };
       localStorage.setItem(KEY, JSON.stringify(fresh));
       return fresh;
@@ -86,6 +90,7 @@ export function loadSave(): SaveData {
       lastClan: typeof parsed.lastClan === 'string' ? parsed.lastClan : null,
       guestId: typeof parsed.guestId === 'string' ? parsed.guestId : newGuestId(),
       mission: parsed.mission === 'won' || parsed.mission === 'accepted' || parsed.mission === 'none' ? parsed.mission : 'none',
+      herbGardens: Array.isArray(parsed.herbGardens) ? parsed.herbGardens : [],
     };
   } catch {
     return {
@@ -98,6 +103,7 @@ export function loadSave(): SaveData {
       lastClan: null,
       guestId: newGuestId(),
       mission: 'none',
+      herbGardens: [],
     };
   }
 }

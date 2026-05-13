@@ -80,6 +80,15 @@ interface GameStore {
   healedWarriorAt: number;
   setHealedWarriorAt: (n: number) => void;
 
+  // Med-cat herb gardens — small fenced plots the medicine cat plants
+  // around the territories. Each ripens after ~60s of real time and
+  // can then be eaten for a hunger boost. Persisted via localStorage
+  // so they survive reloads.
+  herbGardens: Array<{ id: string; x: number; z: number; plantedAt: number; herbs: string[] }>;
+  plantHerbGarden: (x: number, z: number, herbs: string[]) => void;
+  removeHerbGarden: (id: string) => void;
+  setHerbGardens: (g: GameStore['herbGardens']) => void;
+
   // Sleep cutscene — when true the world dims and a soft pad plays for a
   // few seconds before fading back in (also doubles as a Book objective).
   sleeping: boolean;
@@ -256,6 +265,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setFirestarDeadAt: (n) => set({ firestarDeadAt: n }),
   healedWarriorAt: 0,
   setHealedWarriorAt: (n) => set({ healedWarriorAt: n }),
+
+  herbGardens: [],
+  plantHerbGarden: (x, z, herbs) =>
+    set((st) => ({
+      herbGardens: [
+        ...st.herbGardens,
+        { id: 'g' + Date.now() + Math.random().toString(36).slice(2, 5), x, z, plantedAt: Date.now(), herbs },
+      ],
+    })),
+  removeHerbGarden: (id) =>
+    set((st) => ({ herbGardens: st.herbGardens.filter((g) => g.id !== id) })),
+  setHerbGardens: (g) => set({ herbGardens: g }),
 
   sleeping: false,
   setSleeping: (v) => set({ sleeping: v }),
