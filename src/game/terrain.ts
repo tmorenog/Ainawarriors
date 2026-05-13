@@ -41,6 +41,25 @@ export const LAKE = { x: 40, z: 220, r: 55, islandR: 8 };
 // the World colour / foliage exclusion / player ground all agree.
 export const STREAM = { xCenter: 80, zMin: 80, zMax: 170, wave: 8, half: 5 };
 
+// Climbable tree trunks — fixed spots where the player can press E to
+// scramble up onto a low branch. Shared between Game.tsx (collision +
+// climb logic) and World.tsx (renders a chunky standalone oak so they
+// stand out from the procedural pine forest).
+export const CLIMBABLE_TREES: Array<{ x: number; z: number }> = [
+  { x: 12,    z: 6   },
+  { x: -10,   z: 14  },
+  { x: 170,   z: -18 },
+  { x: 192,   z: -42 },
+  { x: -50,   z: 195 },
+  { x: -72,   z: 168 },
+  { x: -190,  z: 78  },
+  { x: -212,  z: 50  },
+  { x: 40,    z: -40 },
+  { x: -30,   z: -60 },
+  { x: 80,    z: 30  },
+  { x: -90,   z: 100 },
+];
+
 function naturalTerrain(x: number, z: number): number {
   // Base rolling hills (low-frequency)
   let h =

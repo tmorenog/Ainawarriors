@@ -117,12 +117,44 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
       <div className="absolute top-24 right-3 bg-black/45 backdrop-blur rounded-xl px-3 py-2 text-xs max-w-[220px] pointer-events-auto">
         <div className="text-[10px] uppercase tracking-wide opacity-70">Quest</div>
         <div>{questText}</div>
+        {!useGameStore.getState().healedWarriorAt && (
+          <div className="mt-2 pt-2 border-t border-white/15">
+            <div className="text-[10px] uppercase tracking-wide opacity-70">Side quest</div>
+            <div>Heal a wounded clanmate — open the Herb pouch and tap “use” on any herb.</div>
+          </div>
+        )}
       </div>
 
       {/* bottom-left action buttons */}
       <div className="absolute left-3 bottom-3 [@media(pointer:coarse)]:bottom-[260px] flex flex-col gap-2 pointer-events-auto">
         {carrying && (
-          <button onClick={drop} className="rounded-full bg-thunder px-3 py-2 text-xs shadow">Drop {carrying} at camp pile</button>
+          <>
+            <button onClick={drop} className="rounded-full bg-thunder px-3 py-2 text-xs shadow">Drop {carrying} at camp pile</button>
+            <button
+              onClick={() => {
+                // Selfish field meal — eat the carried prey right now,
+                // +20 hunger, no contribution to the camp pile.
+                const s = useGameStore.getState();
+                if (!s.carrying) return;
+                const piece = s.carrying;
+                s.setCarrying(null);
+                s.setHud({ hunger: Math.min(100, s.hud.hunger + 20) });
+                s.bumpTask('eat-pile-n', 1);
+                s.pushChat({
+                  id: 'sys' + Date.now(),
+                  fromId: 'system',
+                  fromName: 'StarClan',
+                  scope: 'system',
+                  text: `You crouch over your ${piece} and eat it where you caught it.`,
+                  at: Date.now(),
+                });
+              }}
+              className="rounded-full bg-forest-700 hover:bg-forest-600 px-3 py-2 text-xs shadow"
+              title="Eat your prey right now (+20 hunger). No pile contribution."
+            >
+              🍖 Eat the {carrying} now
+            </button>
+          </>
         )}
         <button onClick={gather} disabled={gathering} className={`rounded-full px-3 py-2 text-xs shadow ${gathering ? 'bg-forest-700/40 cursor-wait' : 'bg-forest-700'}`}>
           {gathering ? 'Searching the undergrowth…' : 'Gather herbs'}
@@ -221,8 +253,12 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
                           setHud({ hp: Math.min(100, hud.hp + 12) });
                           useGameStore.getState().bumpTask('use-herb-n', 1);
                           pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: `You used ${h?.name ?? id}.`, at: Date.now() });
-                          // Heal-warrior chapter trigger — using a herb to
-                          // patch up an injury counts as healing a warrior.
+                          // Mark the heal-a-warrior side quest as done and
+                          // also fire the chapter trigger so chapter 52
+                          // ("Yellowfang's Secret") completes here.
+                          if (!useGameStore.getState().healedWarriorAt) {
+                            useGameStore.getState().setHealedWarriorAt(Date.now());
+                          }
                           try { (window as any).__WOTC_TRIGGER__?.('heal-warrior'); } catch {}
                         }
                       }}
@@ -241,7 +277,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-59 · 14-feature pass
+        wotc-60 · day/night, climb, swim, smush
       </div>
     </div>
   );
