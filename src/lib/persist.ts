@@ -12,6 +12,9 @@ export interface SaveData {
   unlocks: string[];
   lastClan: string | null;
   guestId: string;
+  // Story state — keeps Tigerstar permanently dead once he's been
+  // defeated, instead of respawning every time the page reloads.
+  mission: 'none' | 'accepted' | 'won';
 }
 
 export interface GameSettings {
@@ -52,6 +55,7 @@ export function loadSave(): SaveData {
       unlocks: [],
       lastClan: null,
       guestId: 'guest_ssr',
+      mission: 'none',
     };
   }
   try {
@@ -66,6 +70,7 @@ export function loadSave(): SaveData {
         unlocks: [],
         lastClan: null,
         guestId: newGuestId(),
+        mission: 'none',
       };
       localStorage.setItem(KEY, JSON.stringify(fresh));
       return fresh;
@@ -80,6 +85,7 @@ export function loadSave(): SaveData {
       unlocks: Array.isArray(parsed.unlocks) ? parsed.unlocks : [],
       lastClan: typeof parsed.lastClan === 'string' ? parsed.lastClan : null,
       guestId: typeof parsed.guestId === 'string' ? parsed.guestId : newGuestId(),
+      mission: parsed.mission === 'won' || parsed.mission === 'accepted' || parsed.mission === 'none' ? parsed.mission : 'none',
     };
   } catch {
     return {
@@ -91,6 +97,7 @@ export function loadSave(): SaveData {
       unlocks: [],
       lastClan: null,
       guestId: newGuestId(),
+      mission: 'none',
     };
   }
 }

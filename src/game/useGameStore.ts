@@ -252,7 +252,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setGathering: (v) => set({ gathering: v }),
 
   mission: 'none',
-  setMission: (m) => set({ mission: m }),
+  // Tigerstar mission is a one-way ratchet — once you've defeated him
+  // ('won') we don't let anything (saved state, npc dialogs, raid
+  // resets) downgrade it. This keeps him permanently dead.
+  setMission: (m) => set((st) => ({ mission: st.mission === 'won' ? 'won' : m })),
   tigerstarHp: 100,
   setTigerstarHp: (n) => set({ tigerstarHp: Math.max(0, Math.min(100, n)) }),
   npcDialogId: null,

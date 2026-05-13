@@ -1035,7 +1035,10 @@ export function Game({ room, net }: GameProps) {
   // re-broadcast it every 5s so any tab that joined late catches up.
   useEffect(() => {
     let lastRebroadcastAt = 0;
-    let lastRollAt = 0;
+    // First disaster fires ~40 min after the game loads, not immediately
+    // on game start. Anchor the timer to "now" so the cadence starts
+    // counting from when the player actually entered the forest.
+    let lastRollAt = Date.now();
     const broadcast = (msg: any) => {
       try {
         const w = window as any;
@@ -1082,16 +1085,14 @@ export function Game({ room, net }: GameProps) {
           text: 'The danger has passed. The forest holds its breath.', at: Date.now() });
         return;
       }
-      // Only roll a fresh disaster once a minute, even though the tick
-      // runs more often (so we can re-broadcast active ones quickly).
-      if (Date.now() - lastRollAt < 60_000) return;
+      // Roll a fresh disaster on a long cadence — about every 40 minutes
+      // of play. The tick still runs every 4s so an active disaster's
+      // re-broadcast stays responsive, but rolling only fires when the
+      // 40-minute window has elapsed (then guaranteed to pick one).
+      if (Date.now() - lastRollAt < 40 * 60 * 1000) return;
       lastRollAt = Date.now();
       const roll = Math.random();
-      let pick: 'twoleg' | 'flood' | 'fire' | null = null;
-      if (roll < 0.02) pick = 'twoleg';
-      else if (roll < 0.04) pick = 'flood';
-      else if (roll < 0.06) pick = 'fire';
-      if (!pick) return;
+      const pick: 'twoleg' | 'flood' | 'fire' = roll < 1 / 3 ? 'twoleg' : roll < 2 / 3 ? 'flood' : 'fire';
       const messages: Record<typeof pick, string> = {
         twoleg: 'TWOLEGS in the forest! Hide, or they will carry you away in a cage!',
         flood:  'The river bursts its banks — a flood pours through RiverClan! Higher ground, now!',
