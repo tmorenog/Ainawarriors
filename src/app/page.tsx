@@ -19,6 +19,9 @@ import { WaypointArrow } from '@/components/WaypointArrow';
 import { MapPanel } from '@/components/MapPanel';
 import { BattleOverlay } from '@/components/BattleOverlay';
 import { SwipeFX } from '@/components/SwipeFX';
+import { ChapterBanner } from '@/components/ChapterBanner';
+import { CutsceneOverlay } from '@/components/CutsceneOverlay';
+import { ChapterTriggers } from '@/components/ChapterTriggers';
 import { WarriorsGuide } from '@/components/WarriorsGuide';
 import { ActivityBook } from '@/components/ActivityBook';
 import { useGameStore } from '@/game/useGameStore';
@@ -146,6 +149,9 @@ export default function Page() {
           <MapPanel />
           <BattleOverlay />
           <SwipeFX />
+          <ChapterBanner />
+          <ChapterTriggers />
+          <CutsceneOverlay />
           <WarriorsGuide />
           <ActivityBook />
         </>

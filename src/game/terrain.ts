@@ -114,6 +114,78 @@ export function terrainHeightAt(x: number, z: number): number {
   return naturalTerrain(x, z);
 }
 
+// Solid obstacle blockers — circles in XZ that the player can't walk
+// through. Used by PlayerController to push the cat out of buildings,
+// rock piles, big tree trunks, ruined walls, etc. We deliberately keep
+// the radii a little smaller than the visual footprint so the cat can
+// brush past hedges and corners without getting glued to them.
+export interface Blocker { x: number; z: number; r: number }
+export const BLOCKERS: Blocker[] = [
+  // ---- ThunderClan camp High Rock --------------------------------------
+  { x: 0,    z: -7,        r: 2.0 },
+  // ---- RiverClan camp High Rock ----------------------------------------
+  { x: 180,  z: -37,       r: 2.0 },
+  // ---- ShadowClan camp High Rock ---------------------------------------
+  { x: -60,  z: 173,       r: 2.0 },
+  // ---- WindClan camp High Rock -----------------------------------------
+  { x: -200, z: 53,        r: 2.0 },
+  // ---- Snakerocks (cluster) — one bigger circle around the pile --------
+  { x: 60,   z: 70,        r: 6.5 },
+  // ---- Ancient Oak trunk ------------------------------------------------
+  { x: -10,  z: -80,       r: 1.4 },
+  // ---- Great Oak (Gathering island) — trunk -----------------------------
+  { x: 40,   z: 220,       r: 1.6 },
+  // ---- Moonstone mound (Highstones) -------------------------------------
+  { x: -280, z: -260,      r: 6.5 },
+  // ---- Abandoned twoleg nest --------------------------------------------
+  { x: 130,  z: 110,       r: 4.5 },
+  // ---- SkyClan camp gathering ledge -------------------------------------
+  { x: 220,  z: 58,        r: 3.0 },
+  // ---- Twoleg place houses (rough cluster around (260, 240)) ------------
+  // The TwolegPlace component places houses on either side of a crossing
+  // path; we block the bulk footprints of each row.
+  { x: 260 - 18, z: 240 - 10, r: 3.0 }, // north row
+  { x: 260 - 6,  z: 240 - 10, r: 3.0 },
+  { x: 260 + 6,  z: 240 - 10, r: 3.0 },
+  { x: 260 - 18, z: 240 + 10, r: 3.0 }, // south row
+  { x: 260 - 6,  z: 240 + 10, r: 3.0 },
+  { x: 260 + 6,  z: 240 + 10, r: 3.0 },
+  { x: 260 - 22, z: 240 - 8,  r: 3.0 }, // west row
+  { x: 260 - 22, z: 240 + 8,  r: 3.0 },
+  { x: 260 + 22, z: 240 - 8,  r: 3.0 }, // east row
+  { x: 260 + 22, z: 240 + 8,  r: 3.0 },
+  { x: 260 + 18, z: 240 - 22, r: 3.2 }, // barn / shop corner
+  { x: 260 - 20, z: 240 + 22, r: 3.2 },
+  // ---- Horseplace barns -------------------------------------------------
+  { x: 240,      z: -180,     r: 4.0 },
+  { x: 240 + 14, z: -180,     r: 4.0 },
+  { x: 240 - 14, z: -180,     r: 4.0 },
+  // ---- Greenleaf cabins (lake shore) ------------------------------------
+  { x: 60 - 8,   z: 145,      r: 2.0 },
+  { x: 60,       z: 145,      r: 2.0 },
+  { x: 60 + 8,   z: 145,      r: 2.0 },
+];
+
+export function resolveBlockers(x: number, z: number, padding = 0.45): [number, number] {
+  let nx = x, nz = z;
+  for (const b of BLOCKERS) {
+    const dx = nx - b.x;
+    const dz = nz - b.z;
+    const minR = b.r + padding;
+    const d2 = dx * dx + dz * dz;
+    if (d2 < minR * minR && d2 > 1e-6) {
+      const d = Math.sqrt(d2);
+      const push = (minR - d);
+      nx += (dx / d) * push;
+      nz += (dz / d) * push;
+    } else if (d2 <= 1e-6) {
+      // Directly on top — pop straight out in +x so we don't divide by 0
+      nx = b.x + (b.r + padding);
+    }
+  }
+  return [nx, nz];
+}
+
 // Approximate slope from the analytical field (used for sliding/orientation).
 export function terrainNormalAt(x: number, z: number): [number, number, number] {
   const e = 0.5;
