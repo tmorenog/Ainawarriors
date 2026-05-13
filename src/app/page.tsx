@@ -48,6 +48,28 @@ export default function Page() {
     }
   }, [settings.colorblind]);
 
+  // Hydrate the saved Tigerstar-mission state on app load so that once
+  // the player has won the fight, Tigerstar stays dead across reloads
+  // (previously the store re-defaulted to 'none' every refresh, which
+  // made it look like he respawned). Subscribe so the save stays in
+  // sync whenever mission changes.
+  useEffect(() => {
+    try {
+      const save = loadSave();
+      if (save.mission && save.mission !== 'none') {
+        useGameStore.getState().setMission(save.mission);
+      }
+    } catch {}
+    let lastMission = useGameStore.getState().mission;
+    const unsub = useGameStore.subscribe((s) => {
+      if (s.mission !== lastMission) {
+        lastMission = s.mission;
+        try { patchSave({ mission: s.mission }); } catch {}
+      }
+    });
+    return () => unsub();
+  }, []);
+
   // Hook so chat/move can flow even when HUD/Chat live outside Game
   const mp = useMultiplayer(cat, room, screen === 'game');
 
