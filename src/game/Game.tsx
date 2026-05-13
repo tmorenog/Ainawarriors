@@ -96,6 +96,9 @@ function PlayerController({
   // When Tigerstar last bit / clawed the player on his own. Used to give
   // him an autonomous attack rhythm during the fight.
   const lastTigerAttackAt = useRef(0);
+  // True while the cat is currently overlapping a monster — used to make
+  // the shake fire ONCE per contact instead of every single frame.
+  const lastMonsterContactHit = useRef(false);
 
   useEffect(() => {
     if (cat) {
@@ -170,13 +173,21 @@ function PlayerController({
 
     // Twoleg monster (vehicle) collision on the Thunderpath. Hitting one
     // deals massive HP damage every frame until the cat steps clear, so
-    // staying in the road kills you fast.
+    // staying in the road kills you fast. We do NOT re-set the camera
+    // shake every frame — that made the screen vibrate constantly while
+    // anywhere near the road. Instead we kick the shake once per contact
+    // and let it decay normally.
     {
       const now = Date.now();
       const { distance } = nearestMonsterDistance(pos.current.x, pos.current.z, now);
       if (distance < MONSTER_KILL_RADIUS) {
         useGameStore.getState().setHud({ hp: Math.max(0, hud.hp - 90 * dt) });
-        useGameStore.getState().setCameraShake(0.6);
+        if (!lastMonsterContactHit.current) {
+          useGameStore.getState().setCameraShake(0.6);
+          lastMonsterContactHit.current = true;
+        }
+      } else if (distance > MONSTER_KILL_RADIUS + 0.6) {
+        lastMonsterContactHit.current = false;
       }
     }
 
@@ -315,17 +326,21 @@ function PlayerController({
       c.jump = false;
       useGameStore.getState().bumpTask('jump-n', 1);
     }
-    vy.current -= 18 * dt; // gravity
-    pos.current.y += vy.current * dt;
-    if (pos.current.y <= groundY) {
+    if (grounded.current) {
+      // Pin the cat to the analytical terrain when walking — no gravity,
+      // no per-frame Y micro-dip / snap-back. This kills the "everything
+      // shakes when I walk" feel that gravity-then-clamp was producing.
       pos.current.y = groundY;
       vy.current = 0;
-      if (!grounded.current) lastGroundedAt.current = tNow;
-      grounded.current = true;
-    } else if (grounded.current) {
-      // Just left the ground (e.g. walked off a ledge) — start the grace timer.
-      lastGroundedAt.current = tNow;
-      grounded.current = false;
+    } else {
+      vy.current -= 18 * dt;
+      pos.current.y += vy.current * dt;
+      if (pos.current.y <= groundY) {
+        pos.current.y = groundY;
+        vy.current = 0;
+        lastGroundedAt.current = tNow;
+        grounded.current = true;
+      }
     }
 
     let anim = 'idle';
@@ -1030,18 +1045,21 @@ export function Game({ room, net }: GameProps) {
     const id = setInterval(() => {
       const s = useGameStore.getState();
       if (s.disaster && Date.now() < s.disaster.until) {
-        // Disaster damage / capture — flood and fire chip HP every tick;
-        // twoleg has a small per-tick chance of capturing the player and
-        // launching the kidnap cutscene. Disabled while another cutscene
-        // is already running (don't double up).
+        // Disaster damage / capture (the outer tick fires every 4s):
+        //   - Flood / fire deal real HP damage so disasters feel deadly.
+        //     Roughly  flood ~10 hp / 4s  and  fire ~14 hp / 4s , so a
+        //     full-health cat takes ~30s in a fire or 40s in a flood
+        //     before the WASTED cutscene fires.
+        //   - The twoleg disaster intentionally does NOT damage HP. It
+        //     instead has a chance to kidnap you each tick, which plays
+        //     the cage-bars cutscene and auto-respawns you at camp.
         if (!s.cutscene) {
           if (s.disaster.kind === 'flood') {
-            s.setHud({ hp: Math.max(0, s.hud.hp - 2) });
+            s.setHud({ hp: Math.max(0, s.hud.hp - 10) });
           } else if (s.disaster.kind === 'fire') {
-            s.setHud({ hp: Math.max(0, s.hud.hp - 3) });
-          } else if (s.disaster.kind === 'twoleg' && Math.random() < 0.06) {
+            s.setHud({ hp: Math.max(0, s.hud.hp - 14) });
+          } else if (s.disaster.kind === 'twoleg' && Math.random() < 0.18) {
             s.setCutscene({ kind: 'kidnap', startedAt: Date.now() });
-            // Mark the survive-disaster trigger as used (advances ch4)
             try { (window as any).__WOTC_TRIGGER__?.('survive-disaster'); } catch {}
           }
         }
