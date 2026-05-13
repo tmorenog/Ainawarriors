@@ -13,7 +13,7 @@ import { useGameStore } from './useGameStore';
 import { CLANS } from '@/lib/clans';
 import { SIZE_STATS, type PlayerState } from './types';
 import { SilentErrorBoundary } from '@/components/SilentErrorBoundary';
-import { terrainHeightAt, resolveBlockers, LAKE } from './terrain';
+import { terrainHeightAt, resolveBlockers, LAKE, CLIMBABLE_TREES } from './terrain';
 import { nearestMonsterDistance, MONSTER_KILL_RADIUS, MONSTER_WARN_RADIUS } from './vehicles';
 import { getAudioEngine } from './audio';
 import { Npcs } from './Npcs';
@@ -100,6 +100,14 @@ function PlayerController({
   // True while the cat is currently overlapping a monster — used to make
   // the shake fire ONCE per contact instead of every single frame.
   const lastMonsterContactHit = useRef(false);
+  // Tree-climbing state. While `climbing` is true the cat is perched
+  // ~3 units above the trunk it was standing next to. Pressing E while
+  // climbing drops back down; pressing E near a tree starts a climb.
+  const climbing = useRef(false);
+  const climbTreeRef = useRef<{ x: number; z: number } | null>(null);
+  // Reusable list of climbable tree trunks (seeded once on mount). We
+  // pre-compute them so the E handler can find the closest one fast.
+  const treeTrunksRef = useRef<Array<{ x: number; z: number }>>([]);
 
   useEffect(() => {
     if (cat) {
@@ -137,16 +145,33 @@ function PlayerController({
       const dx = pos.current.x - px;
       const dz = pos.current.z - pz;
       const atPile = myClan && dx * dx + dz * dz < 3 * 3;
-      if (atPile) {
-        eatFromPile();
-      } else if (useGameStore.getState().carrying) {
-        // Selfish field-meal — eat the carried prey wherever you are.
-        // Smaller hunger gain than dropping it on the pile (which would
-        // also reward the clan), but a real option when you're far from
-        // camp and starving.
-        eatCarried();
+      // Tree climbing — toggle. E near a climbable tree starts a climb;
+      // E again drops back down. Beats eating priority because climbing
+      // is a deliberate "I want to escape that monster" action.
+      if (climbing.current) {
+        climbing.current = false;
+        climbTreeRef.current = null;
+      } else {
+        let closest: { x: number; z: number; d: number } | null = null;
+        for (const t of CLIMBABLE_TREES) {
+          const tdx = pos.current.x - t.x;
+          const tdz = pos.current.z - t.z;
+          const d2 = tdx * tdx + tdz * tdz;
+          if (d2 < 3.5 * 3.5 && (!closest || d2 < closest.d)) {
+            closest = { x: t.x, z: t.z, d: d2 };
+          }
+        }
+        if (closest) {
+          climbing.current = true;
+          climbTreeRef.current = { x: closest.x, z: closest.z };
+        } else if (atPile) {
+          eatFromPile();
+        } else if (useGameStore.getState().carrying) {
+          eatCarried();
+        }
       }
     }
+
 
     const stats = SIZE_STATS[cat.size];
     const clanBonus = (CLANS[cat.clan].bonuses.speed ?? 1) as number;
@@ -188,21 +213,28 @@ function PlayerController({
       pos.current.z = nz;
     }
 
-    // Twoleg monster (vehicle) collision on the Thunderpath. Hitting one
-    // deals massive HP damage every frame until the cat steps clear, so
-    // staying in the road kills you fast. We do NOT re-set the camera
-    // shake every frame — that made the screen vibrate constantly while
-    // anywhere near the road. Instead we kick the shake once per contact
-    // and let it decay normally.
+    // Twoleg monster (vehicle) collision on the Thunderpath. The big
+    // metal monsters do not slow down for warriors — touching one is an
+    // instant kill (drop HP to 0 → the WASTED cutscene fires this
+    // frame). Camera-shakes once on impact so the kill feels like one.
     {
       const now = Date.now();
       const { distance } = nearestMonsterDistance(pos.current.x, pos.current.z, now);
       if (distance < MONSTER_KILL_RADIUS) {
-        useGameStore.getState().setHud({ hp: Math.max(0, hud.hp - 90 * dt) });
+        const s = useGameStore.getState();
         if (!lastMonsterContactHit.current) {
-          useGameStore.getState().setCameraShake(0.6);
+          s.setCameraShake(0.8);
+          s.pushChat({
+            id: 'sys' + Date.now(),
+            fromId: 'system',
+            fromName: 'StarClan',
+            scope: 'system',
+            text: 'A monster strikes! Your bones are crushed beneath its wheels.',
+            at: Date.now(),
+          });
           lastMonsterContactHit.current = true;
         }
+        s.setHud({ hp: 0 });
       } else if (distance > MONSTER_KILL_RADIUS + 0.6) {
         lastMonsterContactHit.current = false;
       }
@@ -343,7 +375,14 @@ function PlayerController({
       c.jump = false;
       useGameStore.getState().bumpTask('jump-n', 1);
     }
-    if (grounded.current) {
+    if (climbing.current && climbTreeRef.current) {
+      // Perched on a tree — snap to the trunk, lifted ~3.6 units above
+      // the ground. Movement is ignored; pressing E again drops you.
+      pos.current.x = climbTreeRef.current.x;
+      pos.current.z = climbTreeRef.current.z;
+      pos.current.y = terrainHeightAt(climbTreeRef.current.x, climbTreeRef.current.z) + 3.6;
+      vy.current = 0;
+    } else if (grounded.current) {
       // Pin the cat to the analytical terrain when walking — no gravity,
       // no per-frame Y micro-dip / snap-back. This kills the "everything
       // shakes when I walk" feel that gravity-then-clamp was producing.
@@ -377,6 +416,17 @@ function PlayerController({
 
     if (hud.hp < 30 && (fwd !== 0 || sd !== 0) && grounded.current) anim = 'limp';
 
+    // Override movement anim with 'swim' when the cat is in the lake.
+    // Swim animation lowers the body so the cat reads as submerged.
+    if (inLake && grounded.current && sleepStage === 'idle') {
+      anim = 'swim';
+    }
+    // Override with 'climb' when the player is currently clinging to a
+    // tree. The climbing state is set/cleared by the E key handler.
+    if (climbing.current) {
+      anim = 'climb';
+    }
+
     // stamina / hunger / HP attrition
     const draining = anim === 'run';
     const starving = hud.hunger <= 0;
@@ -389,7 +439,7 @@ function PlayerController({
       // Hunger drains much slower now (was 0.4/sec → 0.12/sec). A full
       // hunger bar (100) lasts ~14 minutes of active play before it
       // bottoms out instead of ~4 minutes.
-      hunger: Math.max(0, hud.hunger - 0.12 * dt),
+      hunger: Math.max(0, hud.hunger - 0.06 * dt),
       hp: Math.max(0, Math.min(100, hud.hp + (hpRegen - hpDrain) * dt)),
     });
 
@@ -1045,7 +1095,12 @@ export function Game({ room, net }: GameProps) {
 
   // Day/night/weather progression in offline mode
   useEffect(() => {
-    if (!roomState || roomState.roomId !== 'offline') return;
+    // Drive the day/night cycle whenever we are NOT being told what time
+    // of day it is by a real server. Both the pure offline mode
+    // (roomId === 'offline') and the BroadcastChannel mode (roomId
+    // 'local-…') run on the client, so they both need the local tick.
+    if (!roomState) return;
+    if (!(roomState.roomId === 'offline' || roomState.roomId.startsWith('local-'))) return;
     const id = setInterval(() => {
       setRoom({
         ...roomState,

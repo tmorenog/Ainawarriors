@@ -12,7 +12,7 @@ interface CatProps {
   cat: CatAppearance;
   position?: [number, number, number];
   rotation?: number;
-  anim?: 'idle' | 'walk' | 'run' | 'sit' | 'sleep' | 'doze' | 'crouch' | 'pounce' | 'limp' | 'jump';
+  anim?: 'idle' | 'walk' | 'run' | 'sit' | 'sleep' | 'doze' | 'crouch' | 'pounce' | 'limp' | 'jump' | 'swim' | 'climb';
   injured?: boolean;
   carrying?: string | null;
 }
@@ -145,6 +145,14 @@ export function Cat({ cat: rawCat, position = [0, 0, 0], rotation = 0, anim = 'i
     else if (anim === 'sleep') { crouchY = -0.32; }
     else if (anim === 'limp' || injured) { stride = 0.6; speed = 4.5; }
     else if (anim === 'jump') { jumpY = 0.4; stride = 0.4; }
+    // Swim — body lowered into the water with the head poking out and
+    // legs paddling beneath the surface. We use the same leg cycle as a
+    // slow walk but drop the body so most of the cat reads as submerged.
+    else if (anim === 'swim') { crouchY = -0.42; stride = 0.7; speed = 5; }
+    // Climb — the cat clings to a tree trunk. Lifted high, body tilted
+    // back, legs splayed and gripping. Slow leg cycle so the paws still
+    // feel alive.
+    else if (anim === 'climb') { jumpY = 0.05; stride = 0.4; speed = 3; crouchY = -0.05; }
 
     const limpFactor = anim === 'limp' || injured ? 0.4 : 1;
     if (fLegL.current && fLegR.current && bLegL.current && bLegR.current) {

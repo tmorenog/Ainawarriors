@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CLAN_LIST } from '@/lib/clans';
-import { terrainHeightAt, LAKE, STREAM } from './terrain';
+import { terrainHeightAt, LAKE, STREAM, CLIMBABLE_TREES } from './terrain';
 import { THUNDERPATH, NUM_MONSTERS, monsterAt } from './vehicles';
 
 interface WorldProps {
@@ -1745,6 +1745,42 @@ function OldThunderpath() {
   );
 }
 
+// Climbable oaks — a chunky standalone trunk at every spot listed in
+// CLIMBABLE_TREES. Tall enough that perching at +3.6 looks like sitting
+// on a real branch.
+function ClimbableOaks() {
+  return (
+    <group>
+      {CLIMBABLE_TREES.map((t, i) => {
+        const y = terrainHeightAt(t.x, t.z);
+        return (
+          <group key={i} position={[t.x, y, t.z]}>
+            {/* trunk */}
+            <mesh position={[0, 2.4, 0]} castShadow>
+              <cylinderGeometry args={[0.45, 0.65, 4.8, 8]} />
+              <meshStandardMaterial color={'#4a3220'} roughness={1} flatShading />
+            </mesh>
+            {/* low branch the cat sits on */}
+            <mesh position={[0.5, 3.4, 0]} rotation={[0, 0, -0.4]} castShadow>
+              <cylinderGeometry args={[0.12, 0.16, 1.6, 6]} />
+              <meshStandardMaterial color={'#4a3220'} roughness={1} flatShading />
+            </mesh>
+            {/* small crown */}
+            <mesh position={[0, 5.6, 0]} castShadow>
+              <icosahedronGeometry args={[2.2, 0]} />
+              <meshStandardMaterial color={'#3a6a3a'} roughness={1} flatShading />
+            </mesh>
+            <mesh position={[1.0, 6.4, -0.4]} castShadow>
+              <icosahedronGeometry args={[1.4, 0]} />
+              <meshStandardMaterial color={'#4a7a4a'} roughness={1} flatShading />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
 export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
   const treeCount = graphics === 'low' ? 50 : graphics === 'medium' ? 120 : 240;
   const grassCount = graphics === 'low' ? 0 : graphics === 'medium' ? 220 : 480;
@@ -1811,6 +1847,7 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
       <SkyClanCamp />
       <SmallThunderpath />
       <OldThunderpath />
+      <ClimbableOaks />
 
       {/* moonpool — uneven stone ring surrounding a glowing silver pool */}
       <group position={[-220, terrainHeightAt(-220, -220), -220]}>

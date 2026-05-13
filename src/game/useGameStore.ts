@@ -75,6 +75,10 @@ interface GameStore {
   // re-trigger it.
   firestarDeadAt: number;
   setFirestarDeadAt: (n: number) => void;
+  // Side-quest: heal a wounded clanmate by using a herb. Shows a quest
+  // pill in the HUD until the player has used at least one herb.
+  healedWarriorAt: number;
+  setHealedWarriorAt: (n: number) => void;
 
   // Sleep cutscene — when true the world dims and a soft pad plays for a
   // few seconds before fading back in (also doubles as a Book objective).
@@ -250,6 +254,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setCutscene: (c) => set({ cutscene: c }),
   firestarDeadAt: 0,
   setFirestarDeadAt: (n) => set({ firestarDeadAt: n }),
+  healedWarriorAt: 0,
+  setHealedWarriorAt: (n) => set({ healedWarriorAt: n }),
 
   sleeping: false,
   setSleeping: (v) => set({ sleeping: v }),
