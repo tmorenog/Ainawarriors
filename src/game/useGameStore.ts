@@ -79,6 +79,11 @@ interface GameStore {
   // pill in the HUD until the player has used at least one herb.
   healedWarriorAt: number;
   setHealedWarriorAt: (n: number) => void;
+  // Wounded clanmate lying near each clan's high rock. The Heal quest
+  // requires the player to actually walk up to him and use a herb at
+  // his side, not just patch up wherever.
+  injuredWarriorHealed: boolean;
+  setInjuredWarriorHealed: (v: boolean) => void;
 
   // Med-cat herb gardens — small fenced plots the medicine cat plants
   // around the territories. Each ripens after ~60s of real time and
@@ -265,6 +270,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setFirestarDeadAt: (n) => set({ firestarDeadAt: n }),
   healedWarriorAt: 0,
   setHealedWarriorAt: (n) => set({ healedWarriorAt: n }),
+  injuredWarriorHealed: false,
+  setInjuredWarriorHealed: (v) => set({ injuredWarriorHealed: v }),
 
   herbGardens: [],
   plantHerbGarden: (x, z, herbs) =>

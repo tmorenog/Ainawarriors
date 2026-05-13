@@ -84,9 +84,13 @@ export default function Page() {
       if (Array.isArray(save.herbGardens) && save.herbGardens.length > 0) {
         useGameStore.getState().setHerbGardens(save.herbGardens);
       }
+      if (save.injuredWarriorHealed) {
+        useGameStore.getState().setInjuredWarriorHealed(true);
+      }
     } catch {}
     let lastMission = useGameStore.getState().mission;
     let lastGardens = useGameStore.getState().herbGardens;
+    let lastInjured = useGameStore.getState().injuredWarriorHealed;
     const unsub = useGameStore.subscribe((s) => {
       if (s.mission !== lastMission) {
         lastMission = s.mission;
@@ -95,6 +99,10 @@ export default function Page() {
       if (s.herbGardens !== lastGardens) {
         lastGardens = s.herbGardens;
         try { patchSave({ herbGardens: s.herbGardens }); } catch {}
+      }
+      if (s.injuredWarriorHealed !== lastInjured) {
+        lastInjured = s.injuredWarriorHealed;
+        try { patchSave({ injuredWarriorHealed: s.injuredWarriorHealed }); } catch {}
       }
     });
     return () => unsub();
