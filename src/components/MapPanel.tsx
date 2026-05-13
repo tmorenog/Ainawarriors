@@ -74,7 +74,8 @@ const TONE_COLOR: Record<Marker['tone'], string> = {
 };
 
 export function MapPanel() {
-  const [open, setOpen] = useState(false);
+  const open = useGameStore((s) => s.mapOpen);
+  const setOpen = useGameStore((s) => s.setMapOpen);
   const players = useGameStore((s) => s.players);
   const selfId = useGameStore((s) => s.selfId);
   const setWaypoint = useGameStore((s) => s.setWaypoint);

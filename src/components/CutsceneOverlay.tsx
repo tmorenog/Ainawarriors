@@ -93,16 +93,15 @@ export function CutsceneOverlay() {
       // 3.5s wasted, then transition into the StarClan walk
       timers.push(setTimeout(() => setCutscene({ kind: 'starclan-walk', startedAt: Date.now() }), 3500));
     } else if (cutscene.kind === 'starclan-walk') {
-      // Walk lasts ~6s, then respawn
+      // Longer (~8s) walk so the ghostly ancestors all get a moment.
       timers.push(setTimeout(() => {
         if (!cat) { setCutscene(null); return; }
         const [cx, , cz] = CLANS[cat.clan].campCenter as [number, number, number];
-        // Teleport via the global flag the PlayerController watches
         try { (window as any).__WOTC_RESPAWN__ = { x: cx, z: cz }; } catch {}
         setHud({ hp: 90, hunger: 60, stamina: 90 });
         pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: 'You return to your camp. Walk softly — the stars are watching.', at: Date.now() });
         setCutscene(null);
-      }, 6000));
+      }, 8000));
     } else if (cutscene.kind === 'kidnap') {
       // 5s being carried away, then respawn at camp
       timers.push(setTimeout(() => {
@@ -148,34 +147,85 @@ export function CutsceneOverlay() {
   }
 
   if (cutscene.kind === 'starclan-walk') {
-    // A starry mist with a cat silhouette walking. Pure CSS — a slow
-    // panning gradient + a few twinkles.
+    // A deeper StarClan walk: layered starry sky + nebula swirl + a
+    // ghostly trail of ancestor cats that fade in alongside the player's
+    // silhouette, plus a slow camera-like horizon pan.
     const phase = Math.min(1, t / 6);
+    const ghosts = [
+      { name: 'Bluestar',   color: '#bccfff', delay: 0.05, top: '20%' },
+      { name: 'Yellowfang', color: '#e7d59a', delay: 0.20, top: '30%' },
+      { name: 'Spottedleaf',color: '#ffb9c7', delay: 0.40, top: '14%' },
+      { name: 'Lionheart',  color: '#ffd07a', delay: 0.55, top: '24%' },
+      { name: 'Firestar',   color: '#ff9a5a', delay: 0.70, top: '34%' },
+    ];
+    const subtitle = phase < 0.18 ? 'You drift between the trees, paws light as moth-wings…'
+                    : phase < 0.45 ? 'A silver path opens through the stars.'
+                    : phase < 0.75 ? 'Your ancestors walk beside you.'
+                    : 'Their voices whisper: not yet, young one — go back to your clan.';
     return (
-      <div className="absolute inset-0 z-50 overflow-hidden" style={{ background: 'radial-gradient(ellipse at center, #1a1f48 0%, #060816 80%)' }}>
-        {/* drifting stars */}
-        {Array.from({ length: 40 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full"
-            style={{
+      <div className="absolute inset-0 z-50 overflow-hidden" style={{ background: 'radial-gradient(ellipse at center, #1a1f48 0%, #060816 75%)' }}>
+        {/* nebula glow swirling behind the stars */}
+        <div className="absolute inset-0" style={{
+          background: 'radial-gradient(ellipse 60% 35% at 30% 40%, rgba(120,90,180,0.20), transparent 70%),'+
+                      'radial-gradient(ellipse 50% 40% at 75% 65%, rgba(70,140,200,0.18), transparent 70%)',
+          filter: 'blur(8px)',
+          transform: `translateX(${(0.5 - phase) * 8}%)`,
+          transition: 'transform 0.4s linear',
+        }} />
+        {/* drifting stars — twin layers for parallax */}
+        {Array.from({ length: 80 }).map((_, i) => {
+          const big = i % 7 === 0;
+          return (
+            <div key={i} className="absolute rounded-full" style={{
               top: `${(i * 37) % 100}%`,
-              left: `${((i * 53) % 100 + phase * 60) % 100}%`,
-              width: `${(i % 3) + 1}px`,
-              height: `${(i % 3) + 1}px`,
-              background: '#dde8ff',
-              opacity: 0.4 + (i % 5) * 0.1,
-            }}
-          />
-        ))}
-        {/* silhouette cat — pure CSS shape, slowly walking left to right */}
+              left: `${((i * 53) % 100 + phase * (big ? 30 : 60)) % 100}%`,
+              width: big ? '3px' : `${(i % 3) + 1}px`,
+              height: big ? '3px' : `${(i % 3) + 1}px`,
+              background: big ? '#fff8d8' : '#dde8ff',
+              opacity: 0.4 + (i % 5) * 0.12,
+              boxShadow: big ? '0 0 6px rgba(255,240,180,0.85)' : undefined,
+            }} />
+          );
+        })}
+        {/* horizon mist band */}
+        <div className="absolute inset-x-0" style={{
+          top: '46%',
+          height: '14%',
+          background: 'linear-gradient(180deg, transparent, rgba(180,200,255,0.22), transparent)',
+          filter: 'blur(6px)',
+        }} />
+        {/* ghostly ancestor silhouettes — fade in over the walk and trail
+            behind the player */}
+        {ghosts.map((g, i) => {
+          const visible = phase > g.delay;
+          const local = Math.max(0, phase - g.delay);
+          return (
+            <div key={g.name} className="absolute" style={{
+              top: g.top,
+              left: `${(10 + local * 60) % 95}%`,
+              opacity: visible ? Math.min(0.65, local * 1.4) : 0,
+              filter: `drop-shadow(0 0 12px ${g.color}88)`,
+              transition: 'opacity 0.6s linear, left 0.4s linear',
+            }}>
+              <svg width="64" height="42" viewBox="0 0 84 56" fill="none">
+                <ellipse cx="48" cy="38" rx="22" ry="9" fill={g.color} opacity="0.9"/>
+                <ellipse cx="22" cy="34" rx="10" ry="9" fill={g.color} opacity="0.9"/>
+                <polygon points="14,28 18,18 24,28" fill={g.color} opacity="0.9"/>
+                <polygon points="26,28 30,18 34,28" fill={g.color} opacity="0.9"/>
+                <path d="M70 36 Q80 30 82 22" stroke={g.color} strokeWidth="2" fill="none"/>
+              </svg>
+              <div className="text-[10px] tracking-[0.3em] uppercase opacity-70 text-center mt-1" style={{ color: g.color }}>{g.name}</div>
+            </div>
+          );
+        })}
+        {/* player silhouette — front and centre, with a bright glow */}
         <div className="absolute" style={{
           bottom: '24%',
           left: `${10 + phase * 70}%`,
           transition: 'left 0.4s linear',
-          filter: 'drop-shadow(0 0 14px rgba(150,170,255,0.5))',
+          filter: 'drop-shadow(0 0 18px rgba(180,200,255,0.85))',
         }}>
-          <svg width="84" height="56" viewBox="0 0 84 56" fill="none">
+          <svg width="96" height="64" viewBox="0 0 84 56" fill="none">
             <ellipse cx="48" cy="38" rx="22" ry="9" fill="#0e1338"/>
             <ellipse cx="22" cy="34" rx="10" ry="9" fill="#0e1338"/>
             <polygon points="14,28 18,18 24,28" fill="#0e1338"/>
@@ -186,9 +236,18 @@ export function CutsceneOverlay() {
             <path d="M70 36 Q80 30 82 22" stroke="#0e1338" strokeWidth="2" fill="none"/>
           </svg>
         </div>
+        {/* "silver path" — a faint glowing line beneath the cat */}
+        <div className="absolute" style={{
+          bottom: '22%',
+          left: '0%',
+          right: '0%',
+          height: '2px',
+          background: 'linear-gradient(90deg, transparent, rgba(180,200,255,0.55), transparent)',
+        }} />
         <div className="absolute inset-0 grid place-items-center pointer-events-none">
-          <div className="text-center">
-            <div className="text-bone/85 italic text-lg">Walk softly, warrior. StarClan walks with you.</div>
+          <div className="text-center px-6 max-w-xl">
+            <div className="text-xs uppercase tracking-[0.5em] text-bone/55 mb-3">Walk in StarClan</div>
+            <div key={subtitle} className="text-bone/90 italic text-lg animate-fade-in">{subtitle}</div>
           </div>
         </div>
       </div>

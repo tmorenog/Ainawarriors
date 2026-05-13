@@ -12,7 +12,7 @@ export interface MultiplayerHandle {
   sendEmote: (emote: string) => void;
   sendCommand: (kind: string, payload?: any) => void;
   sendCatch: (preyId: string, kind: string) => void;
-  sendDisaster: (d: { kind: 'twoleg' | 'flood' | 'fire'; until: number; message: string }) => void;
+  sendDisaster: (d: { kind: 'twoleg' | 'flood' | 'fire' | 'dogpack'; until: number; message: string }) => void;
 }
 
 // Multiplayer Socket.io URL.
@@ -65,7 +65,7 @@ type BcMessage =
   | { kind: 'chat'; msg: ChatMessage }
   | { kind: 'who' }
   | { kind: 'emote'; id: string; name: string; emote: string }
-  | { kind: 'disaster'; disaster: { kind: 'twoleg' | 'flood' | 'fire'; until: number; message: string } };
+  | { kind: 'disaster'; disaster: { kind: 'twoleg' | 'flood' | 'fire' | 'dogpack'; until: number; message: string } };
 
 function makeBroadcastId(): string {
   // Persist the id across re-renders / hot reloads in this same tab so that
@@ -117,7 +117,7 @@ export function useMultiplayer(cat: CatAppearance | null, room: string, enabled:
       const onLeave = (id: string) => removePlayer(id);
       const onChat = (m: ChatMessage) => { if (!muted.has(m.fromId)) pushChat(m); };
       const onSystem = (text: string) => pushChat({ id: 's' + Date.now(), fromId: 'system', fromName: 'System', scope: 'system', text, at: Date.now() });
-      const onDisaster = (d: { kind: 'twoleg' | 'flood' | 'fire'; until: number; message: string }) => {
+      const onDisaster = (d: { kind: 'twoleg' | 'flood' | 'fire' | 'dogpack'; until: number; message: string }) => {
         const st = useGameStore.getState();
         if (!st.disaster || st.disaster.until < d.until) {
           st.setDisaster(d);
