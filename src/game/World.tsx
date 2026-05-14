@@ -459,14 +459,24 @@ function Clouds({ count, isNight }: { count: number; isNight: boolean }) {
 function Camps() {
   return (
     <group>
-      {CLAN_LIST.map((c) => (
+      {CLAN_LIST.map((c) => {
+        // Sample terrain at the camp center; every sub-piece (den, rock,
+        // pile, etc.) compensates for the difference between its own
+        // local terrain Y and the camp center's, so things sit flush
+        // with the actual ground instead of floating or burying.
+        const clanY = terrainHeightAt(c.campCenter[0], c.campCenter[2]);
+        const dy = (dx: number, dz: number) =>
+          terrainHeightAt(c.campCenter[0] + dx, c.campCenter[2] + dz) - clanY;
+        return (
         <group
           key={c.id}
-          position={[c.campCenter[0], terrainHeightAt(c.campCenter[0], c.campCenter[2]), c.campCenter[2]]}
+          position={[c.campCenter[0], clanY, c.campCenter[2]]}
         >
-          {/* clearing */}
+          {/* clearing — small dirt circle in the middle. Was radius 12
+              which made the disc clip in/out of the rolling hills at the
+              edges; 4 keeps it flat against the actual ground. */}
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
-            <circleGeometry args={[12, 24]} />
+            <circleGeometry args={[4, 24]} />
             <meshStandardMaterial color={'#7a6a4a'} roughness={1} />
           </mesh>
 
@@ -474,7 +484,7 @@ function Camps() {
               stones with slight per-stone shade variation so it reads as
               real rock rather than a box. The flat top (kept walkable via
               terrain.ts) is the leader's perch. */}
-          <group position={[0, 0, -7]}>
+          <group position={[0, dy(0, -7), -7]}>
             {/* Main mass — base block, slightly skewed. The camp High
                 Rock is now a low ledge rather than a wall: ~0.5m tall
                 so it reads as a "step up to speak", not a tower. */}
@@ -524,7 +534,7 @@ function Camps() {
           </group>
 
           {/* Leader's den — small cave-like hollow at the base of the high rock */}
-          <group position={[3.2, 0, -6]}>
+          <group position={[3.2, dy(3.2, -6), -6]}>
             <mesh position={[0, 0.7, 0]}>
               <sphereGeometry args={[1.2, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
               <meshStandardMaterial color={'#5a544a'} roughness={1} />
@@ -536,7 +546,7 @@ function Camps() {
           </group>
 
           {/* Warriors' den — bramble dome on the right side of the camp */}
-          <group position={[5.5, 0, 4]}>
+          <group position={[5.5, dy(5.5, 4), 4]}>
             <mesh position={[0, 0.9, 0]}>
               <sphereGeometry args={[1.8, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
               <meshStandardMaterial color={'#3a4a26'} roughness={0.95} flatShading />
@@ -548,7 +558,7 @@ function Camps() {
           </group>
 
           {/* Apprentices' den — left side */}
-          <group position={[-5.5, 0, 4]}>
+          <group position={[-5.5, dy(-5.5, 4), 4]}>
             <mesh position={[0, 0.7, 0]}>
               <sphereGeometry args={[1.4, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
               <meshStandardMaterial color={'#4a5a30'} roughness={0.95} flatShading />
@@ -562,7 +572,7 @@ function Camps() {
           {/* Medicine cat's den — at the back, marked with a small herb
               bundle (green sphere) above the entrance. Sleeping here heals
               you a bit faster. */}
-          <group position={[-3.5, 0, -5]}>
+          <group position={[-3.5, dy(-3.5, -5), -5]}>
             <mesh position={[0, 0.85, 0]}>
               <sphereGeometry args={[1.3, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
               <meshStandardMaterial color={'#3a4a2a'} roughness={0.95} flatShading />
@@ -579,7 +589,7 @@ function Camps() {
 
           {/* Queens' / nursery den — soft moss green, front-left of camp.
               The little mushrooms hint that kits live here. */}
-          <group position={[-7, 0, -1]}>
+          <group position={[-7, dy(-7, -1), -1]}>
             <mesh position={[0, 0.75, 0]}>
               <sphereGeometry args={[1.5, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
               <meshStandardMaterial color={'#5a6a3a'} roughness={0.95} flatShading />
@@ -605,7 +615,7 @@ function Camps() {
 
           {/* Elders' den — front-right, lower & wider, with a sun-bleached
               log laid out front for napping. */}
-          <group position={[6, 0, -1]}>
+          <group position={[6, dy(6, -1), -1]}>
             <mesh position={[0, 0.6, 0]}>
               <sphereGeometry args={[1.55, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
               <meshStandardMaterial color={'#5a4a30'} roughness={0.95} flatShading />
@@ -623,7 +633,7 @@ function Camps() {
 
           {/* Training post — pounce on it (or just hang around) to practice.
               Stand within ~2.5 units to gain a stamina top-up. */}
-          <group position={[-3.5, 0, -3]}>
+          <group position={[-3.5, dy(-3.5, -3), -3]}>
             <mesh position={[0, 0.9, 0]}>
               <cylinderGeometry args={[0.18, 0.22, 1.8, 8]} />
               <meshStandardMaterial color={'#6a4a2a'} roughness={0.95} />
@@ -642,7 +652,7 @@ function Camps() {
               When a player drops prey, the pile visually grows by adding to
               the global hud "freshKill" tally; we still always render the
               base mound so the camp never looks empty. */}
-          <group position={[0, 0, 2]}>
+          <group position={[0, dy(0, 2), 2]}>
             <mesh position={[0, 0.18, 0]} scale={[1.3, 0.5, 1.3]}>
               <sphereGeometry args={[0.5, 12, 8]} />
               <meshStandardMaterial color={'#7a4a2a'} roughness={0.9} />
@@ -662,18 +672,23 @@ function Camps() {
             </mesh>
           </group>
 
-          {/* bramble walls (ring of bushes) */}
+          {/* bramble walls (ring of bushes) — each bush sits on its
+              own bit of ground so the ring follows the rolling hills
+              instead of cutting through them. */}
           {Array.from({ length: 18 }).map((_, i) => {
             const a = (i / 18) * Math.PI * 2;
+            const bx = Math.cos(a) * 12;
+            const bz = Math.sin(a) * 12;
             return (
-              <mesh key={i} position={[Math.cos(a) * 12, 0.6, Math.sin(a) * 12]}>
+              <mesh key={i} position={[bx, dy(bx, bz) + 0.6, bz]}>
                 <sphereGeometry args={[1.0, 8, 6]} />
                 <meshStandardMaterial color={'#3f5a2c'} roughness={0.95} />
               </mesh>
             );
           })}
         </group>
-      ))}
+        );
+      })}
     </group>
   );
 }
