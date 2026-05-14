@@ -4,9 +4,9 @@ import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { CLAN_LIST } from '@/lib/clans';
+import { CLAN_LIST, CLANS } from '@/lib/clans';
 import { useGameStore } from './useGameStore';
-import { terrainHeightAt, LAKE, STREAM, CLIMBABLE_TREES, INJURED_WARRIOR } from './terrain';
+import { terrainHeightAt, LAKE, STREAM, CLIMBABLE_TREES, INJURED_WARRIOR_OFFSET } from './terrain';
 import { THUNDERPATH, NUM_MONSTERS, monsterAt } from './vehicles';
 
 interface WorldProps {
@@ -1853,6 +1853,7 @@ function HerbGardens() {
 // fading out and being removed).
 function InjuredWarrior() {
   const healed = useGameStore((s) => s.injuredWarriorHealed);
+  const cat = useGameStore((s) => s.cat);
   // Bob the floating marker slowly so the eye picks it up from far away.
   const markerRef = useRef<THREE.Group>(null);
   useFrame((state) => {
@@ -1862,9 +1863,25 @@ function InjuredWarrior() {
     g.rotation.y = state.clock.elapsedTime * 0.7;
   });
   if (healed) return null;
-  const y = terrainHeightAt(INJURED_WARRIOR.x, INJURED_WARRIOR.z);
+  // Anchor the wounded clanmate to the player's OWN clan, not just
+  // ThunderClan — so wherever you spawn, there's a wounded cat near
+  // your high rock to walk up to. We expose this resolved position
+  // on window for the HUD proximity check to read.
+  const clanId = cat?.clan ?? 'ThunderClan';
+  const camp = CLANS[clanId]?.campCenter ?? [0, 0, 0];
+  const wx = camp[0] + INJURED_WARRIOR_OFFSET.dx;
+  const wz = camp[2] + INJURED_WARRIOR_OFFSET.dz;
+  try { (window as any).__WOTC_INJURED_POS__ = { x: wx, z: wz }; } catch {}
+  const y = terrainHeightAt(wx, wz);
   return (
-    <group position={[INJURED_WARRIOR.x, y, INJURED_WARRIOR.z]}>
+    <group position={[wx, y, wz]}>
+      {/* tall red beacon — a glowing column up into the sky so the
+          spot is visible from across the territory. Fades out near
+          the top so it doesn't punch through fog. */}
+      <mesh position={[0, 8, 0]}>
+        <cylinderGeometry args={[0.08, 0.08, 16, 8]} />
+        <meshStandardMaterial color={'#ff3030'} emissive={'#c81818'} emissiveIntensity={1.6} transparent opacity={0.55} />
+      </mesh>
       {/* moss patch under him so the spot reads as "tended to" */}
       <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <circleGeometry args={[1.5, 24]} />
@@ -1926,7 +1943,7 @@ function InjuredWarrior() {
           className="px-2 py-0.5 rounded-full text-[10px] whitespace-nowrap pointer-events-none"
           style={{ background: 'rgba(0,0,0,0.55)', color: '#ffd0d0', border: '1px solid rgba(255,80,80,0.45)' }}
         >
-          🩸 {INJURED_WARRIOR.name} (wounded)
+          🩸 {INJURED_WARRIOR_OFFSET.name} (wounded)
         </div>
       </Html>
     </group>

@@ -63,7 +63,16 @@ export const CLIMBABLE_TREES: Array<{ x: number; z: number }> = [
 // Wounded warrior — fixed spot near the ThunderClan medicine den where
 // the "heal a wounded clanmate" side quest's target lies. Shared so
 // both the World mesh and the HUD proximity check stay in sync.
-export const INJURED_WARRIOR = { x: 5, z: 8, name: 'Bramblepaw' };
+// Wounded warrior — small offset from each clan's high rock. The real
+// world position is computed at render time as
+//   CLANS[player.clan].campCenter + INJURED_WARRIOR_OFFSET
+// so every clan has its own wounded clanmate to heal, not just
+// ThunderClan. Kept here so World, HUD, and the heal check all agree
+// on the same offset.
+export const INJURED_WARRIOR_OFFSET = { dx: 5, dz: 8, name: 'Bramblepaw' };
+// Back-compat: legacy code path still imports INJURED_WARRIOR. Points
+// at the ThunderClan position (campCenter is (0,0) for ThunderClan).
+export const INJURED_WARRIOR = { x: INJURED_WARRIOR_OFFSET.dx, z: INJURED_WARRIOR_OFFSET.dz, name: INJURED_WARRIOR_OFFSET.name };
 
 function naturalTerrain(x: number, z: number): number {
   // Base rolling hills (low-frequency)
