@@ -14,10 +14,10 @@
 // The High Rock geometry (see World.tsx Camps) is at camp + (0, _, -7),
 // box [4.2, 2.2, 2.6], so its top is ~2.2 above the local terrain.
 const HIGH_ROCKS: { cx: number; cz: number; hx: number; hz: number; top: number }[] = [
-  { cx: 0,    cz: -7,        hx: 2.1, hz: 1.3, top: 1.4 },
-  { cx: 180,  cz: -30 - 7,   hx: 2.1, hz: 1.3, top: 1.4 },
-  { cx: -60,  cz: 180 - 7,   hx: 2.1, hz: 1.3, top: 1.4 },
-  { cx: -200, cz: 60 - 7,    hx: 2.1, hz: 1.3, top: 1.4 },
+  { cx: 0,    cz: -7,        hx: 2.1, hz: 1.3, top: 0.65 },
+  { cx: 180,  cz: -30 - 7,   hx: 2.1, hz: 1.3, top: 0.65 },
+  { cx: -60,  cz: 180 - 7,   hx: 2.1, hz: 1.3, top: 0.65 },
+  { cx: -200, cz: 60 - 7,    hx: 2.1, hz: 1.3, top: 0.65 },
 ];
 
 function platformHeightAt(x: number, z: number): number {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useFrame } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { CLAN_LIST } from '@/lib/clans';
@@ -472,34 +473,36 @@ function Camps() {
               real rock rather than a box. The flat top (kept walkable via
               terrain.ts) is the leader's perch. */}
           <group position={[0, 0, -7]}>
-            {/* Main mass — base block, slightly skewed. Lowered so the
-                camp clearing isn't dominated by a 2-metre wall. */}
-            <mesh position={[0, 0.65, 0]} rotation={[0, 0.12, 0.04]}>
-              <boxGeometry args={[4.2, 1.3, 2.6]} />
+            {/* Main mass — base block, slightly skewed. The camp High
+                Rock is now a low ledge rather than a wall: ~0.5m tall
+                so it reads as a "step up to speak", not a tower. */}
+            <mesh position={[0, 0.25, 0]} rotation={[0, 0.12, 0.04]}>
+              <boxGeometry args={[4.2, 0.5, 2.6]} />
               <meshStandardMaterial color={'#8a8276'} roughness={1} flatShading />
             </mesh>
             {/* Outcrop on the right — bigger angled chunk */}
-            <mesh position={[1.7, 0.55, 0.6]} rotation={[0, -0.22, -0.18]}>
-              <boxGeometry args={[1.8, 1.0, 1.4]} />
+            <mesh position={[1.7, 0.22, 0.6]} rotation={[0, -0.22, -0.18]}>
+              <boxGeometry args={[1.8, 0.4, 1.4]} />
               <meshStandardMaterial color={'#7a7268'} roughness={1} flatShading />
             </mesh>
             {/* Outcrop on the left */}
-            <mesh position={[-1.6, 0.42, 0.3]} rotation={[0.05, 0.1, 0.22]}>
-              <boxGeometry args={[1.5, 0.85, 1.3]} />
+            <mesh position={[-1.6, 0.18, 0.3]} rotation={[0.05, 0.1, 0.22]}>
+              <boxGeometry args={[1.5, 0.36, 1.3]} />
               <meshStandardMaterial color={'#9a948a'} roughness={1} flatShading />
             </mesh>
             {/* Flat-ish summit slab — top of the rock, where the leader stands */}
-            <mesh position={[0, 1.45, -0.2]}>
-              <boxGeometry args={[3.2, 0.3, 2.2]} />
+            <mesh position={[0, 0.55, -0.2]}>
+              <boxGeometry args={[3.2, 0.2, 2.2]} />
               <meshStandardMaterial color={'#9a948a'} roughness={1} flatShading />
             </mesh>
-            {/* Step-stones leading up */}
-            <mesh position={[1.7, 0.25, 1.2]} rotation={[0, 0, -0.18]}>
-              <boxGeometry args={[1.6, 0.3, 1.0]} />
+            {/* Step-stones leading up — now just a couple of low
+                stepping pebbles, since the rock itself is short. */}
+            <mesh position={[1.7, 0.1, 1.2]} rotation={[0, 0, -0.18]}>
+              <boxGeometry args={[1.6, 0.2, 1.0]} />
               <meshStandardMaterial color={'#7a7268'} roughness={1} flatShading />
             </mesh>
-            <mesh position={[2.4, 0.55, 0.9]} rotation={[0, 0.18, -0.22]}>
-              <boxGeometry args={[1.0, 0.4, 0.85]} />
+            <mesh position={[2.4, 0.22, 0.9]} rotation={[0, 0.18, -0.22]}>
+              <boxGeometry args={[1.0, 0.25, 0.85]} />
               <meshStandardMaterial color={'#8a8278'} roughness={1} flatShading />
             </mesh>
             {/* Two small mossy boulders at the base */}
@@ -1850,44 +1853,82 @@ function HerbGardens() {
 // fading out and being removed).
 function InjuredWarrior() {
   const healed = useGameStore((s) => s.injuredWarriorHealed);
+  // Bob the floating marker slowly so the eye picks it up from far away.
+  const markerRef = useRef<THREE.Group>(null);
+  useFrame((state) => {
+    const g = markerRef.current;
+    if (!g) return;
+    g.position.y = 2.6 + Math.sin(state.clock.elapsedTime * 2) * 0.18;
+    g.rotation.y = state.clock.elapsedTime * 0.7;
+  });
   if (healed) return null;
   const y = terrainHeightAt(INJURED_WARRIOR.x, INJURED_WARRIOR.z);
   return (
     <group position={[INJURED_WARRIOR.x, y, INJURED_WARRIOR.z]}>
-      {/* curled body */}
-      <mesh position={[0, 0.18, 0]} rotation={[0, 0.4, 0.1]}>
-        <capsuleGeometry args={[0.22, 0.6, 6, 12]} />
+      {/* moss patch under him so the spot reads as "tended to" */}
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <circleGeometry args={[1.5, 24]} />
+        <meshStandardMaterial color={'#3a5a2a'} roughness={1} />
+      </mesh>
+      {/* curled body — scaled up so he's clearly visible */}
+      <mesh position={[0, 0.3, 0]} rotation={[0, 0.4, 0.1]} castShadow>
+        <capsuleGeometry args={[0.4, 1.0, 8, 14]} />
         <meshStandardMaterial color={'#7a5a3a'} roughness={1} flatShading />
       </mesh>
-      {/* head tucked in */}
-      <mesh position={[0.42, 0.25, 0.18]}>
-        <sphereGeometry args={[0.18, 12, 10]} />
+      {/* head */}
+      <mesh position={[0.72, 0.42, 0.3]} castShadow>
+        <sphereGeometry args={[0.32, 14, 12]} />
         <meshStandardMaterial color={'#7a5a3a'} roughness={1} flatShading />
       </mesh>
       {/* ears */}
-      <mesh position={[0.48, 0.36, 0.10]} rotation={[0, 0, 0.4]}>
-        <coneGeometry args={[0.06, 0.12, 4]} />
+      <mesh position={[0.82, 0.62, 0.16]} rotation={[0, 0, 0.4]}>
+        <coneGeometry args={[0.1, 0.2, 4]} />
         <meshStandardMaterial color={'#7a5a3a'} roughness={1} flatShading />
       </mesh>
-      <mesh position={[0.48, 0.36, 0.26]} rotation={[0, 0, 0.4]}>
-        <coneGeometry args={[0.06, 0.12, 4]} />
+      <mesh position={[0.82, 0.62, 0.44]} rotation={[0, 0, 0.4]}>
+        <coneGeometry args={[0.1, 0.2, 4]} />
         <meshStandardMaterial color={'#7a5a3a'} roughness={1} flatShading />
       </mesh>
       {/* tail draped behind */}
-      <mesh position={[-0.45, 0.18, -0.05]} rotation={[0, 0.6, 0]}>
-        <cylinderGeometry args={[0.05, 0.05, 0.5, 6]} />
+      <mesh position={[-0.75, 0.28, -0.08]} rotation={[0, 0.6, 0]}>
+        <cylinderGeometry args={[0.08, 0.08, 0.85, 6]} />
         <meshStandardMaterial color={'#7a5a3a'} roughness={1} flatShading />
       </mesh>
-      {/* red claw marks on the flank */}
-      <mesh position={[0.1, 0.28, 0.06]} rotation={[0, 0, 0.5]}>
-        <boxGeometry args={[0.25, 0.02, 0.04]} />
-        <meshStandardMaterial color={'#a02020'} emissive={'#5a0808'} emissiveIntensity={0.5} roughness={0.7} />
+      {/* bigger red claw marks on the flank */}
+      <mesh position={[0.18, 0.5, 0.1]} rotation={[0, 0, 0.5]}>
+        <boxGeometry args={[0.45, 0.04, 0.07]} />
+        <meshStandardMaterial color={'#c02020'} emissive={'#7a1010'} emissiveIntensity={0.7} roughness={0.7} />
       </mesh>
-      <mesh position={[-0.05, 0.28, 0.08]} rotation={[0, 0, 0.55]}>
-        <boxGeometry args={[0.22, 0.02, 0.04]} />
-        <meshStandardMaterial color={'#a02020'} emissive={'#5a0808'} emissiveIntensity={0.5} roughness={0.7} />
+      <mesh position={[-0.08, 0.5, 0.14]} rotation={[0, 0, 0.55]}>
+        <boxGeometry args={[0.4, 0.04, 0.07]} />
+        <meshStandardMaterial color={'#c02020'} emissive={'#7a1010'} emissiveIntensity={0.7} roughness={0.7} />
       </mesh>
-      {/* faint "ouch" Html label */}
+      <mesh position={[0.05, 0.5, -0.1]} rotation={[0, 0, 0.5]}>
+        <boxGeometry args={[0.38, 0.04, 0.07]} />
+        <meshStandardMaterial color={'#c02020'} emissive={'#7a1010'} emissiveIntensity={0.7} roughness={0.7} />
+      </mesh>
+      {/* gentle red point light so the spot is easy to find at night */}
+      <pointLight position={[0, 1.2, 0]} intensity={0.45} distance={14} color={'#ff6a6a'} />
+      {/* floating bobbing red exclamation marker over his head */}
+      <group ref={markerRef} position={[0, 2.6, 0]}>
+        <mesh>
+          <sphereGeometry args={[0.18, 12, 10]} />
+          <meshStandardMaterial color={'#ff3030'} emissive={'#c81818'} emissiveIntensity={1.6} />
+        </mesh>
+        <mesh position={[0, 0.32, 0]}>
+          <cylinderGeometry args={[0.07, 0.07, 0.5, 8]} />
+          <meshStandardMaterial color={'#ff3030'} emissive={'#c81818'} emissiveIntensity={1.6} />
+        </mesh>
+      </group>
+      {/* name label */}
+      <Html position={[0, 2.0, 0]} center distanceFactor={10}>
+        <div
+          className="px-2 py-0.5 rounded-full text-[10px] whitespace-nowrap pointer-events-none"
+          style={{ background: 'rgba(0,0,0,0.55)', color: '#ffd0d0', border: '1px solid rgba(255,80,80,0.45)' }}
+        >
+          🩸 {INJURED_WARRIOR.name} (wounded)
+        </div>
+      </Html>
     </group>
   );
 }
