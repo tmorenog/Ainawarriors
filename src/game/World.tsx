@@ -526,26 +526,26 @@ function Camps() {
               real rock rather than a box. The flat top (kept walkable via
               terrain.ts) is the leader's perch. */}
           <group position={[0, dy(0, -7), -7]}>
-            {/* Main mass — base block, slightly skewed. Tall enough
-                to read as a proper leader's rock, but not the old
-                full-height wall. */}
-            <mesh position={[0, 0.6, 0]} rotation={[0, 0.12, 0.04]}>
-              <boxGeometry args={[4.2, 1.2, 2.6]} />
+            {/* Main mass — base block, slightly skewed. Tall and
+                proper, but the BASE still sits flush with the ground
+                because the outer group's Y is set via dy(). */}
+            <mesh position={[0, 1.4, 0]} rotation={[0, 0.12, 0.04]}>
+              <boxGeometry args={[4.2, 2.8, 2.6]} />
               <meshStandardMaterial color={'#8a8276'} roughness={1} flatShading />
             </mesh>
             {/* Outcrop on the right — bigger angled chunk */}
-            <mesh position={[1.7, 0.5, 0.6]} rotation={[0, -0.22, -0.18]}>
-              <boxGeometry args={[1.8, 0.95, 1.4]} />
+            <mesh position={[1.7, 1.1, 0.6]} rotation={[0, -0.22, -0.18]}>
+              <boxGeometry args={[1.8, 2.2, 1.4]} />
               <meshStandardMaterial color={'#7a7268'} roughness={1} flatShading />
             </mesh>
             {/* Outcrop on the left */}
-            <mesh position={[-1.6, 0.4, 0.3]} rotation={[0.05, 0.1, 0.22]}>
-              <boxGeometry args={[1.5, 0.8, 1.3]} />
+            <mesh position={[-1.6, 0.95, 0.3]} rotation={[0.05, 0.1, 0.22]}>
+              <boxGeometry args={[1.5, 1.9, 1.3]} />
               <meshStandardMaterial color={'#9a948a'} roughness={1} flatShading />
             </mesh>
             {/* Flat-ish summit slab — top of the rock, where the leader stands */}
-            <mesh position={[0, 1.35, -0.2]}>
-              <boxGeometry args={[3.2, 0.3, 2.2]} />
+            <mesh position={[0, 3.05, -0.2]}>
+              <boxGeometry args={[3.2, 0.4, 2.2]} />
               <meshStandardMaterial color={'#9a948a'} roughness={1} flatShading />
             </mesh>
             {/* Step-stones leading up — now just a couple of low
