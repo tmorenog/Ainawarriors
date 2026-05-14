@@ -467,16 +467,57 @@ function Camps() {
         const clanY = terrainHeightAt(c.campCenter[0], c.campCenter[2]);
         const dy = (dx: number, dz: number) =>
           terrainHeightAt(c.campCenter[0] + dx, c.campCenter[2] + dz) - clanY;
+        // Build a terrain-following dirt clearing — a tessellated disc
+        // whose vertices ride the analytical terrain so the patch can
+        // never poke up through a hill or float above grass on the low
+        // side.
+        const clearingGeo = (() => {
+          const radius = 4.5;
+          const rings = 6;
+          const segs  = 24;
+          const positions: number[] = [];
+          const indices: number[] = [];
+          // Centre vertex
+          positions.push(0, 0.02, 0);
+          for (let r = 1; r <= rings; r++) {
+            const rr = (r / rings) * radius;
+            for (let s = 0; s < segs; s++) {
+              const a = (s / segs) * Math.PI * 2;
+              const lx = Math.cos(a) * rr;
+              const lz = Math.sin(a) * rr;
+              positions.push(lx, dy(lx, lz) + 0.02, lz);
+            }
+          }
+          // Triangles between concentric rings.
+          // Centre to ring 0
+          for (let s = 0; s < segs; s++) {
+            indices.push(0, 1 + s, 1 + ((s + 1) % segs));
+          }
+          for (let r = 0; r < rings - 1; r++) {
+            const inner = 1 + r * segs;
+            const outer = 1 + (r + 1) * segs;
+            for (let s = 0; s < segs; s++) {
+              const a = inner + s;
+              const b = inner + ((s + 1) % segs);
+              const c = outer + s;
+              const d = outer + ((s + 1) % segs);
+              indices.push(a, c, b, b, c, d);
+            }
+          }
+          const g = new THREE.BufferGeometry();
+          g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+          g.setIndex(indices);
+          g.computeVertexNormals();
+          return g;
+        })();
         return (
         <group
           key={c.id}
           position={[c.campCenter[0], clanY, c.campCenter[2]]}
         >
-          {/* clearing — small dirt circle in the middle. Was radius 12
-              which made the disc clip in/out of the rolling hills at the
-              edges; 4 keeps it flat against the actual ground. */}
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
-            <circleGeometry args={[4, 24]} />
+          {/* clearing — terrain-following dirt patch; can't clip into
+              hills or float above grass at the edges. */}
+          <mesh geometry={clearingGeo} receiveShadow>
             <meshStandardMaterial color={'#7a6a4a'} roughness={1} />
           </mesh>
 
