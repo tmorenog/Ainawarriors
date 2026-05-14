@@ -150,7 +150,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
         {!useGameStore.getState().injuredWarriorHealed && (
           <div className="mt-2 pt-2 border-t border-white/15">
             <div className="text-[10px] uppercase tracking-wide opacity-70">Side quest</div>
-            <div>Heal a wounded clanmate — find {INJURED_WARRIOR.name} near the ThunderClan high rock and use a herb at their side.</div>
+            <div>Heal a wounded clanmate — find {INJURED_WARRIOR.name} near your high rock (look for the red beacon) and use a herb at their side.</div>
           </div>
         )}
       </div>
@@ -319,12 +319,15 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
                           pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: `You used ${h?.name ?? id}.`, at: Date.now() });
                           // Heal-a-warrior side quest only counts if you
                           // used the herb at the wounded warrior's side.
-                          // Anywhere else just heals YOU.
+                          // Anywhere else just heals YOU. The wounded
+                          // cat's actual XZ is published on window by
+                          // World.tsx (it's per-clan).
                           const s = useGameStore.getState();
                           const me = s.players[s.selfId];
+                          const inj = (typeof window !== 'undefined' && (window as any).__WOTC_INJURED_POS__) || { x: INJURED_WARRIOR.x, z: INJURED_WARRIOR.z };
                           if (me && !s.injuredWarriorHealed) {
-                            const dx = me.pos[0] - INJURED_WARRIOR.x;
-                            const dz = me.pos[2] - INJURED_WARRIOR.z;
+                            const dx = me.pos[0] - inj.x;
+                            const dz = me.pos[2] - inj.z;
                             if (dx * dx + dz * dz < 3 * 3) {
                               s.setInjuredWarriorHealed(true);
                               s.setHealedWarriorAt(Date.now());
@@ -343,7 +346,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
                                 fromId: 'system',
                                 fromName: 'StarClan',
                                 scope: 'system',
-                                text: `You should find a wounded clanmate before spending herbs — try the medicine den near ThunderClan camp.`,
+                                text: `You should find a wounded clanmate before spending herbs — look for the red beacon near your high rock.`,
                                 at: Date.now(),
                               });
                             }
@@ -365,7 +368,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-66 · bramblepaw a step farther
+        wotc-67 · wounded near your camp
       </div>
     </div>
   );
