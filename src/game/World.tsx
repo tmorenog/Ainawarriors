@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import { CLAN_LIST, CLANS } from '@/lib/clans';
 import { useGameStore } from './useGameStore';
 import { terrainHeightAt, LAKE, STREAM, CLIMBABLE_TREES, INJURED_WARRIOR_OFFSET } from './terrain';
+import { Cat } from './Cat';
+import type { CatAppearance } from './types';
 import { THUNDERPATH, NUM_MONSTERS, monsterAt } from './vehicles';
 
 interface WorldProps {
@@ -1851,6 +1853,39 @@ function HerbGardens() {
 // on the flank. Disappears once the heal quest is complete (the
 // warrior gets up and walks off — represented here by the mesh
 // fading out and being removed).
+// Wounded warrior — Bramblepaw, drawn with the regular Cat rig (so he
+// looks like every other cat in the game) but lying down ('sleep' anim
+// + injured = true), with extra red claw-mark decals stuck onto his
+// flank so the wound reads at a glance.
+const BRAMBLEPAW_CAT: CatAppearance = {
+  id: 'npc_bramblepaw',
+  name: 'Bramblepaw',
+  prefix: 'Bramble',
+  suffix: 'paw',
+  furBase: '#6a3e22',
+  furBelly: '#a87a4a',
+  furPattern: 'tabby',
+  patternColor: '#2a1408',
+  patternColor2: '#3a2010',
+  patternColor3: '#7a5a3a',
+  eyeColor: 'amber',
+  earShape: 'standard',
+  tail: 'long',
+  fluffiness: 0.45,
+  size: 'medium',
+  height: 1.0,
+  build: 1.0,
+  scars: ['flank', 'shoulder'],
+  blush: false,
+  clan: 'ThunderClan',
+  role: 'Apprentice',
+  bubbleStyle: 'classic',
+  voicePitch: 1.0,
+  pupilSize: 0.5,
+  vision: 'normal',
+  nightVision: false,
+};
+
 function InjuredWarrior() {
   const healed = useGameStore((s) => s.injuredWarriorHealed);
   const cat = useGameStore((s) => s.cat);
@@ -1873,11 +1908,11 @@ function InjuredWarrior() {
   const wz = camp[2] + INJURED_WARRIOR_OFFSET.dz;
   try { (window as any).__WOTC_INJURED_POS__ = { x: wx, z: wz }; } catch {}
   const y = terrainHeightAt(wx, wz);
+  // The Cat rig faces +X. Lay him on his side by rotating around Z.
   return (
     <group position={[wx, y, wz]}>
       {/* tall red beacon — a glowing column up into the sky so the
-          spot is visible from across the territory. Fades out near
-          the top so it doesn't punch through fog. */}
+          spot is visible from across the territory. */}
       <mesh position={[0, 8, 0]}>
         <cylinderGeometry args={[0.08, 0.08, 16, 8]} />
         <meshStandardMaterial color={'#ff3030'} emissive={'#c81818'} emissiveIntensity={1.6} transparent opacity={0.55} />
@@ -1887,41 +1922,23 @@ function InjuredWarrior() {
         <circleGeometry args={[1.5, 24]} />
         <meshStandardMaterial color={'#3a5a2a'} roughness={1} />
       </mesh>
-      {/* curled body — scaled up so he's clearly visible */}
-      <mesh position={[0, 0.3, 0]} rotation={[0, 0.4, 0.1]} castShadow>
-        <capsuleGeometry args={[0.4, 1.0, 8, 14]} />
-        <meshStandardMaterial color={'#7a5a3a'} roughness={1} flatShading />
-      </mesh>
-      {/* head */}
-      <mesh position={[0.72, 0.42, 0.3]} castShadow>
-        <sphereGeometry args={[0.32, 14, 12]} />
-        <meshStandardMaterial color={'#7a5a3a'} roughness={1} flatShading />
-      </mesh>
-      {/* ears */}
-      <mesh position={[0.82, 0.62, 0.16]} rotation={[0, 0, 0.4]}>
-        <coneGeometry args={[0.1, 0.2, 4]} />
-        <meshStandardMaterial color={'#7a5a3a'} roughness={1} flatShading />
-      </mesh>
-      <mesh position={[0.82, 0.62, 0.44]} rotation={[0, 0, 0.4]}>
-        <coneGeometry args={[0.1, 0.2, 4]} />
-        <meshStandardMaterial color={'#7a5a3a'} roughness={1} flatShading />
-      </mesh>
-      {/* tail draped behind */}
-      <mesh position={[-0.75, 0.28, -0.08]} rotation={[0, 0.6, 0]}>
-        <cylinderGeometry args={[0.08, 0.08, 0.85, 6]} />
-        <meshStandardMaterial color={'#7a5a3a'} roughness={1} flatShading />
-      </mesh>
-      {/* bigger red claw marks on the flank */}
-      <mesh position={[0.18, 0.5, 0.1]} rotation={[0, 0, 0.5]}>
-        <boxGeometry args={[0.45, 0.04, 0.07]} />
+      {/* The actual cat, lying curled & limping (closest visual match
+          to "wounded"). injured=true also dims his eyes a little. */}
+      <group rotation={[0, 0.6, 0]}>
+        <Cat cat={BRAMBLEPAW_CAT} position={[0, 0, 0]} rotation={0} anim={'sleep'} injured />
+      </group>
+      {/* Red claw-mark wound decals — stuck just above the cat body so
+          they sit on the flank visibly. */}
+      <mesh position={[0.05, 0.36, 0.18]} rotation={[0, 0.6, 0.5]}>
+        <boxGeometry args={[0.55, 0.05, 0.08]} />
         <meshStandardMaterial color={'#c02020'} emissive={'#7a1010'} emissiveIntensity={0.7} roughness={0.7} />
       </mesh>
-      <mesh position={[-0.08, 0.5, 0.14]} rotation={[0, 0, 0.55]}>
-        <boxGeometry args={[0.4, 0.04, 0.07]} />
+      <mesh position={[-0.18, 0.36, 0.22]} rotation={[0, 0.6, 0.55]}>
+        <boxGeometry args={[0.5, 0.05, 0.08]} />
         <meshStandardMaterial color={'#c02020'} emissive={'#7a1010'} emissiveIntensity={0.7} roughness={0.7} />
       </mesh>
-      <mesh position={[0.05, 0.5, -0.1]} rotation={[0, 0, 0.5]}>
-        <boxGeometry args={[0.38, 0.04, 0.07]} />
+      <mesh position={[0.15, 0.36, -0.05]} rotation={[0, 0.6, 0.5]}>
+        <boxGeometry args={[0.5, 0.05, 0.08]} />
         <meshStandardMaterial color={'#c02020'} emissive={'#7a1010'} emissiveIntensity={0.7} roughness={0.7} />
       </mesh>
       {/* gentle red point light so the spot is easy to find at night */}
