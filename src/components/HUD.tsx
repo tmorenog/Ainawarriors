@@ -45,7 +45,10 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
       setNearTree(treeFound);
       const now = Date.now();
       const ripe = s.herbGardens.find((g) => {
-        if (now - g.plantedAt < 60_000) return false;
+        // Same cycle as World.tsx HerbGardens: after eating the plot
+        // is bare for 90s then takes another 60s to ripen.
+        const effective = g.eatenAt ? g.eatenAt + 90_000 : g.plantedAt;
+        if (now - effective < 60_000) return false;
         const dx = me.pos[0] - g.x;
         const dz = me.pos[2] - g.z;
         return dx * dx + dz * dz < 4 * 4;
@@ -202,7 +205,10 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           <button
             onClick={() => {
               const s = useGameStore.getState();
-              s.removeHerbGarden(nearRipeGarden);
+              // Don't delete the plot — just mark its veggies as eaten so
+              // the dirt + fence stay in the world and the plot can
+              // regrow another batch after a minute or so.
+              s.eatHerbGarden(nearRipeGarden);
               s.setHud({ hunger: Math.min(100, s.hud.hunger + 25) });
               s.pushChat({
                 id: 'sys' + Date.now(),
@@ -368,7 +374,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-70 · camp clearing follows terrain
+        wotc-71 · taller rocks + garden plot stays
       </div>
     </div>
   );

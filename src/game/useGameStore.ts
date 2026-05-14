@@ -88,9 +88,14 @@ interface GameStore {
   // Med-cat herb gardens — small fenced plots the medicine cat plants
   // around the territories. Each ripens after ~60s of real time and
   // can then be eaten for a hunger boost. Persisted via localStorage
-  // so they survive reloads.
-  herbGardens: Array<{ id: string; x: number; z: number; plantedAt: number; herbs: string[] }>;
+  // so they survive reloads. After being eaten the plot stays (dirt
+  // patch + fence) and the plants regrow another 90s later.
+  herbGardens: Array<{ id: string; x: number; z: number; plantedAt: number; herbs: string[]; eatenAt?: number }>;
   plantHerbGarden: (x: number, z: number, herbs: string[]) => void;
+  // Mark a garden as eaten (clears the plants for a regrow cycle) but
+  // keeps the plot itself in the world.
+  eatHerbGarden: (id: string) => void;
+  // Hard-remove a garden from the world (kept for back-compat / debug).
   removeHerbGarden: (id: string) => void;
   setHerbGardens: (g: GameStore['herbGardens']) => void;
 
@@ -280,6 +285,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
         ...st.herbGardens,
         { id: 'g' + Date.now() + Math.random().toString(36).slice(2, 5), x, z, plantedAt: Date.now(), herbs },
       ],
+    })),
+  eatHerbGarden: (id) =>
+    set((st) => ({
+      herbGardens: st.herbGardens.map((g) =>
+        g.id === id ? { ...g, eatenAt: Date.now() } : g
+      ),
     })),
   removeHerbGarden: (id) =>
     set((st) => ({ herbGardens: st.herbGardens.filter((g) => g.id !== id) })),
