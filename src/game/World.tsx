@@ -526,26 +526,26 @@ function Camps() {
               real rock rather than a box. The flat top (kept walkable via
               terrain.ts) is the leader's perch. */}
           <group position={[0, dy(0, -7), -7]}>
-            {/* Main mass — base block, slightly skewed. The camp High
-                Rock is now a low ledge rather than a wall: ~0.5m tall
-                so it reads as a "step up to speak", not a tower. */}
-            <mesh position={[0, 0.25, 0]} rotation={[0, 0.12, 0.04]}>
-              <boxGeometry args={[4.2, 0.5, 2.6]} />
+            {/* Main mass — base block, slightly skewed. Tall enough
+                to read as a proper leader's rock, but not the old
+                full-height wall. */}
+            <mesh position={[0, 0.6, 0]} rotation={[0, 0.12, 0.04]}>
+              <boxGeometry args={[4.2, 1.2, 2.6]} />
               <meshStandardMaterial color={'#8a8276'} roughness={1} flatShading />
             </mesh>
             {/* Outcrop on the right — bigger angled chunk */}
-            <mesh position={[1.7, 0.22, 0.6]} rotation={[0, -0.22, -0.18]}>
-              <boxGeometry args={[1.8, 0.4, 1.4]} />
+            <mesh position={[1.7, 0.5, 0.6]} rotation={[0, -0.22, -0.18]}>
+              <boxGeometry args={[1.8, 0.95, 1.4]} />
               <meshStandardMaterial color={'#7a7268'} roughness={1} flatShading />
             </mesh>
             {/* Outcrop on the left */}
-            <mesh position={[-1.6, 0.18, 0.3]} rotation={[0.05, 0.1, 0.22]}>
-              <boxGeometry args={[1.5, 0.36, 1.3]} />
+            <mesh position={[-1.6, 0.4, 0.3]} rotation={[0.05, 0.1, 0.22]}>
+              <boxGeometry args={[1.5, 0.8, 1.3]} />
               <meshStandardMaterial color={'#9a948a'} roughness={1} flatShading />
             </mesh>
             {/* Flat-ish summit slab — top of the rock, where the leader stands */}
-            <mesh position={[0, 0.55, -0.2]}>
-              <boxGeometry args={[3.2, 0.2, 2.2]} />
+            <mesh position={[0, 1.35, -0.2]}>
+              <boxGeometry args={[3.2, 0.3, 2.2]} />
               <meshStandardMaterial color={'#9a948a'} roughness={1} flatShading />
             </mesh>
             {/* Step-stones leading up — now just a couple of low
@@ -1815,8 +1815,8 @@ function OldThunderpath() {
 // ripe little cabbages and carrots once mature.
 function HerbGardens() {
   const gardens = useGameStore((s) => s.herbGardens);
-  // Re-render every 5s so the "ripe" check (Date.now() >= plantedAt+60s)
-  // flips on at the right moment without forcing a fast re-render loop.
+  // Re-render every 5s so the "ripe"/"regrown" checks flip on at the
+  // right moment without forcing a fast re-render loop.
   const [, setT] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setT(Date.now()), 5000);
@@ -1826,8 +1826,17 @@ function HerbGardens() {
     <group>
       {gardens.map((g) => {
         const y = terrainHeightAt(g.x, g.z);
-        const age = Date.now() - g.plantedAt;
-        const ripe = age >= 60_000;
+        const now = Date.now();
+        // Stage of life this plot is in. After being eaten the garden
+        // takes 90s to clear and then runs through the same seedling
+        // (60s) → ripe cycle as a fresh planting. The dirt patch and
+        // fence are always rendered so the player's planted plot stays
+        // in the world permanently.
+        const effectivePlantedAt = g.eatenAt ? g.eatenAt + 90_000 : g.plantedAt;
+        const age = now - effectivePlantedAt;
+        const stage: 'bare' | 'seedling' | 'ripe' =
+          age < 0 ? 'bare' : age < 60_000 ? 'seedling' : 'ripe';
+        const ripe = stage === 'ripe';
         // Four fence posts
         const fence = [-1.2, 1.2].flatMap((dx) => [-1.2, 1.2].map((dz) => [dx, dz] as [number, number]));
         // Row of 6 seedlings / veggies in a 3x2 grid
@@ -1856,8 +1865,9 @@ function HerbGardens() {
               <boxGeometry args={[2.4, 0.06, 0.06]} />
               <meshStandardMaterial color={'#7a5a3a'} roughness={1} />
             </mesh>
-            {/* plants */}
-            {rows.map((cx, i) => cols.map((cz, j) => {
+            {/* plants — skipped entirely while the plot is bare
+                (just eaten); seedlings or ripe veggies otherwise. */}
+            {stage !== 'bare' && rows.map((cx, i) => cols.map((cz, j) => {
               const k = i * 2 + j;
               if (!ripe) {
                 // seedling — tiny green sprig
