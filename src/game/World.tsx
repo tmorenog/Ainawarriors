@@ -525,26 +525,44 @@ function Camps() {
               stones with slight per-stone shade variation so it reads as
               real rock rather than a box. The flat top (kept walkable via
               terrain.ts) is the leader's perch. */}
-          <group position={[0, dy(0, -7), -7]}>
-            {/* Main mass — tall again, but the BOTTOM of the box is
-                pushed below terrain so any rolling ground around it
-                stays plugged with rock instead of showing a gap. */}
-            <mesh position={[0, 1.2, 0]} rotation={[0, 0.12, 0.04]}>
+          {(() => {
+            // The High Rock is a 4.2x2.6 footprint at (camp + (0,-7)).
+            // Sample the four corners + the centre and use the LOWEST
+            // sample as the rock's base, then bury 0.5m below that so
+            // even uneven ground inside the footprint is hidden under
+            // the rock. Result: the rock is always rooted in the
+            // ground, never floating on a sloped side.
+            const rcx = c.campCenter[0], rcz = c.campCenter[2] - 7;
+            const samples = [
+              terrainHeightAt(rcx, rcz),
+              terrainHeightAt(rcx - 2.1, rcz - 1.3),
+              terrainHeightAt(rcx + 2.1, rcz - 1.3),
+              terrainHeightAt(rcx - 2.1, rcz + 1.3),
+              terrainHeightAt(rcx + 2.1, rcz + 1.3),
+            ];
+            const rockBase = Math.min(...samples) - 0.5;
+            const rockLocalY = rockBase - clanY;
+            return (
+          <group position={[0, rockLocalY, -7]}>
+            {/* Main mass — tall, with the rock group anchored at the
+                lowest corner of its footprint so the base is always
+                buried in the ground. */}
+            <mesh position={[0, 1.5, 0]} rotation={[0, 0.12, 0.04]}>
               <boxGeometry args={[4.2, 3.0, 2.6]} />
               <meshStandardMaterial color={'#8a8276'} roughness={1} flatShading />
             </mesh>
             {/* Outcrop on the right — bigger angled chunk */}
-            <mesh position={[1.7, 0.95, 0.6]} rotation={[0, -0.22, -0.18]}>
+            <mesh position={[1.7, 1.25, 0.6]} rotation={[0, -0.22, -0.18]}>
               <boxGeometry args={[1.8, 2.4, 1.4]} />
               <meshStandardMaterial color={'#7a7268'} roughness={1} flatShading />
             </mesh>
             {/* Outcrop on the left */}
-            <mesh position={[-1.6, 0.85, 0.3]} rotation={[0.05, 0.1, 0.22]}>
+            <mesh position={[-1.6, 1.15, 0.3]} rotation={[0.05, 0.1, 0.22]}>
               <boxGeometry args={[1.5, 2.1, 1.3]} />
               <meshStandardMaterial color={'#9a948a'} roughness={1} flatShading />
             </mesh>
             {/* Flat-ish summit slab — top of the rock, where the leader stands */}
-            <mesh position={[0, 2.85, -0.2]}>
+            <mesh position={[0, 3.15, -0.2]}>
               <boxGeometry args={[3.2, 0.4, 2.2]} />
               <meshStandardMaterial color={'#9a948a'} roughness={1} flatShading />
             </mesh>
@@ -567,12 +585,14 @@ function Camps() {
               <dodecahedronGeometry args={[0.38, 0]} />
               <meshStandardMaterial color={'#4a5a36'} roughness={1} flatShading />
             </mesh>
-            {/* Clan banner stone glowing on top */}
-            <mesh position={[0, 2.85, -0.2]}>
+            {/* Clan banner stone glowing on top — sits on the summit slab */}
+            <mesh position={[0, 3.55, -0.2]}>
               <sphereGeometry args={[0.28, 12, 12]} />
               <meshStandardMaterial color={c.color} emissive={c.color} emissiveIntensity={0.55} />
             </mesh>
           </group>
+            );
+          })()}
 
           {/* Leader's den — small cave-like hollow at the base of the high rock */}
           <group position={[3.2, dy(3.2, -6), -6]}>

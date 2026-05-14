@@ -13,20 +13,30 @@
 //   ShadowClan (-60, 180) WindClan (-200, 60)
 // The High Rock geometry (see World.tsx Camps) is at camp + (0, _, -7),
 // box [4.2, 2.2, 2.6], so its top is ~2.2 above the local terrain.
+// Rock base is buried 0.5m below the lowest corner of the footprint so
+// the rock looks rooted on uneven ground (see World.tsx).
+const HIGH_ROCK_BURY = 0.5;
+
 const HIGH_ROCKS: { cx: number; cz: number; hx: number; hz: number; top: number }[] = [
-  { cx: 0,    cz: -7,        hx: 2.1, hz: 1.3, top: 3.05 },
-  { cx: 180,  cz: -30 - 7,   hx: 2.1, hz: 1.3, top: 3.05 },
-  { cx: -60,  cz: 180 - 7,   hx: 2.1, hz: 1.3, top: 3.05 },
-  { cx: -200, cz: 60 - 7,    hx: 2.1, hz: 1.3, top: 3.05 },
+  { cx: 0,    cz: -7,        hx: 2.1, hz: 1.3, top: 3.35 },
+  { cx: 180,  cz: -30 - 7,   hx: 2.1, hz: 1.3, top: 3.35 },
+  { cx: -60,  cz: 180 - 7,   hx: 2.1, hz: 1.3, top: 3.35 },
+  { cx: -200, cz: 60 - 7,    hx: 2.1, hz: 1.3, top: 3.35 },
 ];
 
 function platformHeightAt(x: number, z: number): number {
   for (const r of HIGH_ROCKS) {
     if (Math.abs(x - r.cx) < r.hx && Math.abs(z - r.cz) < r.hz) {
-      // Approximate the platform top relative to the local rolling terrain.
-      // The platform sits on top of whatever the natural ground is, so we
-      // add the top Y to the smooth field.
-      return r.top + naturalTerrain(r.cx, r.cz);
+      // Mirror the visual rendering: the rock base sits at
+      // min(corner samples) - HIGH_ROCK_BURY, and the walkable summit
+      // is `top` above that. Sampling four corners + centre.
+      const c  = naturalTerrain(r.cx, r.cz);
+      const c1 = naturalTerrain(r.cx - r.hx, r.cz - r.hz);
+      const c2 = naturalTerrain(r.cx + r.hx, r.cz - r.hz);
+      const c3 = naturalTerrain(r.cx - r.hx, r.cz + r.hz);
+      const c4 = naturalTerrain(r.cx + r.hx, r.cz + r.hz);
+      const base = Math.min(c, c1, c2, c3, c4) - HIGH_ROCK_BURY;
+      return base + r.top;
     }
   }
   return -Infinity;
