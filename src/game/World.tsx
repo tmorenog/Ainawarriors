@@ -526,26 +526,28 @@ function Camps() {
               real rock rather than a box. The flat top (kept walkable via
               terrain.ts) is the leader's perch. */}
           <group position={[0, dy(0, -7), -7]}>
-            {/* Main mass — base block, slightly skewed. Tall and
-                proper, but the BASE still sits flush with the ground
-                because the outer group's Y is set via dy(). */}
-            <mesh position={[0, 1.4, 0]} rotation={[0, 0.12, 0.04]}>
-              <boxGeometry args={[4.2, 2.8, 2.6]} />
+            {/* Main mass — long and low. The platform AABB in
+                terrain.ts has been widened to match so you can just
+                walk straight onto the top. */}
+            <mesh position={[0, 0.35, 0]} rotation={[0, 0.12, 0.04]}>
+              <boxGeometry args={[6.8, 0.7, 3.0]} />
               <meshStandardMaterial color={'#8a8276'} roughness={1} flatShading />
             </mesh>
-            {/* Outcrop on the right — bigger angled chunk */}
-            <mesh position={[1.7, 1.1, 0.6]} rotation={[0, -0.22, -0.18]}>
-              <boxGeometry args={[1.8, 2.2, 1.4]} />
+            {/* Outcrop on the right — slightly raised end of the ledge */}
+            <mesh position={[2.6, 0.4, 0.5]} rotation={[0, -0.22, -0.12]}>
+              <boxGeometry args={[2.1, 0.6, 1.6]} />
               <meshStandardMaterial color={'#7a7268'} roughness={1} flatShading />
             </mesh>
             {/* Outcrop on the left */}
-            <mesh position={[-1.6, 0.95, 0.3]} rotation={[0.05, 0.1, 0.22]}>
-              <boxGeometry args={[1.5, 1.9, 1.3]} />
+            <mesh position={[-2.4, 0.32, 0.3]} rotation={[0.04, 0.1, 0.18]}>
+              <boxGeometry args={[1.8, 0.55, 1.5]} />
               <meshStandardMaterial color={'#9a948a'} roughness={1} flatShading />
             </mesh>
-            {/* Flat-ish summit slab — top of the rock, where the leader stands */}
-            <mesh position={[0, 3.05, -0.2]}>
-              <boxGeometry args={[3.2, 0.4, 2.2]} />
+            {/* Flat-ish summit slab — top of the rock, where the leader
+                stands. Sits just above the main mass so it reads as a
+                proper standing spot but is still cat-walkable. */}
+            <mesh position={[0, 0.78, -0.2]}>
+              <boxGeometry args={[5.6, 0.18, 2.4]} />
               <meshStandardMaterial color={'#9a948a'} roughness={1} flatShading />
             </mesh>
             {/* Step-stones leading up — now just a couple of low
