@@ -70,25 +70,25 @@ export function ChapterTriggers() {
     }
   }, [mission, chapterIndex]);
 
-  // Scripted beat — a few chapters after Tigerstar dies, Firestar dies
-  // off-screen, the cutscene plays, then it rolls into the Graystripe
-  // flashback and the player is given the find-graystripe quest.
-  // We fire it once chapterIndex >= 4 (after surviving a disaster) so
-  // there's some breathing room first.
+  // Scripted beat — Firestar's "StarClan dream" cutscene fires the
+  // moment the player enters chapter 5 ("A Dangerous Path"). It then
+  // rolls into the Graystripe flashback. We no longer require
+  // mission='won' (the user can reach chapter 5 from a number of
+  // paths and the dream should always play when the chapter starts).
   useEffect(() => {
     if (firestarDeadAt) return;
-    if (mission !== 'won') return;
-    if (chapterIndex < 4) return;
+    if (chapterIndex < 4) return; // chapter 5 = zero-based index 4
     if (cutscene) return;
-    // Wait 12s in chapter so the player isn't ambushed mid-action.
+    // Small 3s breathing pause so the chapter-card animation finishes
+    // before the cutscene takes over the screen.
     const t = setTimeout(() => {
       const s = useGameStore.getState();
       if (s.cutscene) return;
       setFirestarDeadAt(Date.now());
       setCutscene({ kind: 'firestar-dies', startedAt: Date.now() });
-    }, 12_000);
+    }, 3_000);
     return () => clearTimeout(t);
-  }, [mission, chapterIndex, cutscene, firestarDeadAt, setCutscene, setFirestarDeadAt]);
+  }, [chapterIndex, cutscene, firestarDeadAt, setCutscene, setFirestarDeadAt]);
 
   // Hunt counter — bump on every prey caught (StarClan system message
   // matches the pattern "You caught a …"). Three catches advances ch2.
