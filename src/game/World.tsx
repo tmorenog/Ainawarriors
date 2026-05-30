@@ -604,6 +604,7 @@ function Camps() {
               <boxGeometry args={[0.9, 0.7, 0.1]} />
               <meshStandardMaterial color={'#1c1814'} />
             </mesh>
+            <DenLabel name="Leader's den" />
           </group>
 
           {/* Warriors' den — bramble dome on the right side of the camp */}
@@ -616,6 +617,7 @@ function Camps() {
               <boxGeometry args={[1.2, 0.9, 0.1]} />
               <meshStandardMaterial color={'#1c1814'} />
             </mesh>
+            <DenLabel name="Warriors' den" />
           </group>
 
           {/* Apprentices' den — left side */}
@@ -628,6 +630,7 @@ function Camps() {
               <boxGeometry args={[1.0, 0.7, 0.1]} />
               <meshStandardMaterial color={'#1c1814'} />
             </mesh>
+            <DenLabel name="Apprentices' den" />
           </group>
 
           {/* Medicine cat's den — at the back, marked with a small herb
@@ -646,6 +649,7 @@ function Camps() {
               <sphereGeometry args={[0.2, 10, 8]} />
               <meshStandardMaterial color={'#7ab26a'} emissive={'#3a6a3a'} emissiveIntensity={0.25} />
             </mesh>
+            <DenLabel name="Medicine den" />
           </group>
 
           {/* Queens' / nursery den — soft moss green, front-left of camp.
@@ -672,6 +676,7 @@ function Camps() {
                 </mesh>
               </group>
             ))}
+            <DenLabel name="Nursery (kits)" />
           </group>
 
           {/* Elders' den — front-right, lower & wider, with a sun-bleached
@@ -690,6 +695,7 @@ function Camps() {
               <cylinderGeometry args={[0.18, 0.18, 1.4, 10]} />
               <meshStandardMaterial color={'#a89878'} roughness={0.95} />
             </mesh>
+            <DenLabel name="Elders' den" />
           </group>
 
           {/* Training post — pounce on it (or just hang around) to practice.
@@ -2149,6 +2155,20 @@ function InjuredWarrior() {
   );
 }
 
+// Tiny floating label above a den so the player can tell which is which.
+function DenLabel({ name }: { name: string }) {
+  return (
+    <Html position={[0, 1.6, 0]} center distanceFactor={12}>
+      <div
+        className="px-2 py-0.5 rounded-full text-[10px] whitespace-nowrap pointer-events-none"
+        style={{ background: 'rgba(0,0,0,0.55)', color: '#f3e7c9', border: '1px solid rgba(243,231,201,0.35)' }}
+      >
+        {name}
+      </div>
+    </Html>
+  );
+}
+
 function ClimbableOaks() {
   return (
     <group>
@@ -2222,16 +2242,24 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
       {/* sun / moon — shadows only on 'high' to avoid framebuffer alloc crashes */}
       <directionalLight
         position={[sunX * 100, Math.max(0.1, sunY) * 100 + 10, 50]}
-        intensity={isNight ? 0.18 : 1.0}
-        color={isNight ? '#a5b8e8' : sunY < 0.2 ? '#ffc89a' : '#fff7e8'}
+        intensity={isNight ? 0.28 : 1.35}
+        color={isNight ? '#b8caf2' : sunY < 0.2 ? '#ffd0a0' : '#fff8e6'}
         castShadow={graphics === 'high'}
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-bias={-0.0005}
       />
-      {/* Ambient + hemisphere fill so the scene is well lit even if the
-          directional light fails to compute on a constrained device */}
-      <ambientLight intensity={isNight ? 0.5 : 0.85} color={isNight ? '#243049' : '#ffffff'} />
-      <hemisphereLight args={[isNight ? '#aabbe6' : '#cfe9f3', isNight ? '#10162a' : '#5a7d4f', 0.6]} />
+      {/* warm secondary directional kicker — softens shadowed faces and
+          gives the scene a hint of bounced light. */}
+      <directionalLight
+        position={[-sunX * 80, Math.max(0.05, sunY) * 60 + 8, -40]}
+        intensity={isNight ? 0.1 : 0.35}
+        color={isNight ? '#506890' : '#f0d6a8'}
+      />
+      {/* Ambient + hemisphere fill — slightly brighter so day reads as
+          luminous and night still keeps colour. */}
+      <ambientLight intensity={isNight ? 0.6 : 1.05} color={isNight ? '#2a3654' : '#ffffff'} />
+      <hemisphereLight args={[isNight ? '#aebee4' : '#d6ecf6', isNight ? '#10162a' : '#6e8e5e', isNight ? 0.7 : 0.85]} />
 
       {/* terrain */}
       <mesh receiveShadow geometry={terrainGeo}>

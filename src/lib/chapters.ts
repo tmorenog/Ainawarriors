@@ -104,6 +104,8 @@ export const CHAPTERS: Chapter[] = [
   ch(79, 'The Last Gathering',   'All five clans at peace.',                                        'Attend a Gathering with no fighting.'),
   ch(80, 'A New Dawn',           'The clans live on. The forest watches.',                          'Lead your clan into a new dawn.'),
   ch(81, 'Rise of Scourge',      'A small black cat with claws of bone gathers a clan in the Twoleg place.', 'Track Scourge to the Twoleg place and end him in single combat.', 'defeat-scourge'),
+  ch(82, "Jayfeather's Path",    'A blind apprentice walks where StarClan cannot follow.',          'Sleep at the medicine den and listen for a dream.'),
+  ch(83, "Violetkit's Journey",  'A kit was split from her sister at dawn.',                        'Find Violetkit and walk her to your camp.'),
 ];
 
 export function chapterAt(index: number): Chapter {

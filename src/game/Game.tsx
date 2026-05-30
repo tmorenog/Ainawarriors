@@ -436,18 +436,35 @@ function PlayerController({
     // stamina / hunger / HP attrition
     const draining = anim === 'run';
     const starving = hud.hunger <= 0;
-    // When hunger hits zero, you slowly take damage. HP regenerates slowly
-    // when you're well-fed and not running.
-    const hpRegen = !starving && !draining && hud.hunger > 30 ? 1.0 : 0;
-    const hpDrain = starving ? 1.5 : 0;
+    const sick = useGameStore.getState().sick;
+    // Drowning — once the cat is deep enough in the lake basin (close
+    // to its centre, away from the island) the water is over its head
+    // and HP drains fast. Wading near the bank is still safe.
+    const lakeDist = Math.sqrt(lakeDist2);
+    const drowning = inLake && lakeDist < LAKE.r * 0.45;
+    // HP regenerates slowly when fed and not running; drains on starve,
+    // on sickness, and rapidly while drowning.
+    const hpRegen = !starving && !sick && !drowning && !draining && hud.hunger > 30 ? 1.0 : 0;
+    const hpDrain = (starving ? 1.5 : 0) + (sick ? 0.6 : 0) + (drowning ? 14 : 0);
     setHud({
       stamina: Math.max(0, Math.min(100, hud.stamina + (draining ? -20 : 8) * dt)),
-      // Hunger drains much slower now (was 0.4/sec → 0.12/sec). A full
-      // hunger bar (100) lasts ~14 minutes of active play before it
-      // bottoms out instead of ~4 minutes.
       hunger: Math.max(0, hud.hunger - 0.06 * dt),
       hp: Math.max(0, Math.min(100, hud.hp + (hpRegen - hpDrain) * dt)),
     });
+    // Rare chance to fall sick. Roughly once every 20 minutes of
+    // active play. Sickness only ticks while not already sick and not
+    // already in a cutscene. Cured by using a herb (see HUD).
+    if (!sick && !useGameStore.getState().cutscene && Math.random() < dt * (1 / 1200)) {
+      useGameStore.getState().setSick(true);
+      useGameStore.getState().pushChat({
+        id: 'sys' + Date.now(),
+        fromId: 'system',
+        fromName: 'StarClan',
+        scope: 'system',
+        text: 'A chill creeps into your bones — you have fallen sick. Find a herb to cure it.',
+        at: Date.now(),
+      });
+    }
 
     // Death — HP hit zero. Trigger the WASTED cutscene (which then rolls
     // into the StarClan walk and respawns the cat at camp). The cutscene
