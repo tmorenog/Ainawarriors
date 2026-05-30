@@ -20,6 +20,8 @@ export interface SaveData {
   // Heal-a-warrior side quest — once you've patched up Bramblepaw next
   // to the medicine den, the wounded mesh stays healed across reloads.
   injuredWarriorHealed: boolean;
+  // Rise of Scourge — once defeated, he stays gone across reloads.
+  scourgeDefeated: boolean;
 }
 
 export interface GameSettings {
@@ -63,6 +65,7 @@ export function loadSave(): SaveData {
       mission: 'none',
       herbGardens: [],
       injuredWarriorHealed: false,
+      scourgeDefeated: false,
     };
   }
   try {
@@ -80,6 +83,7 @@ export function loadSave(): SaveData {
         mission: 'none',
         herbGardens: [],
         injuredWarriorHealed: false,
+        scourgeDefeated: false,
       };
       localStorage.setItem(KEY, JSON.stringify(fresh));
       return fresh;
@@ -97,6 +101,7 @@ export function loadSave(): SaveData {
       mission: parsed.mission === 'won' || parsed.mission === 'accepted' || parsed.mission === 'none' ? parsed.mission : 'none',
       herbGardens: Array.isArray(parsed.herbGardens) ? parsed.herbGardens : [],
       injuredWarriorHealed: typeof parsed.injuredWarriorHealed === 'boolean' ? parsed.injuredWarriorHealed : false,
+      scourgeDefeated: typeof parsed.scourgeDefeated === 'boolean' ? parsed.scourgeDefeated : false,
     };
   } catch {
     return {
@@ -111,6 +116,7 @@ export function loadSave(): SaveData {
       mission: 'none',
       herbGardens: [],
       injuredWarriorHealed: false,
+      scourgeDefeated: false,
     };
   }
 }

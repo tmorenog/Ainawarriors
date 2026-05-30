@@ -1972,6 +1972,102 @@ const BRAMBLEPAW_CAT: CatAppearance = {
   nightVision: false,
 };
 
+// Scourge — small but vicious BloodClan leader, lurks in the Twoleg
+// place. Stays visible until the player defeats him via the HUD
+// "Strike Scourge" button. Uses the standard Cat rig so he matches
+// every other cat in the game; his "claws of bone" are evoked by
+// tiny pale spheres at the paws and a clan banner-style glow.
+const SCOURGE_POS = { x: 270, z: 248 };
+const SCOURGE_CAT: CatAppearance = {
+  id: 'npc_scourge',
+  name: 'Scourge',
+  prefix: 'Scou',
+  suffix: 'rge',
+  furBase: '#1a1a1a',
+  furBelly: '#2a2a2a',
+  furPattern: 'solid',
+  patternColor: '#0a0a0a',
+  patternColor2: '#1a1a1a',
+  patternColor3: '#3a3a3a',
+  eyeColor: 'silver',
+  earShape: 'standard',
+  tail: 'long',
+  fluffiness: 0.25,
+  size: 'small',
+  height: 0.9,
+  build: 0.9,
+  scars: ['shoulder', 'face'],
+  blush: false,
+  clan: 'Rogue',
+  role: 'Leader',
+  bubbleStyle: 'stone',
+  voicePitch: 0.85,
+  pupilSize: 0.3,
+  vision: 'normal',
+  nightVision: true,
+};
+
+function Scourge() {
+  const defeated = useGameStore((s) => s.scourgeDefeated);
+  const hp = useGameStore((s) => s.scourgeHp);
+  const markerRef = useRef<THREE.Group>(null);
+  useFrame((state) => {
+    const g = markerRef.current;
+    if (!g) return;
+    g.position.y = 2.8 + Math.sin(state.clock.elapsedTime * 2.4) * 0.18;
+    g.rotation.y = state.clock.elapsedTime * 0.6;
+  });
+  if (defeated) return null;
+  const y = terrainHeightAt(SCOURGE_POS.x, SCOURGE_POS.z);
+  return (
+    <group position={[SCOURGE_POS.x, y, SCOURGE_POS.z]}>
+      {/* dark moss patch underfoot */}
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <circleGeometry args={[1.6, 24]} />
+        <meshStandardMaterial color={'#2a2820'} roughness={1} />
+      </mesh>
+      {/* the cat himself, standing / crouched a bit */}
+      <group rotation={[0, -0.3, 0]}>
+        <Cat cat={SCOURGE_CAT} position={[0, 0, 0]} rotation={0} anim={'crouch'} />
+      </group>
+      {/* pale claw studs at each paw */}
+      {[[0.35, 0.05, 0.18], [-0.35, 0.05, 0.18], [0.35, 0.05, -0.18], [-0.35, 0.05, -0.18]].map((p, i) => (
+        <mesh key={i} position={p as [number, number, number]}>
+          <sphereGeometry args={[0.06, 8, 6]} />
+          <meshStandardMaterial color={'#f4f0e0'} emissive={'#807060'} emissiveIntensity={0.4} />
+        </mesh>
+      ))}
+      {/* dark crimson light so the spot feels ominous at night */}
+      <pointLight position={[0, 1.2, 0]} intensity={0.6} distance={14} color={'#a8302a'} />
+      {/* floating purple beacon-skull marker */}
+      <group ref={markerRef} position={[0, 2.8, 0]}>
+        <mesh>
+          <sphereGeometry args={[0.22, 12, 10]} />
+          <meshStandardMaterial color={'#1a0a0a'} emissive={'#9a1818'} emissiveIntensity={1.6} />
+        </mesh>
+        <mesh position={[0, 0.32, 0]}>
+          <cylinderGeometry args={[0.08, 0.08, 0.5, 8]} />
+          <meshStandardMaterial color={'#1a0a0a'} emissive={'#9a1818'} emissiveIntensity={1.6} />
+        </mesh>
+      </group>
+      {/* name + HP label */}
+      <Html position={[0, 2.0, 0]} center distanceFactor={10}>
+        <div
+          className="px-2 py-0.5 rounded-full text-[10px] whitespace-nowrap pointer-events-none"
+          style={{ background: 'rgba(0,0,0,0.65)', color: '#ffd0d0', border: '1px solid rgba(255,80,80,0.45)' }}
+        >
+          ☠ Scourge — {hp}/120
+        </div>
+      </Html>
+      {/* tall dark beacon so he's visible from across the territory */}
+      <mesh position={[0, 8, 0]}>
+        <cylinderGeometry args={[0.08, 0.08, 16, 8]} />
+        <meshStandardMaterial color={'#9a1818'} emissive={'#5a0a0a'} emissiveIntensity={1.2} transparent opacity={0.55} />
+      </mesh>
+    </group>
+  );
+}
+
 function InjuredWarrior() {
   const healed = useGameStore((s) => s.injuredWarriorHealed);
   const cat = useGameStore((s) => s.cat);
@@ -2166,6 +2262,7 @@ export function World({ timeOfDay, weather, season, graphics }: WorldProps) {
       <ClimbableOaks />
       <HerbGardens />
       <InjuredWarrior />
+      <Scourge />
 
       {/* moonpool — uneven stone ring surrounding a glowing silver pool */}
       <group position={[-220, terrainHeightAt(-220, -220), -220]}>
