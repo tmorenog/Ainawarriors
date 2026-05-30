@@ -84,6 +84,13 @@ interface GameStore {
   // his side, not just patch up wherever.
   injuredWarriorHealed: boolean;
   setInjuredWarriorHealed: (v: boolean) => void;
+  // Scourge battle — small but vicious BloodClan leader, ~120 hp. Each
+  // "Strike Scourge" tap in the HUD does 10. Once HP hits zero the
+  // chapter "Rise of Scourge" advances and Scourge stays dead.
+  scourgeHp: number;
+  setScourgeHp: (n: number) => void;
+  scourgeDefeated: boolean;
+  setScourgeDefeated: (v: boolean) => void;
 
   // Med-cat herb gardens — small fenced plots the medicine cat plants
   // around the territories. Each ripens after ~60s of real time and
@@ -277,6 +284,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setHealedWarriorAt: (n) => set({ healedWarriorAt: n }),
   injuredWarriorHealed: false,
   setInjuredWarriorHealed: (v) => set({ injuredWarriorHealed: v }),
+  scourgeHp: 120,
+  setScourgeHp: (n) => set({ scourgeHp: Math.max(0, Math.min(120, n)) }),
+  scourgeDefeated: false,
+  setScourgeDefeated: (v) => set({ scourgeDefeated: v }),
 
   herbGardens: [],
   plantHerbGarden: (x, z, herbs) =>

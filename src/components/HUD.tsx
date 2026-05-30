@@ -4,6 +4,9 @@ import { useGameStore } from '@/game/useGameStore';
 import { CLANS } from '@/lib/clans';
 import { HERBS } from '@/lib/herbs';
 import { CLIMBABLE_TREES, INJURED_WARRIOR } from '@/game/terrain';
+
+// Scourge battle position — same as World.tsx
+const SCOURGE_POS = { x: 270, z: 248 };
 import { adjustCameraZoom } from '@/game/CameraRig';
 import { getAudioEngine } from '@/game/audio';
 import { useEffect, useState } from 'react';
@@ -32,11 +35,20 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
   // frame, which is wasteful.
   const [nearTree, setNearTree] = useState(false);
   const [nearRipeGarden, setNearRipeGarden] = useState<string | null>(null);
+  const [nearScourge, setNearScourge] = useState(false);
   useEffect(() => {
     const id = setInterval(() => {
       const s = useGameStore.getState();
       const me = s.players[s.selfId];
-      if (!me) { setNearTree(false); setNearRipeGarden(null); return; }
+      if (!me) { setNearTree(false); setNearRipeGarden(null); setNearScourge(false); return; }
+      // Scourge proximity — only while he's alive
+      if (!s.scourgeDefeated) {
+        const sdx = me.pos[0] - SCOURGE_POS.x;
+        const sdz = me.pos[2] - SCOURGE_POS.z;
+        setNearScourge(sdx * sdx + sdz * sdz < 5 * 5);
+      } else {
+        setNearScourge(false);
+      }
       const treeFound = CLIMBABLE_TREES.some((t) => {
         const dx = me.pos[0] - t.x;
         const dz = me.pos[2] - t.z;
@@ -199,6 +211,43 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
             title="Climb the nearby oak (E)"
           >
             🌲 Climb tree
+          </button>
+        )}
+        {nearScourge && (
+          <button
+            onClick={() => {
+              const s = useGameStore.getState();
+              const nextHp = Math.max(0, s.scourgeHp - 10);
+              s.setScourgeHp(nextHp);
+              s.setCameraShake(0.4);
+              s.setHud({ hp: Math.max(0, s.hud.hp - 5) });
+              if (nextHp <= 0) {
+                s.setScourgeDefeated(true);
+                s.pushChat({
+                  id: 'sys' + Date.now(),
+                  fromId: 'system',
+                  fromName: 'StarClan',
+                  scope: 'system',
+                  text: 'Scourge falls. The forest exhales. Your clan will sing of this day.',
+                  at: Date.now(),
+                });
+                s.setHud({ hp: 100, hunger: 100, stamina: 100, reputation: Math.min(100, s.hud.reputation + 25) });
+                try { (window as any).__WOTC_TRIGGER__?.('defeat-scourge'); } catch {}
+              } else {
+                s.pushChat({
+                  id: 'sys' + Date.now(),
+                  fromId: 'system',
+                  fromName: 'Scourge',
+                  scope: 'system',
+                  text: `You strike Scourge! (${nextHp}/120 hp left)`,
+                  at: Date.now(),
+                });
+              }
+            }}
+            className="rounded-full bg-red-700/90 hover:bg-red-600 px-3 py-2 text-xs shadow"
+            title="Strike Scourge in single combat"
+          >
+            ⚔️ Strike Scourge
           </button>
         )}
         {nearRipeGarden && (
@@ -374,7 +423,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-76 · firestar dream on chapter 5
+        wotc-77 · 200 tasks + scourge battle
       </div>
     </div>
   );
