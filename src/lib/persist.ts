@@ -35,10 +35,9 @@ export interface GameSettings {
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
-  // Start at the safest setting — low triggers no shadow framebuffers and
-  // light geometry. Players can bump to medium/high in Settings if their
-  // device handles it.
-  graphics: 'low',
+  // Bumped from 'low' → 'high' so the game looks its best out of the
+  // box. Players on weak devices can drop it back via Settings.
+  graphics: 'high',
   cameraMode: 'third',
   sound: 0.7,
   music: 0.4,

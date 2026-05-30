@@ -372,6 +372,11 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
                           setHud({ hp: Math.min(100, hud.hp + 12) });
                           useGameStore.getState().bumpTask('use-herb-n', 1);
                           pushChat({ id: 'sys' + Date.now(), fromId: 'system', fromName: 'StarClan', scope: 'system', text: `You used ${h?.name ?? id}.`, at: Date.now() });
+                          // Using any herb clears a current sickness.
+                          if (useGameStore.getState().sick) {
+                            useGameStore.getState().setSick(false);
+                            pushChat({ id: 'sys' + Date.now() + 'c', fromId: 'system', fromName: 'StarClan', scope: 'system', text: 'Your fever breaks. You feel well again.', at: Date.now() });
+                          }
                           // Heal-a-warrior side quest only counts if you
                           // used the herb at the wounded warrior's side.
                           // Anywhere else just heals YOU. The wounded
@@ -423,7 +428,7 @@ export function HUD({ onOpenSettings, onOpenLeader }: { onOpenSettings: () => vo
           If you don't see "build wotc-08" after a hard reload, the deploy
           is serving an older bundle (clear cache / redeploy). */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] opacity-50 pointer-events-none">
-        wotc-77 · 200 tasks + scourge battle
+        wotc-78 · graphics + dens + drown + sick + chapters
       </div>
     </div>
   );

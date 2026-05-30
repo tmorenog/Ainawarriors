@@ -91,6 +91,10 @@ interface GameStore {
   setScourgeHp: (n: number) => void;
   scourgeDefeated: boolean;
   setScourgeDefeated: (v: boolean) => void;
+  // Sickness — small ambient chance per second of falling sick. While
+  // sick, HP slowly drains. Cured by using any herb.
+  sick: boolean;
+  setSick: (v: boolean) => void;
 
   // Med-cat herb gardens — small fenced plots the medicine cat plants
   // around the territories. Each ripens after ~60s of real time and
@@ -288,6 +292,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setScourgeHp: (n) => set({ scourgeHp: Math.max(0, Math.min(120, n)) }),
   scourgeDefeated: false,
   setScourgeDefeated: (v) => set({ scourgeDefeated: v }),
+  sick: false,
+  setSick: (v) => set({ sick: v }),
 
   herbGardens: [],
   plantHerbGarden: (x, z, herbs) =>
